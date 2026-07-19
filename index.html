@@ -538,6 +538,21 @@
         </div>
       </div>
 
+      <!-- Phase "chauffe" (ajoutée le 19/07/2026) — même principe que le
+           Blindtest, voir renderGameWarmup() dans index.html. -->
+      <div id="gqPhaseWarmup" style="display:none;">
+        <div class="card" style="text-align:center;padding:28px;">
+          <div id="gameWarmupYtPlayer" style="display:none;"></div>
+          <div style="font-size:32px;margin-bottom:10px;">🔥</div>
+          <p style="font-size:15px;font-weight:700;margin-bottom:6px;">Manche de chauffe...</p>
+          <p style="font-size:12.5px;color:var(--text-dim);margin-bottom:16px;">Ça ne compte pas — ça laisse juste le temps à une pub éventuelle de passer avant le début de la vraie partie.</p>
+          <p class="pill" id="gameWarmupCountdown" style="display:inline-block;">7s...</p>
+          <div style="margin-top:16px;">
+            <button class="btn-ghost" style="width:auto;padding:10px 20px;" onclick="skipGameWarmup()">⏭️ Passer</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Phase 3 : la partie — écoute manche par manche + vote en direct +
            points selon la vitesse de réponse (construite le 12/07/2026). -->
       <div id="gqPhasePlaying" style="display:none;">
@@ -576,10 +591,14 @@
                    clics vers le vrai bouton pause d'Harmonize (celui qui
                    prévient bien tout le monde), plutôt que de dépendre des
                    boutons natifs de YouTube. -->
-              <div onclick="toggleGamePlayPause()" style="position:absolute;inset:0;cursor:pointer;" title="Cliquer pour mettre en pause / reprendre — pour tout le monde"></div>
+              <div id="gqClickBlocker" onclick="toggleGamePlayPause()" style="position:absolute;inset:0;cursor:pointer;" title="Cliquer pour mettre en pause / reprendre — pour tout le monde"></div>
             </div>
             <div style="display:flex;gap:8px;margin-top:10px;">
               <button class="btn-ghost" style="width:auto;padding:8px 14px;" onclick="toggleGamePlayPause()" id="gamePlayPauseBtn">⏸ Pause</button>
+              <!-- Ajouté le 19/07/2026, même correctif que le Blindtest
+                   (revealAdSkipButton()) : les 2 couches ci-dessus bloquent
+                   aussi le bouton natif "Passer" d'une éventuelle pub. -->
+              <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="revealGameAdSkipButton()">📺 Pub bloquée ?</button>
             </div>
           </div>
 
@@ -697,6 +716,23 @@
         </div>
       </div>
 
+      <!-- Phase "chauffe" (ajoutée le 19/07/2026, idée de Rémi) : chaque
+           appareil joue localement une chanson fixe hors-jeu quelques
+           secondes avant la vraie partie, pour absorber une pub potentielle.
+           Purement local — voir renderBtWarmup() dans index.html. -->
+      <div id="btPhaseWarmup" style="display:none;">
+        <div class="card" style="text-align:center;padding:28px;">
+          <div id="btWarmupYtPlayer" style="display:none;"></div>
+          <div style="font-size:32px;margin-bottom:10px;">🔥</div>
+          <p style="font-size:15px;font-weight:700;margin-bottom:6px;">Manche de chauffe...</p>
+          <p style="font-size:12.5px;color:var(--text-dim);margin-bottom:16px;">Ça ne compte pas — ça laisse juste le temps à une pub éventuelle de passer avant le début de la vraie partie.</p>
+          <p class="pill" id="btWarmupCountdown" style="display:inline-block;">7s...</p>
+          <div style="margin-top:16px;">
+            <button class="btn-ghost" style="width:auto;padding:10px 20px;" onclick="skipBtWarmup()">⏭️ Passer</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Phase 3 : la partie — écoute manche par manche + choix multiple +
            points selon la vitesse. -->
       <div id="btPhasePlaying" style="display:none;">
@@ -717,10 +753,17 @@
                 <div style="font-size:28px;">🎧</div>
                 <div style="font-size:12.5px;font-weight:600;">Écoute en cours — devine de quelle chanson il s'agit !</div>
               </div>
-              <div onclick="toggleBtPlayPause()" style="position:absolute;inset:0;cursor:pointer;" title="Cliquer pour mettre en pause / reprendre — pour tout le monde"></div>
+              <div id="btClickBlocker" onclick="toggleBtPlayPause()" style="position:absolute;inset:0;cursor:pointer;" title="Cliquer pour mettre en pause / reprendre — pour tout le monde"></div>
             </div>
             <div style="display:flex;gap:8px;margin-top:10px;">
               <button class="btn-ghost" style="width:auto;padding:8px 14px;" onclick="toggleBtPlayPause()" id="btPlayPauseBtn">⏸ Pause</button>
+              <!-- Ajouté le 19/07/2026 : les 2 couches ci-dessus recouvrent
+                   TOUTE la vidéo (y compris le bouton natif "Passer" d'une
+                   éventuelle pub YouTube), les rendant impossibles à
+                   atteindre. Ce bouton les désactive quelques secondes pour
+                   pouvoir taper directement sur "Passer" en dessous — voir
+                   revealAdSkipButton(). -->
+              <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="revealAdSkipButton()">📺 Pub bloquée ?</button>
             </div>
           </div>
 
@@ -1144,6 +1187,11 @@ let gameQuestionIntroRoundIdx = -1;
 let gameMyGuessSelection = new Set();
 let gameGuessSelectionRoundIdx = -1; // dernière manche pour laquelle gameMyGuessSelection a été initialisée depuis la base
 let gamePlayer = null; // lecteur YouTube de CET appareil pour la manche en cours
+// Manche de chauffe (ajoutée le 19/07/2026) — voir son équivalent Blindtest
+// (BT_WARMUP_SECONDS) pour l'explication, purement local à cet appareil.
+let gameWarmupPlayer = null;
+let gameWarmupTimerInterval = null;
+let gameWarmupAdvanceInFlight = false;
 
 // État du VRAI Blindtest multijoueur (ajouté le 19/07/2026) — même principe
 // que le bloc ci-dessus pour "Le jeu des questions", dont on réutilise
@@ -1169,6 +1217,14 @@ let btVoteTimerRoundIdx = -1;
 let btPlayer = null; // lecteur YouTube de CET appareil, distinct de gamePlayer (écran différent)
 let btAnswerSearchResults = [];
 let btAnswerSearchDebounce = null;
+
+// Manche de chauffe (ajoutée le 19/07/2026, voir launchBlindtest()) — état
+// purement LOCAL à cet appareil, jamais synchronisé (chaque appareil absorbe
+// sa propre pub potentielle indépendamment).
+const BT_WARMUP_SECONDS = 7;
+let btWarmupPlayer = null;
+let btWarmupTimerInterval = null;
+let btWarmupAdvanceInFlight = false;
 
 // ---- Blindtest SOLO sur vraies données (ajouté le 19/07/2026) ----
 // Contrairement au multijoueur ci-dessus, pas de salon/Supabase-realtime ici :
@@ -1989,6 +2045,8 @@ function stopAnyPlayback(){
   stopGamePlayer();
   stopBtPlayer();
   stopBtSoloPlayer();
+  stopBtWarmupPlayer();
+  stopGameWarmupPlayer();
 }
 
 // Construit le contenu du lecteur affiché dans un vrai salon — différent
@@ -3278,14 +3336,17 @@ function renderGameLobby(){
   if(!currentRoom) return;
   renderRoomAvatars("gqRoomAvatars");
   const phase = currentRoom.game_phase || "lobby";
+  if(phase !== "warmup") stopGameWarmupPlayer();
   document.getElementById("gqPhaseLobby").style.display = phase === "lobby" ? "block" : "none";
   document.getElementById("gqPhaseAnswering").style.display = phase === "answering" ? "block" : "none";
+  document.getElementById("gqPhaseWarmup").style.display = phase === "warmup" ? "block" : "none";
   document.getElementById("gqPhasePlaying").style.display = (phase === "playing" || phase === "finished") ? "block" : "none";
   document.getElementById("gqPlayingActive").style.display = phase === "playing" ? "block" : "none";
   document.getElementById("gqPhaseFinished").style.display = phase === "finished" ? "block" : "none";
 
   if(phase === "lobby") renderQuestionPicker();
   else if(phase === "answering") renderAnsweringPhase();
+  else if(phase === "warmup") renderGameWarmup();
   else if(phase === "playing") renderGamePlaying();
   else renderGameFinished();
 }
@@ -3597,20 +3658,78 @@ function computeGameRounds(){
 // réponses identiques, voir computeGameRounds()) une seule fois, l'écrit en
 // base pour que TOUT LE MONDE voie exactement le même déroulé, et démarre la
 // première manche.
+// Manche de chauffe ajoutée le 19/07/2026, même principe que Blindtest (voir
+// launchBlindtest() pour le pourquoi et la limite connue : comportement
+// probable mais non garanti côté YouTube).
 async function launchGame(){
   if(!isGameCreator()) return;
   const rounds = computeGameRounds();
   if(!rounds.length){ showToast("Aucune réponse à jouer — attends que tout le monde ait répondu."); return; }
   const nowIso = new Date().toISOString();
-  // "game_playback_start" (réglé au lobby, voir gqStepPlayback) : si 'middle',
-  // chaque manche démarre vers ~45 secondes plutôt que dès le début, pour
-  // éviter une intro trop reconnaissable. Limite connue : une chanson plus
-  // courte que 45s ira directement vers sa fin — acceptable pour l'instant,
-  // pas de quoi interroger l'API YouTube pour la durée exacte de chaque titre.
+  const { data, error } = await sb.from("rooms").update({
+    game_phase: "warmup",
+    game_rounds: rounds,
+    game_round_started_at: nowIso,
+  }).eq("id", currentRoom.id).select().single();
+  if(error){ showToast("Erreur au lancement de la partie : " + error.message); return; }
+  currentRoom = data;
+  showToast(`🔥 Manche de chauffe avant le début (${rounds.length} manche(s) au programme) !`);
+  renderGameLobby();
+}
+
+/* ---- Phase "chauffe" : voir son équivalent côté Blindtest
+   (renderBtWarmup()) pour l'explication complète — même principe exact,
+   dupliqué ici plutôt que partagé car les deux jeux ont des écrans
+   distincts (gqPhaseWarmup vs btPhaseWarmup). ---- */
+function renderGameWarmup(){
+  ensureGameWarmupPlayer();
+  if(!gameWarmupTimerInterval){
+    gameWarmupTimerInterval = setInterval(updateGameWarmupCountdown, 1000);
+  }
+  updateGameWarmupCountdown();
+}
+
+function ensureGameWarmupPlayer(){
+  if(!ytApiReady || typeof YT === "undefined" || !YT.Player){ setTimeout(() => renderGameLobby(), 300); return; }
+  if(gameWarmupPlayer) return;
+  gameWarmupPlayer = new YT.Player("gameWarmupYtPlayer", {
+    height: "1", width: "1",
+    videoId: CATALOG[0].youtubeId,
+    playerVars: { autoplay: 1, controls: 0, disablekb: 1, playsinline: 1, fs: 0, rel: 0, iv_load_policy: 3 },
+  });
+}
+
+function stopGameWarmupPlayer(){
+  if(gameWarmupPlayer){ try { gameWarmupPlayer.destroy(); } catch(e){} gameWarmupPlayer = null; }
+  if(gameWarmupTimerInterval){ clearInterval(gameWarmupTimerInterval); gameWarmupTimerInterval = null; }
+  gameWarmupAdvanceInFlight = false;
+}
+
+function gameWarmupSecondsLeft(){
+  if(!currentRoom?.game_round_started_at) return BT_WARMUP_SECONDS;
+  const elapsed = Math.max(0, (Date.now() - new Date(currentRoom.game_round_started_at).getTime()) / 1000);
+  return Math.max(0, Math.ceil(BT_WARMUP_SECONDS - elapsed));
+}
+
+function updateGameWarmupCountdown(){
+  if(!currentRoom || currentRoom.game_phase !== "warmup"){ stopGameWarmupPlayer(); return; }
+  const secondsLeft = gameWarmupSecondsLeft();
+  const el = document.getElementById("gameWarmupCountdown");
+  if(el) el.textContent = secondsLeft > 0 ? `${secondsLeft}s...` : "C'est bon !";
+  if(secondsLeft <= 0) advanceGamePastWarmup();
+}
+
+function skipGameWarmup(){
+  advanceGamePastWarmup();
+}
+
+async function advanceGamePastWarmup(){
+  if(!currentRoom || currentRoom.game_phase !== "warmup" || gameWarmupAdvanceInFlight) return;
+  gameWarmupAdvanceInFlight = true;
+  const nowIso = new Date().toISOString();
   const startSeconds = currentRoom.game_playback_start === "middle" ? 45 : 0;
   const { data, error } = await sb.from("rooms").update({
     game_phase: "playing",
-    game_rounds: rounds,
     game_current_round: 0,
     game_round_started_at: nowIso,
     game_round_revealed: false,
@@ -3618,9 +3737,9 @@ async function launchGame(){
     playback_position: startSeconds,
     playback_started_at: nowIso,
   }).eq("id", currentRoom.id).select().single();
-  if(error){ showToast("Erreur au lancement de la partie : " + error.message); return; }
+  if(error){ gameWarmupAdvanceInFlight = false; return; }
   currentRoom = data;
-  showToast(`🚀 Partie lancée ! ${rounds.length} manche(s).`);
+  stopGameWarmupPlayer();
   renderGameLobby();
 }
 
@@ -3805,6 +3924,23 @@ async function toggleGamePlayPause(){
 function stopGamePlayer(){
   if(gamePlayer){ try { gamePlayer.destroy(); } catch(e) {} gamePlayer = null; }
   stopGameVoteTimer();
+}
+
+// Même correctif que revealAdSkipButton() (Blindtest) — voir son commentaire
+// pour le pourquoi (bouton natif "Passer" d'une pub bloqué par nos propres
+// couches de recouvrement).
+let gameAdSkipRestoreTimer = null;
+function revealGameAdSkipButton(){
+  const cover = document.getElementById("gqAudioCover");
+  const blocker = document.getElementById("gqClickBlocker");
+  if(blocker) blocker.style.display = "none";
+  if(cover && cover.style.display !== "none") cover.style.opacity = "0.15";
+  showToast("Tape directement sur le bouton \"Passer\" de la pub si tu le vois — ça revient à la normale dans 10 secondes.");
+  clearTimeout(gameAdSkipRestoreTimer);
+  gameAdSkipRestoreTimer = setTimeout(() => {
+    if(blocker) blocker.style.display = "block";
+    if(cover) cover.style.opacity = "1";
+  }, 10000);
 }
 
 /* ---- Minuteur de vote : 20 secondes pour voter sur chaque manche (la
@@ -4244,19 +4380,24 @@ async function loadBtGuesses(roomId){
   btGuesses = data || [];
 }
 
-/* ---- Point d'entrée : affiche la bonne phase (lobby / propositions / partie) ---- */
+/* ---- Point d'entrée : affiche la bonne phase (lobby / propositions / chauffe / partie) ---- */
 function renderBlindtestLobby(){
   if(!currentRoom) return;
   renderRoomAvatars("btRoomAvatars");
   const phase = currentRoom.game_phase || "lobby";
+  // Si on vient de quitter la phase "chauffe" (voir plus bas), on arrête son
+  // lecteur local — sinon il continuerait à jouer en silence en arrière-plan.
+  if(phase !== "warmup") stopBtWarmupPlayer();
   document.getElementById("btPhaseLobby").style.display = phase === "lobby" ? "block" : "none";
   document.getElementById("btPhaseAnswering").style.display = phase === "answering" ? "block" : "none";
+  document.getElementById("btPhaseWarmup").style.display = phase === "warmup" ? "block" : "none";
   document.getElementById("btPhasePlaying").style.display = (phase === "playing" || phase === "finished") ? "block" : "none";
   document.getElementById("btPlayingActive").style.display = phase === "playing" ? "block" : "none";
   document.getElementById("btPhaseFinished").style.display = phase === "finished" ? "block" : "none";
 
   if(phase === "lobby") renderBtSongCountPicker();
   else if(phase === "answering") renderBtAnsweringPhase();
+  else if(phase === "warmup") renderBtWarmup();
   else if(phase === "playing") renderBtPlaying();
   else renderBtFinished();
 }
@@ -4490,15 +4631,92 @@ async function computeBtRounds(){
   });
 }
 
+// Ajouté le 19/07/2026, idée de Rémi : une pub YouTube ne peut apparaître que
+// sur la PREMIÈRE vidéo chargée par un appareil (pas garanti à 100% — YouTube
+// ne documente pas ce comportement — mais probable vu la façon dont YouTube
+// limite la fréquence des pubs). On fait donc jouer une "manche de chauffe"
+// (une chanson fixe, hors-jeu, qui ne compte pas) juste avant la vraie
+// première manche, pour absorber une pub potentielle sur chaque appareil
+// avant que ça compte pour de vrai. Le bouton "📺 Pub bloquée ?" reste utile
+// en complément, en cas de pub sur une manche suivante.
 async function launchBlindtest(){
   if(!isGameCreator()) return;
   const rounds = await computeBtRounds();
   if(!rounds.length){ showToast("Aucune chanson à jouer — attends que tout le monde ait proposé."); return; }
   const nowIso = new Date().toISOString();
+  const { data, error } = await sb.from("rooms").update({
+    game_phase: "warmup",
+    game_rounds: rounds,
+    game_round_started_at: nowIso,
+  }).eq("id", currentRoom.id).select().single();
+  if(error){ showToast("Erreur au lancement de la partie : " + error.message); return; }
+  currentRoom = data;
+  showToast(`🔥 Manche de chauffe avant le début (${rounds.length} manche(s) au programme) !`);
+  renderBlindtestLobby();
+}
+
+/* ---- Phase "chauffe" : chaque appareil joue localement une chanson fixe
+   (hors-jeu, ne compte pas) pendant quelques secondes, pour absorber une
+   pub potentielle avant que la vraie partie ne commence — voir le
+   commentaire de launchBlindtest(). Purement local, rien n'est écrit en base
+   pendant cette phase à part le passage à "playing" une fois le temps
+   écoulé (ou si quelqu'un clique "Passer"). ---- */
+function renderBtWarmup(){
+  ensureBtWarmupPlayer();
+  if(!btWarmupTimerInterval){
+    btWarmupTimerInterval = setInterval(updateBtWarmupCountdown, 1000);
+  }
+  updateBtWarmupCountdown();
+}
+
+function ensureBtWarmupPlayer(){
+  if(!ytApiReady || typeof YT === "undefined" || !YT.Player){ setTimeout(() => renderBlindtestLobby(), 300); return; }
+  if(btWarmupPlayer) return;
+  btWarmupPlayer = new YT.Player("btWarmupYtPlayer", {
+    height: "1", width: "1",
+    videoId: CATALOG[0].youtubeId,
+    playerVars: { autoplay: 1, controls: 0, disablekb: 1, playsinline: 1, fs: 0, rel: 0, iv_load_policy: 3 },
+  });
+}
+
+function stopBtWarmupPlayer(){
+  if(btWarmupPlayer){ try { btWarmupPlayer.destroy(); } catch(e){} btWarmupPlayer = null; }
+  if(btWarmupTimerInterval){ clearInterval(btWarmupTimerInterval); btWarmupTimerInterval = null; }
+  btWarmupAdvanceInFlight = false;
+}
+
+function btWarmupSecondsLeft(){
+  if(!currentRoom?.game_round_started_at) return BT_WARMUP_SECONDS;
+  const elapsed = Math.max(0, (Date.now() - new Date(currentRoom.game_round_started_at).getTime()) / 1000);
+  return Math.max(0, Math.ceil(BT_WARMUP_SECONDS - elapsed));
+}
+
+function updateBtWarmupCountdown(){
+  if(!currentRoom || currentRoom.game_phase !== "warmup"){ stopBtWarmupPlayer(); return; }
+  const secondsLeft = btWarmupSecondsLeft();
+  const el = document.getElementById("btWarmupCountdown");
+  if(el) el.textContent = secondsLeft > 0 ? `${secondsLeft}s...` : "C'est bon !";
+  if(secondsLeft <= 0) advanceBtPastWarmup();
+}
+
+// N'importe qui peut cliquer "Passer" (même philosophie que le reste de
+// l'app, pas de chef de salon) — appelle directement la même fonction que le
+// minuteur automatique.
+function skipBtWarmup(){
+  advanceBtPastWarmup();
+}
+
+// Idempotent comme le reste des transitions automatiques de l'app (voir
+// revealGameRound()/revealBtRound()) : plusieurs appareils peuvent l'appeler
+// à quelques centaines de ms d'écart sans risque, seule la première écriture
+// compte réellement.
+async function advanceBtPastWarmup(){
+  if(!currentRoom || currentRoom.game_phase !== "warmup" || btWarmupAdvanceInFlight) return;
+  btWarmupAdvanceInFlight = true;
+  const nowIso = new Date().toISOString();
   const startSeconds = currentRoom.game_playback_start === "middle" ? 45 : 0;
   const { data, error } = await sb.from("rooms").update({
     game_phase: "playing",
-    game_rounds: rounds,
     game_current_round: 0,
     game_round_started_at: nowIso,
     game_round_revealed: false,
@@ -4506,9 +4724,9 @@ async function launchBlindtest(){
     playback_position: startSeconds,
     playback_started_at: nowIso,
   }).eq("id", currentRoom.id).select().single();
-  if(error){ showToast("Erreur au lancement de la partie : " + error.message); return; }
+  if(error){ btWarmupAdvanceInFlight = false; return; } // silencieux : un autre appareil aura peut-être déjà réussi entre-temps
   currentRoom = data;
-  showToast(`🚀 Partie lancée ! ${rounds.length} manche(s).`);
+  stopBtWarmupPlayer();
   renderBlindtestLobby();
 }
 
@@ -4658,6 +4876,30 @@ async function toggleBtPlayPause(){
 function stopBtPlayer(){
   if(btPlayer){ try { btPlayer.destroy(); } catch(e) {} btPlayer = null; }
   stopBtVoteTimer();
+}
+
+// Ajouté le 19/07/2026 : remonté par Rémi en testant sur téléphone — une pub
+// YouTube peut se lancer avant la musique, et son bouton natif "Passer" est
+// alors totalement bloqué par btAudioCover + btClickBlocker (les 2 couches
+// qui recouvrent la vidéo pour l'anti-spoiler et la synchro pause/lecture),
+// rendant la pub impossible à passer. Il n'existe pas de moyen fiable de
+// détecter qu'une pub est en cours via l'API YouTube (aucun événement public
+// pour ça) — la solution la plus robuste reste donc de laisser la main à la
+// personne : ce bouton désactive temporairement les 2 couches pour qu'elle
+// puisse taper directement sur "Passer" si elle le voit, avant qu'elles ne
+// se réactivent toutes seules.
+let adSkipRestoreTimer = null;
+function revealAdSkipButton(){
+  const cover = document.getElementById("btAudioCover");
+  const blocker = document.getElementById("btClickBlocker");
+  if(blocker) blocker.style.display = "none";
+  if(cover && cover.style.display !== "none") cover.style.opacity = "0.15";
+  showToast("Tape directement sur le bouton \"Passer\" de la pub si tu le vois — ça revient à la normale dans 10 secondes.");
+  clearTimeout(adSkipRestoreTimer);
+  adSkipRestoreTimer = setTimeout(() => {
+    if(blocker) blocker.style.display = "block";
+    if(cover) cover.style.opacity = "1";
+  }, 10000);
 }
 
 /* ---- Minuteur de vote : 20 secondes, même principe que le jeu des
