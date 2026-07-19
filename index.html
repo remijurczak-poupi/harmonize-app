@@ -538,18 +538,19 @@
         </div>
       </div>
 
-      <!-- Phase "chauffe" (ajoutée le 19/07/2026) — même principe que le
-           Blindtest, voir renderGameWarmup() dans index.html. -->
+      <!-- Écran d'intro (ajouté le 19/07/2026, repensé le même jour suite au
+           retour de Rémi) — même principe que le Blindtest, voir
+           renderGameWarmup() dans index.html. Présenté comme un vrai écran
+           d'ambiance avant la partie (toujours la même chanson entraînante,
+           vidéo bien visible) plutôt que comme un artifice anti-pub — mais
+           sert aussi, de fait, à laisser le temps de voir et taper le
+           bouton natif "Passer" si une pub se lance ici. -->
       <div id="gqPhaseWarmup" style="display:none;">
-        <div class="card" style="text-align:center;padding:28px;">
-          <div id="gameWarmupYtPlayer" style="display:none;"></div>
-          <div style="font-size:32px;margin-bottom:10px;">🔥</div>
-          <p style="font-size:15px;font-weight:700;margin-bottom:6px;">Manche de chauffe...</p>
-          <p style="font-size:12.5px;color:var(--text-dim);margin-bottom:16px;">Ça ne compte pas — ça laisse juste le temps à une pub éventuelle de passer avant le début de la vraie partie.</p>
-          <p class="pill" id="gameWarmupCountdown" style="display:inline-block;">7s...</p>
-          <div style="margin-top:16px;">
-            <button class="btn-ghost" style="width:auto;padding:10px 20px;" onclick="skipGameWarmup()">⏭️ Passer</button>
-          </div>
+        <div class="card" style="text-align:center;padding:20px;">
+          <div class="logo" style="justify-content:center;margin-bottom:12px;"><span class="logo-mark">🎧</span> Harmonize</div>
+          <div id="gameWarmupYtPlayer" style="border-radius:12px;overflow:hidden;margin-bottom:12px;"></div>
+          <p style="font-size:12.5px;color:var(--text-dim);margin-bottom:14px;">🎶 Ambiance avant de commencer...</p>
+          <button class="btn-primary" style="width:auto;padding:12px 28px;" onclick="skipGameWarmup()">▶️ C'est parti ! <span id="gameWarmupCountdown" style="opacity:.7;"></span></button>
         </div>
       </div>
 
@@ -716,20 +717,18 @@
         </div>
       </div>
 
-      <!-- Phase "chauffe" (ajoutée le 19/07/2026, idée de Rémi) : chaque
-           appareil joue localement une chanson fixe hors-jeu quelques
-           secondes avant la vraie partie, pour absorber une pub potentielle.
-           Purement local — voir renderBtWarmup() dans index.html. -->
+      <!-- Écran d'intro (ajouté le 19/07/2026, idée de Rémi, repensé le
+           même jour) : chaque appareil joue localement, en vidéo bien
+           visible, toujours la même chanson entraînante — présenté comme un
+           vrai écran d'ambiance, pas comme un artifice anti-pub, tout en
+           laissant justement le temps/moyen de taper "Passer" si une pub
+           s'y lance. Purement local — voir renderBtWarmup() dans index.html. -->
       <div id="btPhaseWarmup" style="display:none;">
-        <div class="card" style="text-align:center;padding:28px;">
-          <div id="btWarmupYtPlayer" style="display:none;"></div>
-          <div style="font-size:32px;margin-bottom:10px;">🔥</div>
-          <p style="font-size:15px;font-weight:700;margin-bottom:6px;">Manche de chauffe...</p>
-          <p style="font-size:12.5px;color:var(--text-dim);margin-bottom:16px;">Ça ne compte pas — ça laisse juste le temps à une pub éventuelle de passer avant le début de la vraie partie.</p>
-          <p class="pill" id="btWarmupCountdown" style="display:inline-block;">7s...</p>
-          <div style="margin-top:16px;">
-            <button class="btn-ghost" style="width:auto;padding:10px 20px;" onclick="skipBtWarmup()">⏭️ Passer</button>
-          </div>
+        <div class="card" style="text-align:center;padding:20px;">
+          <div class="logo" style="justify-content:center;margin-bottom:12px;"><span class="logo-mark">🎧</span> Harmonize</div>
+          <div id="btWarmupYtPlayer" style="border-radius:12px;overflow:hidden;margin-bottom:12px;"></div>
+          <p style="font-size:12.5px;color:var(--text-dim);margin-bottom:14px;">🎶 Ambiance avant de commencer...</p>
+          <button class="btn-primary" style="width:auto;padding:12px 28px;" onclick="skipBtWarmup()">▶️ C'est parti ! <span id="btWarmupCountdown" style="opacity:.7;"></span></button>
         </div>
       </div>
 
@@ -1218,10 +1217,14 @@ let btPlayer = null; // lecteur YouTube de CET appareil, distinct de gamePlayer 
 let btAnswerSearchResults = [];
 let btAnswerSearchDebounce = null;
 
-// Manche de chauffe (ajoutée le 19/07/2026, voir launchBlindtest()) — état
-// purement LOCAL à cet appareil, jamais synchronisé (chaque appareil absorbe
-// sa propre pub potentielle indépendamment).
-const BT_WARMUP_SECONDS = 7;
+// Écran d'intro / "manche de chauffe" (ajouté le 19/07/2026, voir
+// launchBlindtest()) — état purement LOCAL à cet appareil, jamais
+// synchronisé (chaque appareil absorbe sa propre pub potentielle
+// indépendamment). Durée allongée et vidéo rendue VISIBLE (19/07/2026,
+// 2e retour de Rémi) : 7s ne laissait pas le temps de voir/taper le bouton
+// "Passer" d'une pub, et un lecteur invisible (1x1) le rendait de toute
+// façon impossible à atteindre même s'il y en avait le temps.
+const BT_WARMUP_SECONDS = 15;
 let btWarmupPlayer = null;
 let btWarmupTimerInterval = null;
 let btWarmupAdvanceInFlight = false;
@@ -3693,9 +3696,13 @@ function ensureGameWarmupPlayer(){
   if(!ytApiReady || typeof YT === "undefined" || !YT.Player){ setTimeout(() => renderGameLobby(), 300); return; }
   if(gameWarmupPlayer) return;
   gameWarmupPlayer = new YT.Player("gameWarmupYtPlayer", {
-    height: "1", width: "1",
+    height: "180", width: "100%",
     videoId: CATALOG[0].youtubeId,
-    playerVars: { autoplay: 1, controls: 0, disablekb: 1, playsinline: 1, fs: 0, rel: 0, iv_load_policy: 3 },
+    // Volontairement PAS de couche invisible par-dessus (contrairement au
+    // lecteur de la vraie partie) : cet écran n'a rien à synchroniser entre
+    // appareils, et surtout, si une pub apparaît, son bouton "Passer" doit
+    // rester atteignable — voir le commentaire sur BT_WARMUP_SECONDS.
+    playerVars: { autoplay: 1, playsinline: 1, rel: 0, iv_load_policy: 3 },
   });
 }
 
@@ -3715,7 +3722,7 @@ function updateGameWarmupCountdown(){
   if(!currentRoom || currentRoom.game_phase !== "warmup"){ stopGameWarmupPlayer(); return; }
   const secondsLeft = gameWarmupSecondsLeft();
   const el = document.getElementById("gameWarmupCountdown");
-  if(el) el.textContent = secondsLeft > 0 ? `${secondsLeft}s...` : "C'est bon !";
+  if(el) el.textContent = secondsLeft > 0 ? `(${secondsLeft}s)` : "";
   if(secondsLeft <= 0) advanceGamePastWarmup();
 }
 
@@ -4673,9 +4680,13 @@ function ensureBtWarmupPlayer(){
   if(!ytApiReady || typeof YT === "undefined" || !YT.Player){ setTimeout(() => renderBlindtestLobby(), 300); return; }
   if(btWarmupPlayer) return;
   btWarmupPlayer = new YT.Player("btWarmupYtPlayer", {
-    height: "1", width: "1",
+    height: "180", width: "100%",
     videoId: CATALOG[0].youtubeId,
-    playerVars: { autoplay: 1, controls: 0, disablekb: 1, playsinline: 1, fs: 0, rel: 0, iv_load_policy: 3 },
+    // Volontairement PAS de couche invisible par-dessus (contrairement au
+    // lecteur de la vraie partie) : cet écran n'a rien à synchroniser entre
+    // appareils, et surtout, si une pub apparaît, son bouton "Passer" doit
+    // rester atteignable — voir le commentaire sur BT_WARMUP_SECONDS.
+    playerVars: { autoplay: 1, playsinline: 1, rel: 0, iv_load_policy: 3 },
   });
 }
 
@@ -4695,7 +4706,7 @@ function updateBtWarmupCountdown(){
   if(!currentRoom || currentRoom.game_phase !== "warmup"){ stopBtWarmupPlayer(); return; }
   const secondsLeft = btWarmupSecondsLeft();
   const el = document.getElementById("btWarmupCountdown");
-  if(el) el.textContent = secondsLeft > 0 ? `${secondsLeft}s...` : "C'est bon !";
+  if(el) el.textContent = secondsLeft > 0 ? `(${secondsLeft}s)` : "";
   if(secondsLeft <= 0) advanceBtPastWarmup();
 }
 
