@@ -922,6 +922,23 @@ function escapeHtml(str){
   return String(str ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
 
+// Décode les entités HTML (ajouté le 19/07/2026, bug repéré par Rémi :
+// "L&#39;ALLEMAND" au lieu de "L'ALLEMAND"). L'API YouTube (search.list ET
+// playlistItems.list) renvoie parfois les titres/artistes avec des entités
+// HTML brutes (apostrophes, esperluettes...) au lieu du caractère réel — pas
+// un souci d'encodage de fichier, l'API renvoie littéralement ce texte.
+// Technique standard et sûre : on fait décoder le texte par le navigateur
+// lui-même via un <textarea> jamais affiché, puis on relit sa valeur en
+// texte brut (jamais réinjecté tel quel dans le HTML sans passer par
+// escapeHtml() ensuite, donc aucun risque d'injection).
+let htmlEntityDecoder = null;
+function decodeHtmlEntities(str){
+  if(!str) return str;
+  if(!htmlEntityDecoder) htmlEntityDecoder = document.createElement("textarea");
+  htmlEntityDecoder.innerHTML = str;
+  return htmlEntityDecoder.value;
+}
+
 // Bascule un champ de texte en majuscules AU FUR ET À MESURE qu'on tape
 // (ajouté le 12/07/2026, retour de Rémi pour le champ "Code du salon") — les
 // codes de salon sont déjà comparés en majuscules côté joinRoom(), donc ça ne
@@ -2401,8 +2418,8 @@ async function searchYouTube(q){
     throw new Error(data?.error?.message || ("erreur " + res.status));
   }
   return (data.items || []).map(item => ({
-    title: item.snippet.title,
-    artist: item.snippet.channelTitle,
+    title: decodeHtmlEntities(item.snippet.title),
+    artist: decodeHtmlEntities(item.snippet.channelTitle),
     youtubeId: item.id.videoId,
     thumbnail: item.snippet.thumbnails?.default?.url || item.snippet.thumbnails?.medium?.url || "",
   }));
@@ -2616,10 +2633,10 @@ async function fetchPlaylistTracks(playlist){
     .map(it => ({
       user_id: currentUser.id,
       platform: "youtube",
-      playlist_title: playlist.snippet.title,
+      playlist_title: decodeHtmlEntities(playlist.snippet.title),
       youtube_playlist_id: playlist.id, // gardé pour pouvoir actualiser cette playlist plus tard sans se tromper si son nom change
-      title: it.snippet.title,
-      artist: it.snippet.videoOwnerChannelTitle || it.snippet.channelTitle || "",
+      title: decodeHtmlEntities(it.snippet.title),
+      artist: decodeHtmlEntities(it.snippet.videoOwnerChannelTitle || it.snippet.channelTitle || ""),
       youtube_id: it.snippet.resourceId.videoId,
       thumbnail: it.snippet.thumbnails?.default?.url || "",
     }));
@@ -3812,19 +3829,35 @@ function gameVoteSecondsLeft(){
   return Math.max(0, Math.ceil(GAME_VOTE_SECONDS - elapsed));
 }
 
+// Révélation anticipée (ajoutée le 19/07/2026, demande de Rémi "sur tous les
+// modes de jeux") : si tout le monde qui devait deviner a déjà répondu, pas
+// besoin d'attendre la fin des 20 secondes pour révéler — sert aussi bien au
+// jeu des questions (gameGuesses) qu'au Blindtest (btGuesses), d'où le
+// paramètre "guesses" générique. Les propriétaires de la manche (qui ne
+// votent pas) ne comptent pas parmi les gens attendus.
+function allExpectedGuessersHaveVoted(round, roundIndex, guesses){
+  const owners = new Set(round?.owner_user_ids || []);
+  const expected = getGameParticipantIds().filter(uid => !owners.has(uid));
+  if(!expected.length) return false;
+  const voted = new Set(guesses.filter(g => g.round_index === roundIndex).map(g => g.guesser_user_id));
+  return expected.every(uid => voted.has(uid));
+}
+
 function updateGameVoteCountdown(){
   if(!currentRoom || currentRoom.game_phase !== "playing") { stopGameVoteTimer(); return; }
   const secondsLeft = gameVoteSecondsLeft();
   const timeUp = secondsLeft <= 0;
+  const everyoneVoted = allExpectedGuessersHaveVoted(currentGameRound(), currentRoom.game_current_round, gameGuesses);
 
   // Révélation automatique (remplace le bouton "🔍 Révéler" manuel, retiré le
-  // 13/07/2026 à la demande de Rémi) : dès que le temps de vote est écoulé,
-  // n'importe quel appareil déclenche la révélation pour tout le monde — un
-  // seul appel suffit (les autres appareils, à quelques centaines de ms près,
+  // 13/07/2026 à la demande de Rémi) : dès que le temps de vote est écoulé —
+  // OU dès que tout le monde a déjà répondu (ajouté le 19/07/2026) — n'importe
+  // quel appareil déclenche la révélation pour tout le monde — un seul appel
+  // suffit (les autres appareils, à quelques centaines de ms près,
   // arriveront au même total et essaieront la même chose ; sans risque,
   // c'est juste une mise à jour idempotente). gameAutoRevealRoundIdx évite de
   // le refaire à chaque tick une fois que c'est fait pour cette manche.
-  if(timeUp && !currentRoom.game_round_revealed && gameAutoRevealRoundIdx !== currentRoom.game_current_round){
+  if((timeUp || everyoneVoted) && !currentRoom.game_round_revealed && gameAutoRevealRoundIdx !== currentRoom.game_current_round){
     gameAutoRevealRoundIdx = currentRoom.game_current_round;
     revealGameRound();
   }
@@ -4066,8 +4099,13 @@ async function rejouerMemeSalon(){
   await sb.from("game_guesses").delete().eq("room_id", currentRoom.id);
   const { data, error } = await sb.from("rooms").update({
     game_phase: "lobby",
-    game_question_ids: null,
-    game_rounds: null,
+    // "[]" et non "null" (corrigé le 19/07/2026) : ces 2 colonnes sont NOT
+    // NULL en base (voir harmonize-schema.sql) — un "null" explicite ici
+    // faisait échouer TOUTE la requête (donc tout le bouton "🔄 Rejouer dans
+    // ce salon"), sans jamais avoir été repéré car ce bouton n'avait été
+    // testé que statiquement, jamais en conditions réelles (Round 18).
+    game_question_ids: [],
+    game_rounds: [],
     game_current_round: 0,
     game_round_started_at: null,
     game_round_revealed: false,
@@ -4396,16 +4434,25 @@ function updateBtLaunchButton(slots){
 // propositions identiques (même vidéo YouTube) ne sont jouées qu'une seule
 // fois, avec plusieurs "propriétaires" possibles.
 //
-// Pièges (decoys) — retravaillé le 19/07/2026 suite à un vrai test : les
-// pièges venaient au départ des AUTRES chansons du salon, donc d'une manche
-// à l'autre, on finissait par voir en avance le titre d'une chanson qui
-// n'était pas encore jouée pour de vrai (spoiler à quelques manches
-// d'écart). Les pièges sont donc désormais tirés du catalogue de démo
-// (CATALOG, déjà utilisé ailleurs dans l'app) — jamais une vraie chanson de
-// CE salon, donc jamais de risque de dévoiler une réponse à l'avance.
-// Calculés une seule fois ici (pas à l'affichage) pour rester stables et
-// identiques pour tout le monde — voir renderBtGuessOptions().
-function computeBtRounds(){
+// Pièges (decoys) — retravaillé le 19/07/2026 suite à 2 vrais tests :
+// 1) Les pièges venaient au départ des AUTRES chansons du salon, donc d'une
+//    manche à l'autre, on finissait par voir en avance le titre d'une
+//    chanson qui n'était pas encore jouée pour de vrai (spoiler à quelques
+//    manches d'écart) — corrigé en passant au catalogue de démo (CATALOG).
+// 2) Mais les titres de CATALOG sont "propres" (titre et artiste séparés),
+//    alors qu'une vraie recherche YouTube donne des titres "bruts" (ex.
+//    *"Dja Dja - Aya Nakamura - Clip Officiel (VEVO)"*) — Rémi a repéré
+//    qu'on reconnaissait donc la bonne réponse rien qu'au FORMAT, sans même
+//    avoir besoin d'écouter. Nouvelle source : le pool communautaire
+//    (blindtest_pool, voir harmonize-schema.sql) contient de VRAIES
+//    chansons YouTube au même format que les vraies réponses, tout en
+//    excluant explicitement les chansons de CETTE partie (donc toujours
+//    aucun risque de spoiler). CATALOG ne sert plus qu'en complément si le
+//    pool est trop petit (tout début du projet, avant la première vraie
+//    partie terminée).
+// Calculés une seule fois au lancement (pas à l'affichage) pour rester
+// stables et identiques pour tout le monde — voir renderBtGuessOptions().
+async function computeBtRounds(){
   const groups = new Map();
   gameAnswers.forEach(a => {
     const key = a.youtube_id || ("title:" + a.title);
@@ -4421,17 +4468,31 @@ function computeBtRounds(){
     groups.get(key).owner_user_ids.push(a.user_id);
   });
   const rounds = shuffleArray([...groups.values()]);
+  const realAnswerIds = new Set(rounds.map(r => r.youtube_id).filter(Boolean));
+
+  let poolCandidates = [];
+  try {
+    const { data } = await sb.from("blindtest_pool").select("youtube_id,title,artist").limit(300);
+    poolCandidates = (data || []).filter(t => !realAnswerIds.has(t.youtube_id));
+  } catch(e){
+    console.warn("[Harmonize] Pool communautaire indisponible, pièges tirés du catalogue de démo uniquement :", e);
+  }
+
   return rounds.map(round => {
-    const candidates = CATALOG.filter(c => c.title !== round.title);
-    const decoys = shuffleArray(candidates).slice(0, 3)
-      .map(c => ({ youtube_id: c.youtubeId, title: c.title, artist: c.artist }));
+    const poolChoices = shuffleArray(poolCandidates.filter(c => c.title !== round.title)).slice(0, 3);
+    const stillNeeded = 3 - poolChoices.length;
+    const catalogChoices = stillNeeded > 0
+      ? shuffleArray(CATALOG.filter(c => c.title !== round.title)).slice(0, stillNeeded)
+          .map(c => ({ youtube_id: c.youtubeId, title: c.title, artist: c.artist }))
+      : [];
+    const decoys = shuffleArray([...poolChoices, ...catalogChoices]);
     return { ...round, decoys };
   });
 }
 
 async function launchBlindtest(){
   if(!isGameCreator()) return;
-  const rounds = computeBtRounds();
+  const rounds = await computeBtRounds();
   if(!rounds.length){ showToast("Aucune chanson à jouer — attends que tout le monde ait proposé."); return; }
   const nowIso = new Date().toISOString();
   const startSeconds = currentRoom.game_playback_start === "middle" ? 45 : 0;
@@ -4619,8 +4680,12 @@ function updateBtVoteCountdown(){
   if(!currentRoom || currentRoom.game_phase !== "playing") { stopBtVoteTimer(); return; }
   const secondsLeft = gameVoteSecondsLeft();
   const timeUp = secondsLeft <= 0;
+  // Révélation anticipée si tout le monde a déjà répondu (ajoutée le
+  // 19/07/2026, voir allExpectedGuessersHaveVoted() — mutualisée avec le jeu
+  // des questions).
+  const everyoneVoted = allExpectedGuessersHaveVoted(currentBtRound(), currentRoom.game_current_round, btGuesses);
 
-  if(timeUp && !currentRoom.game_round_revealed && btAutoRevealRoundIdx !== currentRoom.game_current_round){
+  if((timeUp || everyoneVoted) && !currentRoom.game_round_revealed && btAutoRevealRoundIdx !== currentRoom.game_current_round){
     btAutoRevealRoundIdx = currentRoom.game_current_round;
     revealBtRound();
   }
@@ -4846,8 +4911,10 @@ async function rejouerBtMemeSalon(){
   await sb.from("blindtest_guesses").delete().eq("room_id", currentRoom.id);
   const { data, error } = await sb.from("rooms").update({
     game_phase: "lobby",
-    game_question_ids: null,
-    game_rounds: null,
+    // "[]" et non "null" (même correctif que rejouerMemeSalon(), voir son
+    // commentaire) : ces 2 colonnes sont NOT NULL en base.
+    game_question_ids: [],
+    game_rounds: [],
     game_current_round: 0,
     game_round_started_at: null,
     game_round_revealed: false,
