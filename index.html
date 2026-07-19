@@ -199,7 +199,7 @@
   }
   .guess-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;}
   .guess-option{
-    background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-sm);
+    background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);
     padding:12px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12.5px;font-weight:600;
   }
   .guess-option.correct{border-color:var(--success);background:#22c55e18;}
@@ -452,8 +452,14 @@
         </div>
       </div>
 
-      <h2 style="margin-top:24px;">Scores</h2>
-      <div id="scoreBoard"></div>
+      <!-- Masqué en Blindtest solo réel (ajouté le 19/07/2026) : un
+           "classement" n'a pas de sens quand on joue seul contre de vraies
+           données — voir beginBtSoloSession()/startGame(). Reste affiché pour
+           les autres jeux encore en démo (avec les amis fictifs). -->
+      <div id="gameScoresSection">
+        <h2 style="margin-top:24px;">Scores</h2>
+        <div id="scoreBoard"></div>
+      </div>
     </section>
 
     <!-- SCREEN: JEU DES QUESTIONS — VRAI salon (ajouté le 12/07/2026).
@@ -1743,21 +1749,30 @@ function subscribeQueue(roomId){
       currentRoom = payload.new;
       if(state.mode === "distance") applyDistancePlaybackState();
       if(state.mode === "questions") renderGameLobby();
+      if(state.mode === "blindtest") renderBlindtestLobby();
     })
-    // Réponses du "jeu des questions" (ajouté le 12/07/2026) : dès qu'un
-    // participant choisit ou change un titre pour une question, tout le
+    // Réponses/propositions (ajouté le 12/07/2026, étendu au Blindtest le
+    // 19/07/2026) : dès qu'un participant choisit ou change un titre, tout le
     // monde revoit la progression se mettre à jour sans recharger la page.
+    // Table partagée par les deux jeux (voir harmonize-schema.sql).
     .on("postgres_changes", { event:"*", schema:"public", table:"game_answers", filter:"room_id=eq." + roomId }, () => {
       if(state.mode === "questions") loadGameAnswers(roomId).then(renderGameLobby);
+      if(state.mode === "blindtest") loadGameAnswers(roomId).then(renderBlindtestLobby);
     })
     // Votes de la partie (ajouté le 12/07/2026) : dès que quelqu'un devine qui
     // a répondu quoi, le classement se met à jour en direct chez tout le monde.
     .on("postgres_changes", { event:"*", schema:"public", table:"game_guesses", filter:"room_id=eq." + roomId }, () => {
       if(state.mode === "questions") loadGameGuesses(roomId).then(renderGameLobby);
     })
+    // Votes du Blindtest (ajouté le 19/07/2026, table distincte de
+    // game_guesses — voir harmonize-schema.sql).
+    .on("postgres_changes", { event:"*", schema:"public", table:"blindtest_guesses", filter:"room_id=eq." + roomId }, () => {
+      if(state.mode === "blindtest") loadBtGuesses(roomId).then(renderBlindtestLobby);
+    })
     .on("presence", { event: "sync" }, () => {
       renderRoomAvatars();
       if(state.mode === "questions") renderGameLobby();
+      if(state.mode === "blindtest") renderBlindtestLobby();
     })
     .subscribe(async (status) => {
       if(status === "SUBSCRIBED"){
@@ -1798,6 +1813,17 @@ function startQueuePolling(roomId){
       await loadGameAnswers(roomId);
       await loadGameGuesses(roomId);
       renderGameLobby();
+      return;
+    }
+    if(state.mode === "blindtest"){
+      // Même filet de sécurité que "questions" ci-dessus (ajouté le
+      // 19/07/2026) — c'est justement l'absence de ce bloc qui obligeait à
+      // actualiser la page manuellement pour voir les propositions des autres.
+      const { data } = await sb.from("rooms").select("*").eq("id", roomId).maybeSingle();
+      if(data) currentRoom = data;
+      await loadGameAnswers(roomId);
+      await loadBtGuesses(roomId);
+      renderBlindtestLobby();
       return;
     }
     await loadRealQueue(roomId);
@@ -4865,9 +4891,18 @@ function pickRounds(n){
 }
 
 function startGame(){
-  // on repart d'un tableau des scores à zéro pour cette nouvelle partie
-  state.scores = FRIENDS.reduce((acc,f)=>{acc[f.name]=0;return acc;},{});
-  state.scores[state.user] = 0;
+  // Blindtest solo réel (ajouté le 19/07/2026) : pas d'amis fictifs à
+  // afficher, on joue seul contre de vraies chansons — voir aussi
+  // resetBtSoloVisuals()/gameScoresSection ci-dessous.
+  const realBtSolo = state.mode === "blindtest" && btSoloQueue.length >= BT_SOLO_MIN_TRACKS;
+  document.getElementById("gameScoresSection").style.display = realBtSolo ? "none" : "block";
+  if(realBtSolo){
+    state.scores = { [state.user]: 0 };
+  } else {
+    // on repart d'un tableau des scores à zéro pour cette nouvelle partie
+    state.scores = FRIENDS.reduce((acc,f)=>{acc[f.name]=0;return acc;},{});
+    state.scores[state.user] = 0;
+  }
   renderScores();
   roundState.currentRound = 0;
   document.getElementById("gameOver").style.display = "none";
