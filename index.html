@@ -667,19 +667,16 @@
             <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">Combien de chansons chacun propose-t-il ?</p>
             <div style="display:flex;gap:8px;flex-wrap:wrap;" id="btSongsPicker"></div>
           </div>
+          <!-- Pas de choix "vidéo visible" ici (contrairement au jeu des
+               questions) : toujours audio seulement, voir confirmBtSettings()
+               dans index.html pour le pourquoi. -->
           <div id="btStepPlayback" class="card" style="display:none;margin-bottom:16px;">
-            <p style="font-size:13px;color:var(--text-dim);margin-bottom:10px;">Comment veux-tu afficher les manches ?</p>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;" id="btDisplayModePicker">
-              <button class="btn-ghost" style="width:auto;flex:1;padding:10px 8px;" data-display="video" onclick="pickBtDisplayMode('video')">🎬 Vidéo visible</button>
-              <button class="btn-ghost" style="width:auto;flex:1;padding:10px 8px;" data-display="audio" onclick="pickBtDisplayMode('audio')">🎧 Audio seulement</button>
-            </div>
             <p style="font-size:13px;color:var(--text-dim);margin-bottom:10px;">Où démarrer la lecture de chaque chanson ?</p>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;" id="btPlaybackStartPicker">
               <button class="btn-ghost" style="width:auto;flex:1;padding:10px 8px;" data-start="start" onclick="pickBtPlaybackStart('start')">⏮ Depuis le début</button>
               <button class="btn-ghost" style="width:auto;flex:1;padding:10px 8px;" data-start="middle" onclick="pickBtPlaybackStart('middle')">⏭ Vers ~45 secondes</button>
             </div>
-            <p style="font-size:11px;color:var(--text-faint);margin:0 0 14px;">Choisis les deux réglages ci-dessus pour continuer automatiquement.</p>
-            <button class="btn-ghost" onclick="backToBtSongsCountStep()">← Changer le nombre de chansons</button>
+            <button class="btn-ghost" style="margin-top:10px;" onclick="backToBtSongsCountStep()">← Changer le nombre de chansons</button>
           </div>
         </div>
         <p id="btLobbyWaitMsg" style="display:none;font-size:13px;color:var(--text-faint);text-align:center;margin-top:14px;">En attente que le créateur du salon choisisse les réglages...</p>
@@ -1144,10 +1141,10 @@ let gamePlayer = null; // lecteur YouTube de CET appareil pour la manche en cour
 let btGuesses = [];
 let btPickingSlot = null; // le "slot" ('bt1', 'bt2'...) pour lequel la fenêtre de proposition est ouverte
 let btSongsPerPersonTarget = null; // réglage du créateur : combien de chansons chacun doit proposer
-let btDisplayMode = null;   // 'video' | 'audio' | null — même principe que gameDisplayMode
 let btPlaybackStart = null; // 'start' | 'middle' | null — même principe que gamePlaybackStart
 let btGuessSelectionRoundIdx = -1;
 let btMyGuess = null; // youtube_id choisi pour la manche en cours (un seul choix, pas un Set comme gameMyGuessSelection)
+let btGuessOptionsCache = []; // ordre mélangé des choix, figé pour la manche en cours (voir ensureBtGuessSelectionForRound)
 let btAutoRevealRoundIdx = -1;
 let btRoundIntroIdx = -1;
 let btVoteTimerInterval = null;
@@ -1619,7 +1616,6 @@ async function enterRealRoom(room, toastMsg){
     document.getElementById("playerCard").style.display = "none";
     document.getElementById("btRoomCode").textContent = room.code;
     btSongsPerPersonTarget = null;
-    btDisplayMode = null;
     btPlaybackStart = null;
     btGuessSelectionRoundIdx = -1;
     btMyGuess = null;
@@ -4257,11 +4253,6 @@ function renderBtSongCountPicker(){
   }
   document.getElementById("btStepSongs").style.display = "none";
   document.getElementById("btStepPlayback").style.display = "block";
-  document.querySelectorAll("#btDisplayModePicker button").forEach(btn => {
-    const active = btn.dataset.display === btDisplayMode;
-    btn.style.borderColor = active ? "var(--accent1)" : "var(--border)";
-    btn.style.color = active ? "var(--text)" : "var(--text-dim)";
-  });
   document.querySelectorAll("#btPlaybackStartPicker button").forEach(btn => {
     const active = btn.dataset.start === btPlaybackStart;
     btn.style.borderColor = active ? "var(--accent1)" : "var(--border)";
@@ -4271,26 +4262,18 @@ function renderBtSongCountPicker(){
 
 function pickBtSongsCount(n){
   btSongsPerPersonTarget = n;
-  btDisplayMode = null;
   btPlaybackStart = null;
   renderBtSongCountPicker();
-}
-
-function pickBtDisplayMode(mode){
-  btDisplayMode = mode;
-  renderBtSongCountPicker();
-  if(btDisplayMode && btPlaybackStart) confirmBtSettings();
 }
 
 function pickBtPlaybackStart(mode){
   btPlaybackStart = mode;
   renderBtSongCountPicker();
-  if(btDisplayMode && btPlaybackStart) confirmBtSettings();
+  confirmBtSettings();
 }
 
 function backToBtSongsCountStep(){
   btSongsPerPersonTarget = null;
-  btDisplayMode = null;
   btPlaybackStart = null;
   renderBtSongCountPicker();
 }
@@ -4298,13 +4281,21 @@ function backToBtSongsCountStep(){
 // Les "slots" ('bt1', 'bt2'...) jouent le même rôle que les vraies catégories
 // dans game_question_ids pour "Le jeu des questions" : savoir combien de
 // propositions chacun doit encore faire, et suivre qui a fini.
+//
+// game_display_mode toujours forcé à 'audio' (changé le 19/07/2026, suite à
+// un vrai test) : en mode "vidéo visible", YouTube affiche son propre titre
+// de vidéo par-dessus le lecteur (impossible à masquer de façon fiable, voir
+// la leçon du Round 12/13 dans idees.md) — ce qui donnait directement la
+// réponse. Contrairement au jeu des questions (où voir le titre ne gâche pas
+// grand-chose), ici deviner LE TITRE est tout l'intérêt du jeu : l'option
+// "vidéo visible" n'a donc plus lieu d'être pour le Blindtest.
 async function confirmBtSettings(){
   if(!isGameCreator()) return;
   const slots = Array.from({ length: btSongsPerPersonTarget }, (_, i) => `bt${i + 1}`);
   const { data, error } = await sb.from("rooms").update({
     game_question_ids: slots,
     game_phase: "answering",
-    game_display_mode: btDisplayMode || "video",
+    game_display_mode: "audio",
     game_playback_start: btPlaybackStart || "start",
   }).eq("id", currentRoom.id).select().single();
   if(error){ showToast("Erreur à la validation des réglages : " + error.message); return; }
@@ -4403,14 +4394,17 @@ function updateBtLaunchButton(slots){
 // dans le salon (peu importe le slot — contrairement à "Le jeu des
 // questions", il n'y a pas de catégorie à respecter). Comme là-bas, 2
 // propositions identiques (même vidéo YouTube) ne sont jouées qu'une seule
-// fois, avec plusieurs "propriétaires" possibles. Précalcule aussi, pour
-// chaque manche, jusqu'à 3 pièges (decoys) tirés des AUTRES chansons du
-// salon — stables et identiques pour tout le monde, calculés une seule fois
-// ici plutôt qu'à l'affichage (voir renderBtGuessOptions()).
-// Limite connue : avec très peu de chansons au total dans le salon (2-3
-// joueurs à 2 chansons chacun, par exemple), il peut y avoir moins de 3
-// pièges disponibles — le choix multiple affiche alors moins d'options,
-// sans planter, ce qui reste acceptable pour un petit groupe.
+// fois, avec plusieurs "propriétaires" possibles.
+//
+// Pièges (decoys) — retravaillé le 19/07/2026 suite à un vrai test : les
+// pièges venaient au départ des AUTRES chansons du salon, donc d'une manche
+// à l'autre, on finissait par voir en avance le titre d'une chanson qui
+// n'était pas encore jouée pour de vrai (spoiler à quelques manches
+// d'écart). Les pièges sont donc désormais tirés du catalogue de démo
+// (CATALOG, déjà utilisé ailleurs dans l'app) — jamais une vraie chanson de
+// CE salon, donc jamais de risque de dévoiler une réponse à l'avance.
+// Calculés une seule fois ici (pas à l'affichage) pour rester stables et
+// identiques pour tout le monde — voir renderBtGuessOptions().
 function computeBtRounds(){
   const groups = new Map();
   gameAnswers.forEach(a => {
@@ -4427,10 +4421,10 @@ function computeBtRounds(){
     groups.get(key).owner_user_ids.push(a.user_id);
   });
   const rounds = shuffleArray([...groups.values()]);
-  return rounds.map((round, i) => {
-    const others = rounds.filter((_, j) => j !== i);
-    const decoys = shuffleArray(others).slice(0, Math.min(3, others.length))
-      .map(o => ({ youtube_id: o.youtube_id, title: o.title, artist: o.artist }));
+  return rounds.map(round => {
+    const candidates = CATALOG.filter(c => c.title !== round.title);
+    const decoys = shuffleArray(candidates).slice(0, 3)
+      .map(c => ({ youtube_id: c.youtubeId, title: c.title, artist: c.artist }));
     return { ...round, decoys };
   });
 }
@@ -4641,20 +4635,27 @@ function updateBtVoteCountdown(){
 /* ---- Choix multiple : c'est quelle chanson ? Un seul choix possible par
    manche (contrairement à "Le jeu des questions" où plusieurs suspects sont
    possibles) — voir blindtest_guesses dans harmonize-schema.sql. ---- */
+// btGuessOptionsCache mémorise l'ORDRE mélangé des choix pour la manche
+// affichée (ajouté le 19/07/2026, corrige un vrai bug remonté par Rémi : les
+// options changeaient de place à chaque nouveau rendu, parce que
+// renderBtGuessOptions() les re-mélangeait à chaque appel — donc à chaque
+// mise à jour reçue en temps réel, y compris juste en votant soi-même).
+// Calculé UNE SEULE FOIS par manche ici, comme btMyGuess juste au-dessus.
 function ensureBtGuessSelectionForRound(idx){
   if(btGuessSelectionRoundIdx === idx) return;
   btGuessSelectionRoundIdx = idx;
   const mine = btGuesses.find(g => g.round_index === idx && g.guesser_user_id === currentUser?.id);
   btMyGuess = mine ? mine.guessed_youtube_id : null;
+  const round = currentBtRound();
+  btGuessOptionsCache = round
+    ? shuffleArray([{ youtube_id: round.youtube_id, title: round.title, artist: round.artist }, ...(round.decoys || [])])
+    : [];
 }
 
 function renderBtGuessOptions(round){
   const timeUp = gameVoteSecondsLeft() <= 0;
   const locked = timeUp || !!btMyGuess;
-  const options = shuffleArray([
-    { youtube_id: round.youtube_id, title: round.title, artist: round.artist },
-    ...(round.decoys || []),
-  ]);
+  const options = btGuessOptionsCache;
   document.getElementById("btGuessOptions").innerHTML = options.map(opt => {
     const active = btMyGuess === opt.youtube_id;
     return `
@@ -4860,7 +4861,6 @@ async function rejouerBtMemeSalon(){
   gameAnswers = [];
   btGuesses = [];
   btSongsPerPersonTarget = null;
-  btDisplayMode = null;
   btPlaybackStart = null;
   btGuessSelectionRoundIdx = -1;
   btMyGuess = null;
