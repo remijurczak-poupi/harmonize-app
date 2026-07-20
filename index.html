@@ -549,7 +549,8 @@
         <div class="card" style="text-align:center;padding:20px;">
           <div class="logo" style="justify-content:center;margin-bottom:12px;"><span class="logo-mark">🎧</span> Harmonize</div>
           <div id="gameWarmupYtPlayer" style="border-radius:12px;overflow:hidden;margin-bottom:12px;"></div>
-          <p style="font-size:12.5px;color:var(--text-dim);margin-bottom:14px;">🎶 Ambiance avant de commencer...</p>
+          <p style="font-size:12.5px;color:var(--text-dim);margin-bottom:4px;">🎶 Ambiance avant de commencer...</p>
+          <p style="font-size:11px;color:var(--text-faint);margin-bottom:14px;">Ça évite aussi les pubs pendant le reste de la partie 😉</p>
           <button class="btn-primary" style="width:auto;padding:12px 28px;" onclick="skipGameWarmup()">▶️ C'est parti ! <span id="gameWarmupCountdown" style="opacity:.7;"></span></button>
         </div>
       </div>
@@ -727,7 +728,8 @@
         <div class="card" style="text-align:center;padding:20px;">
           <div class="logo" style="justify-content:center;margin-bottom:12px;"><span class="logo-mark">🎧</span> Harmonize</div>
           <div id="btWarmupYtPlayer" style="border-radius:12px;overflow:hidden;margin-bottom:12px;"></div>
-          <p style="font-size:12.5px;color:var(--text-dim);margin-bottom:14px;">🎶 Ambiance avant de commencer...</p>
+          <p style="font-size:12.5px;color:var(--text-dim);margin-bottom:4px;">🎶 Ambiance avant de commencer...</p>
+          <p style="font-size:11px;color:var(--text-faint);margin-bottom:14px;">Ça évite aussi les pubs pendant le reste de la partie 😉</p>
           <button class="btn-primary" style="width:auto;padding:12px 28px;" onclick="skipBtWarmup()">▶️ C'est parti ! <span id="btWarmupCountdown" style="opacity:.7;"></span></button>
         </div>
       </div>
@@ -1223,8 +1225,10 @@ let btAnswerSearchDebounce = null;
 // indépendamment). Durée allongée et vidéo rendue VISIBLE (19/07/2026,
 // 2e retour de Rémi) : 7s ne laissait pas le temps de voir/taper le bouton
 // "Passer" d'une pub, et un lecteur invisible (1x1) le rendait de toute
-// façon impossible à atteindre même s'il y en avait le temps.
-const BT_WARMUP_SECONDS = 15;
+// façon impossible à atteindre même s'il y en avait le temps. Repassée à
+// 30s (19/07/2026, 4e retour de Rémi) pour être sûr qu'une pub ait le temps
+// de se terminer ou d'afficher son bouton "Ignorer".
+const BT_WARMUP_SECONDS = 30;
 let btWarmupPlayer = null;
 let btWarmupTimerInterval = null;
 let btWarmupAdvanceInFlight = false;
@@ -3709,6 +3713,11 @@ function ensureGameWarmupPlayer(){
     // natif de YouTube reste affiché (pas de "controls:0" ici), donc
     // n'importe qui peut réactiver le son d'un tap s'il le souhaite.
     playerVars: { autoplay: 1, mute: 1, playsinline: 1, rel: 0, iv_load_policy: 3 },
+    // onReady : appel explicite à playVideo() en filet de sécurité (ajouté
+    // le 19/07/2026) — le paramètre "autoplay" ne suffit pas toujours à
+    // déclencher la lecture selon le navigateur, demander la lecture une
+    // fois le lecteur prêt est plus fiable.
+    events: { onReady: (e) => { try { e.target.playVideo(); } catch(err){} } },
   });
 }
 
@@ -4699,6 +4708,11 @@ function ensureBtWarmupPlayer(){
     // "mute: 1" ajouté le 19/07/2026 (retour de Rémi : rien ne se lançait
     // sur téléphone) — voir le commentaire jumeau dans ensureGameWarmupPlayer().
     playerVars: { autoplay: 1, mute: 1, playsinline: 1, rel: 0, iv_load_policy: 3 },
+    // onReady : appel explicite à playVideo() en filet de sécurité (ajouté
+    // le 19/07/2026) — le paramètre "autoplay" ne suffit pas toujours à
+    // déclencher la lecture selon le navigateur, demander la lecture une
+    // fois le lecteur prêt est plus fiable.
+    events: { onReady: (e) => { try { e.target.playVideo(); } catch(err){} } },
   });
 }
 
