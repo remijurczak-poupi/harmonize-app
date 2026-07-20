@@ -549,7 +549,8 @@
         <div class="card" style="text-align:center;padding:20px;">
           <div class="logo" style="justify-content:center;margin-bottom:12px;"><span class="logo-mark">🎧</span> Harmonize</div>
           <div id="gameWarmupYtPlayer" style="border-radius:12px;overflow:hidden;margin-bottom:12px;"></div>
-          <p style="font-size:12.5px;color:var(--text-dim);margin-bottom:14px;">🎶 Ambiance avant de commencer...</p>
+          <p style="font-size:12.5px;color:var(--text-dim);margin-bottom:4px;">🎶 Ambiance avant de commencer...</p>
+          <p style="font-size:11px;color:var(--text-faint);margin-bottom:14px;">Ça évite aussi les pubs pendant le reste de la partie 😉</p>
           <button class="btn-primary" style="width:auto;padding:12px 28px;" onclick="skipGameWarmup()">▶️ C'est parti ! <span id="gameWarmupCountdown" style="opacity:.7;"></span></button>
         </div>
       </div>
@@ -727,7 +728,8 @@
         <div class="card" style="text-align:center;padding:20px;">
           <div class="logo" style="justify-content:center;margin-bottom:12px;"><span class="logo-mark">🎧</span> Harmonize</div>
           <div id="btWarmupYtPlayer" style="border-radius:12px;overflow:hidden;margin-bottom:12px;"></div>
-          <p style="font-size:12.5px;color:var(--text-dim);margin-bottom:14px;">🎶 Ambiance avant de commencer...</p>
+          <p style="font-size:12.5px;color:var(--text-dim);margin-bottom:4px;">🎶 Ambiance avant de commencer...</p>
+          <p style="font-size:11px;color:var(--text-faint);margin-bottom:14px;">Ça évite aussi les pubs pendant le reste de la partie 😉</p>
           <button class="btn-primary" style="width:auto;padding:12px 28px;" onclick="skipBtWarmup()">▶️ C'est parti ! <span id="btWarmupCountdown" style="opacity:.7;"></span></button>
         </div>
       </div>
@@ -1223,8 +1225,10 @@ let btAnswerSearchDebounce = null;
 // indépendamment). Durée allongée et vidéo rendue VISIBLE (19/07/2026,
 // 2e retour de Rémi) : 7s ne laissait pas le temps de voir/taper le bouton
 // "Passer" d'une pub, et un lecteur invisible (1x1) le rendait de toute
-// façon impossible à atteindre même s'il y en avait le temps.
-const BT_WARMUP_SECONDS = 15;
+// façon impossible à atteindre même s'il y en avait le temps. Repassée à
+// 30s (19/07/2026, 4e retour de Rémi) pour être sûr qu'une pub ait le temps
+// de se terminer ou d'afficher son bouton "Ignorer".
+const BT_WARMUP_SECONDS = 30;
 let btWarmupPlayer = null;
 let btWarmupTimerInterval = null;
 let btWarmupAdvanceInFlight = false;
@@ -3702,7 +3706,18 @@ function ensureGameWarmupPlayer(){
     // lecteur de la vraie partie) : cet écran n'a rien à synchroniser entre
     // appareils, et surtout, si une pub apparaît, son bouton "Passer" doit
     // rester atteignable — voir le commentaire sur BT_WARMUP_SECONDS.
-    playerVars: { autoplay: 1, playsinline: 1, rel: 0, iv_load_policy: 3 },
+    // "mute: 1" ajouté le 19/07/2026 (retour de Rémi : rien ne se lançait
+    // sur téléphone) : Safari iOS et Chrome Android bloquent l'autoplay AVEC
+    // le son, la vidéo restait donc muette silencieusement (aucun son, mais
+    // en fait aucune LECTURE du tout) sans ce réglage. Le contrôle de son
+    // natif de YouTube reste affiché (pas de "controls:0" ici), donc
+    // n'importe qui peut réactiver le son d'un tap s'il le souhaite.
+    playerVars: { autoplay: 1, mute: 1, playsinline: 1, rel: 0, iv_load_policy: 3 },
+    // onReady : appel explicite à playVideo() en filet de sécurité (ajouté
+    // le 19/07/2026) — le paramètre "autoplay" ne suffit pas toujours à
+    // déclencher la lecture selon le navigateur, demander la lecture une
+    // fois le lecteur prêt est plus fiable.
+    events: { onReady: (e) => { try { e.target.playVideo(); } catch(err){} } },
   });
 }
 
@@ -3793,9 +3808,14 @@ function renderGamePlaying(){
   // faire côté lecteur, seul l'affichage change. Le cache disparaît dès la
   // révélation (ajusté le 13/07/2026) : une fois qu'on sait qui a répondu, il
   // n'y a plus rien à cacher, autant remontrer la vidéo.
+  // gameAdSkipActive (voir revealGameAdSkipButton()) : pendant la fenêtre de
+  // déblocage de 10 secondes, on ne réaffiche ni le cache ni la couche de
+  // clic, même si ce rendu est déclenché par une mise à jour reçue entre-temps.
   const audioOnly = currentRoom.game_display_mode === "audio";
   const cover = document.getElementById("gqAudioCover");
-  if(cover) cover.style.display = (audioOnly && !revealed) ? "flex" : "none";
+  if(cover) cover.style.display = (audioOnly && !revealed && !gameAdSkipActive) ? "flex" : "none";
+  const blocker = document.getElementById("gqClickBlocker");
+  if(blocker) blocker.style.display = gameAdSkipActive ? "none" : "block";
 
   ensureGamePlayer(round);
 
@@ -3934,19 +3954,18 @@ function stopGamePlayer(){
 }
 
 // Même correctif que revealAdSkipButton() (Blindtest) — voir son commentaire
-// pour le pourquoi (bouton natif "Passer" d'une pub bloqué par nos propres
-// couches de recouvrement).
+// pour le pourquoi (bouton natif "Ignorer" d'une pub bloqué par nos propres
+// couches de recouvrement, et pourquoi une simple opacité ne suffisait pas).
 let gameAdSkipRestoreTimer = null;
+let gameAdSkipActive = false;
 function revealGameAdSkipButton(){
-  const cover = document.getElementById("gqAudioCover");
-  const blocker = document.getElementById("gqClickBlocker");
-  if(blocker) blocker.style.display = "none";
-  if(cover && cover.style.display !== "none") cover.style.opacity = "0.15";
-  showToast("Tape directement sur le bouton \"Passer\" de la pub si tu le vois — ça revient à la normale dans 10 secondes.");
+  gameAdSkipActive = true;
+  renderGamePlaying(); // applique tout de suite (cover + blocker gérés par renderGamePlaying, voir plus haut)
+  showToast("Tape directement sur le bouton \"Ignorer\" de la pub si tu le vois — ça revient à la normale dans 10 secondes.");
   clearTimeout(gameAdSkipRestoreTimer);
   gameAdSkipRestoreTimer = setTimeout(() => {
-    if(blocker) blocker.style.display = "block";
-    if(cover) cover.style.opacity = "1";
+    gameAdSkipActive = false;
+    renderGamePlaying();
   }, 10000);
 }
 
@@ -4686,7 +4705,14 @@ function ensureBtWarmupPlayer(){
     // lecteur de la vraie partie) : cet écran n'a rien à synchroniser entre
     // appareils, et surtout, si une pub apparaît, son bouton "Passer" doit
     // rester atteignable — voir le commentaire sur BT_WARMUP_SECONDS.
-    playerVars: { autoplay: 1, playsinline: 1, rel: 0, iv_load_policy: 3 },
+    // "mute: 1" ajouté le 19/07/2026 (retour de Rémi : rien ne se lançait
+    // sur téléphone) — voir le commentaire jumeau dans ensureGameWarmupPlayer().
+    playerVars: { autoplay: 1, mute: 1, playsinline: 1, rel: 0, iv_load_policy: 3 },
+    // onReady : appel explicite à playVideo() en filet de sécurité (ajouté
+    // le 19/07/2026) — le paramètre "autoplay" ne suffit pas toujours à
+    // déclencher la lecture selon le navigateur, demander la lecture une
+    // fois le lecteur prêt est plus fiable.
+    events: { onReady: (e) => { try { e.target.playVideo(); } catch(err){} } },
   });
 }
 
@@ -4761,9 +4787,15 @@ function renderBtPlaying(){
 
   const revealed = !!currentRoom.game_round_revealed;
 
+  // btAdSkipActive (voir revealAdSkipButton()) : pendant la fenêtre de
+  // déblocage de 10 secondes, on ne réaffiche ni le cache ni la couche de
+  // clic par-dessus, même si ce rendu est déclenché par une mise à jour
+  // reçue entre-temps (vote d'un autre participant, etc.).
   const audioOnly = currentRoom.game_display_mode === "audio";
   const cover = document.getElementById("btAudioCover");
-  if(cover) cover.style.display = (audioOnly && !revealed) ? "flex" : "none";
+  if(cover) cover.style.display = (audioOnly && !revealed && !btAdSkipActive) ? "flex" : "none";
+  const blocker = document.getElementById("btClickBlocker");
+  if(blocker) blocker.style.display = btAdSkipActive ? "none" : "block";
 
   ensureBtPlayer(round);
 
@@ -4900,16 +4932,23 @@ function stopBtPlayer(){
 // puisse taper directement sur "Passer" si elle le voit, avant qu'elles ne
 // se réactivent toutes seules.
 let adSkipRestoreTimer = null;
+// btAdSkipActive (ajouté le 19/07/2026, corrige un vrai bug remonté par
+// Rémi) : mettre le cache juste en transparent (opacity) ne suffisait pas,
+// il restait cliquable PAR-DESSUS le vrai bouton "Ignorer" de la pub — donc
+// le tap atterrissait sur notre cache (qui ne fait rien d'utile ici) plutôt
+// que sur YouTube en dessous. Il faut vraiment le cacher (display:none). Et
+// comme renderBtPlaying() réaffiche ce cache à CHAQUE rendu (y compris ceux
+// déclenchés par le temps réel pendant ces 10 secondes), ce drapeau lui dit
+// de ne pas le faire tant que la fenêtre de déblocage est active.
+let btAdSkipActive = false;
 function revealAdSkipButton(){
-  const cover = document.getElementById("btAudioCover");
-  const blocker = document.getElementById("btClickBlocker");
-  if(blocker) blocker.style.display = "none";
-  if(cover && cover.style.display !== "none") cover.style.opacity = "0.15";
-  showToast("Tape directement sur le bouton \"Passer\" de la pub si tu le vois — ça revient à la normale dans 10 secondes.");
+  btAdSkipActive = true;
+  renderBtPlaying(); // applique tout de suite (cover + blocker gérés par renderBtPlaying, voir plus haut)
+  showToast("Tape directement sur le bouton \"Ignorer\" de la pub si tu le vois — ça revient à la normale dans 10 secondes.");
   clearTimeout(adSkipRestoreTimer);
   adSkipRestoreTimer = setTimeout(() => {
-    if(blocker) blocker.style.display = "block";
-    if(cover) cover.style.opacity = "1";
+    btAdSkipActive = false;
+    renderBtPlaying();
   }, 10000);
 }
 
