@@ -370,7 +370,10 @@
         <div style="font-size:34px;">🎧</div>
         <p style="font-size:12.5px;color:var(--text-dim);margin:8px 0 0;">Écoute et devine de quelle chanson il s'agit !</p>
         <p style="font-size:22px;font-weight:700;margin:10px 0 0;" id="serieCountdown">15</p>
-        <button class="btn-ghost" style="margin-top:10px;font-size:12.5px;" onclick="serieSkipForward()">⏩ +1 min (intro trop longue)</button>
+        <div style="display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap;">
+          <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12.5px;" onclick="serieSkipForward()">⏩ Avancer de 1 min</button>
+          <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12.5px;" onclick="revealSerieAdSkip()">📺 Pub bloquée ?</button>
+        </div>
       </div>
       <div id="serieGuessBox">
         <div class="guess-grid" id="serieGuessGrid"></div>
@@ -1425,6 +1428,8 @@ function updateSerieCounters(){
 
 function startSerieRound(){
   serieAnswered = false;
+  clearTimeout(serieAdSkipRestoreTimer);
+  serieAdSkipActive = false;
   document.getElementById("serieResultPanel").style.display = "none";
   document.getElementById("serieGuessBox").style.display = "block";
   const correct = serieQueue[Math.floor(Math.random() * serieQueue.length)];
@@ -1476,6 +1481,36 @@ function serieSkipForward(){
   seriePlayer.seekTo(current + 60, true);
 }
 
+// "Pub bloquée ?" (ajouté le 21/07/2026, demande de Rémi après avoir perdu une
+// série à cause d'une pub) — même principe que revealAdSkipButton() côté
+// Blindtest, mais adapté : ici le lecteur reste normalement en 1x1 (invisible,
+// puisque Série ne montre jamais la vidéo pour ne pas spoiler le titre), donc
+// le bouton natif "Ignorer" de YouTube n'est de toute façon jamais atteignable
+// vu sa taille. On agrandit temporairement le lecteur via setSize() pour le
+// rendre cliquable, et on repousse d'autant l'échéance du chrono de réponse
+// pour ne pas perdre la série à cause du temps pris par la pub elle-même.
+let serieAdSkipActive = false;
+let serieAdSkipRestoreTimer = null;
+function revealSerieAdSkip(){
+  if(!seriePlayer || typeof seriePlayer.setSize !== "function") return;
+  serieAdSkipActive = true;
+  seriePlayer.setSize(280, 158);
+  // Le conteneur garde le "display:none" du placeholder d'origine (voir
+  // screen-serie) — setSize() seul ne suffit donc pas à le rendre visible.
+  const el = document.getElementById("serieYtPlayer");
+  if(el) el.style.display = "block";
+  serieVoteDeadline += 10000;
+  updateSerieVoteCountdown();
+  showToast("Tape directement sur le bouton \"Ignorer\" de la pub si tu le vois — le lecteur revient à la normale dans 10 secondes, et ton chrono de réponse est repoussé d'autant.");
+  clearTimeout(serieAdSkipRestoreTimer);
+  serieAdSkipRestoreTimer = setTimeout(() => {
+    serieAdSkipActive = false;
+    if(seriePlayer && typeof seriePlayer.setSize === "function") seriePlayer.setSize(1, 1);
+    const el2 = document.getElementById("serieYtPlayer");
+    if(el2) el2.style.display = "none";
+  }, 10000);
+}
+
 async function serieTimeExpired(){
   if(serieAnswered) return;
   serieAnswered = true;
@@ -1500,6 +1535,8 @@ function ensureSeriePlayer(youtubeId){
 
 function stopSeriePlayer(){
   stopSerieVoteTimer();
+  clearTimeout(serieAdSkipRestoreTimer);
+  serieAdSkipActive = false;
   if(seriePlayer){ try { seriePlayer.destroy(); } catch(e){} seriePlayer = null; }
 }
 
