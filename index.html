@@ -366,7 +366,17 @@
         <span class="pill">🏆 Record total : <span id="serieRecordAllTime">0</span></span>
       </div>
       <div class="card" style="text-align:center;padding:24px;margin-bottom:16px;">
-        <div id="serieYtPlayer" style="display:none;"></div>
+        <div style="position:relative;display:inline-block;">
+          <div id="serieYtPlayer" style="display:none;"></div>
+          <!-- Bandeau partiel (ajouté le 21/07/2026, même principe que
+               btAdSkipBanner/gqAdSkipBanner) : pendant la fenêtre de "Pub
+               bloquée ?", le lecteur agrandi resterait sinon visible en
+               entier et spoilerait le titre/la vignette de la vraie chanson.
+               Ce bandeau ne couvre que le haut (là où YouTube affiche le
+               titre) sans bloquer aucun clic (pointer-events:none), pour ne
+               jamais gêner le bouton natif "Ignorer" en dessous. -->
+          <div id="serieAdSkipBanner" style="display:none;position:absolute;top:0;left:0;right:0;height:55%;pointer-events:none;background:linear-gradient(160deg,var(--accent1),var(--accent2));border-radius:8px 8px 0 0;"></div>
+        </div>
         <div style="font-size:34px;">🎧</div>
         <p style="font-size:12.5px;color:var(--text-dim);margin:8px 0 0;">Écoute et devine de quelle chanson il s'agit !</p>
         <p style="font-size:22px;font-weight:700;margin:10px 0 0;" id="serieCountdown">15</p>
@@ -1428,8 +1438,7 @@ function updateSerieCounters(){
 
 function startSerieRound(){
   serieAnswered = false;
-  clearTimeout(serieAdSkipRestoreTimer);
-  serieAdSkipActive = false;
+  resetSerieAdSkipUI();
   document.getElementById("serieResultPanel").style.display = "none";
   document.getElementById("serieGuessBox").style.display = "block";
   const correct = serieQueue[Math.floor(Math.random() * serieQueue.length)];
@@ -1499,16 +1508,29 @@ function revealSerieAdSkip(){
   // screen-serie) — setSize() seul ne suffit donc pas à le rendre visible.
   const el = document.getElementById("serieYtPlayer");
   if(el) el.style.display = "block";
+  // Bandeau partiel (voir screen-serie) : couvre le haut du lecteur agrandi
+  // (là où YouTube affiche le titre/la vignette) sans bloquer le clic, pour
+  // ne pas spoiler la chanson pendant qu'on cherche le bouton "Ignorer".
+  const banner = document.getElementById("serieAdSkipBanner");
+  if(banner) banner.style.display = "block";
   serieVoteDeadline += 10000;
   updateSerieVoteCountdown();
   showToast("Tape directement sur le bouton \"Ignorer\" de la pub si tu le vois — le lecteur revient à la normale dans 10 secondes, et ton chrono de réponse est repoussé d'autant.");
   clearTimeout(serieAdSkipRestoreTimer);
-  serieAdSkipRestoreTimer = setTimeout(() => {
-    serieAdSkipActive = false;
-    if(seriePlayer && typeof seriePlayer.setSize === "function") seriePlayer.setSize(1, 1);
-    const el2 = document.getElementById("serieYtPlayer");
-    if(el2) el2.style.display = "none";
-  }, 10000);
+  serieAdSkipRestoreTimer = setTimeout(resetSerieAdSkipUI, 10000);
+}
+
+// Partagé entre le timeout automatique (10s), le début d'une nouvelle manche
+// et la sortie de l'écran — remet toujours le lecteur en 1x1/masqué et
+// cache le bandeau, quel que soit le moment où c'est déclenché.
+function resetSerieAdSkipUI(){
+  clearTimeout(serieAdSkipRestoreTimer);
+  serieAdSkipActive = false;
+  if(seriePlayer && typeof seriePlayer.setSize === "function") seriePlayer.setSize(1, 1);
+  const el = document.getElementById("serieYtPlayer");
+  if(el) el.style.display = "none";
+  const banner = document.getElementById("serieAdSkipBanner");
+  if(banner) banner.style.display = "none";
 }
 
 async function serieTimeExpired(){
@@ -1535,8 +1557,7 @@ function ensureSeriePlayer(youtubeId){
 
 function stopSeriePlayer(){
   stopSerieVoteTimer();
-  clearTimeout(serieAdSkipRestoreTimer);
-  serieAdSkipActive = false;
+  resetSerieAdSkipUI();
   if(seriePlayer){ try { seriePlayer.destroy(); } catch(e){} seriePlayer = null; }
 }
 
