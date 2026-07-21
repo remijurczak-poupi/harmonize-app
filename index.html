@@ -346,41 +346,19 @@
       <button class="btn-ghost" style="margin-top:16px;" onclick="showScreen('screen-confirm')">← Retour</button>
     </section>
 
-    <!-- SCREEN: SÉRIE DE BLINDTEST — choix de la source (ajouté le 21/07/2026).
-         Même principe que screen-blindtest-solo-source, toujours solo. -->
-    <section class="screen" id="screen-serie-solo-source">
-      <h1>🔥 Série de blindtest</h1>
-      <p class="sub">D'où viennent les chansons à deviner ?</p>
-      <div class="stack">
-        <button class="mode-card" onclick="startSerieFromPool()">
-          <div class="mode-icon">🎲</div>
-          <div>
-            <div class="mode-title">Chansons aléatoires</div>
-            <div class="mode-desc">Pioche dans le pool communautaire — toutes les chansons déjà proposées par des joueurs lors de vraies parties en groupe.</div>
-          </div>
-        </button>
-        <button class="mode-card" onclick="startSerieFromPlaylist()">
-          <div class="mode-icon">🎵</div>
-          <div>
-            <div class="mode-title">Ma playlist</div>
-            <div class="mode-desc">Pioche dans tes propres titres importés (écran "Tes playlists").</div>
-          </div>
-        </button>
-      </div>
-      <p id="serieSourceHint" style="font-size:12px;color:var(--text-faint);text-align:center;margin-top:14px;"></p>
-      <button class="btn-ghost" style="margin-top:16px;" onclick="showScreen('screen-lobby')">← Retour</button>
-    </section>
-
-    <!-- SCREEN: SÉRIE DE BLINDTEST — la partie elle-même (ajouté le 21/07/2026).
-         Pas de nombre de manches fixé : on enchaîne tant qu'on répond juste,
-         une erreur remet la série à 0 (mais ne coupe jamais automatiquement —
-         toujours un bouton pour continuer ou recommencer, voir CLAUDE.md). -->
+    <!-- SCREEN: SÉRIE DE BLINDTEST — la partie elle-même (ajouté le
+         21/07/2026, simplifié le même jour : plus d'écran de choix de source,
+         toujours le pool communautaire — voir previewMode()). Pas de nombre
+         de manches fixé : on enchaîne tant qu'on répond juste, une erreur
+         remet la série à 0 (mais ne coupe jamais automatiquement — toujours
+         un bouton pour continuer ou recommencer, voir CLAUDE.md). -->
     <section class="screen" id="screen-serie">
       <h1>🔥 Série de blindtest</h1>
-      <p class="sub">Enchaîne un maximum de bonnes réponses sans te tromper !</p>
-      <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <p class="sub" id="serieSourceHint">Enchaîne un maximum de bonnes réponses sans te tromper !</p>
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
         <span class="pill">🔥 Série : <span id="serieStreak">0</span></span>
-        <span class="pill">🏆 Record de la session : <span id="serieBest">0</span></span>
+        <span class="pill">📅 Record du jour : <span id="serieRecordToday">0</span></span>
+        <span class="pill">🏆 Record total : <span id="serieRecordAllTime">0</span></span>
       </div>
       <div class="card" style="text-align:center;padding:24px;margin-bottom:16px;">
         <div id="serieYtPlayer" style="display:none;"></div>
@@ -390,6 +368,9 @@
       <div id="serieGuessBox">
         <div class="guess-grid" id="serieGuessGrid"></div>
       </div>
+      <!-- Ne sert plus qu'aux BONNES réponses (ajouté le 21/07/2026) — une
+           mauvaise réponse ouvre désormais le popup serieGameOverModal
+           ci-dessous, à la demande de Rémi. -->
       <div id="serieResultPanel" style="display:none;text-align:center;">
         <p id="serieResultText" style="font-size:14px;margin-bottom:14px;"></p>
         <button class="btn-primary" id="serieContinueBtn" onclick="nextSerieRound()"></button>
@@ -905,6 +886,20 @@
     </div>
   </div>
 
+  <!-- Popup de fin de série (ajouté le 21/07/2026, demande de Rémi) — affiché
+       à la place de l'ancien panneau inline dès qu'on se trompe, avec le
+       score obtenu et une mention si c'est un nouveau record. -->
+  <div class="modal-backdrop" id="serieGameOverModal">
+    <div class="modal" style="text-align:center;">
+      <div class="modal-handle"></div>
+      <div style="font-size:34px;margin-bottom:8px;">💥</div>
+      <h2 style="margin-bottom:6px;">Série terminée !</h2>
+      <p id="serieGameOverText" style="font-size:15px;color:var(--text-dim);margin-bottom:6px;"></p>
+      <p id="serieGameOverRecordNote" style="font-size:13px;color:var(--accent1);font-weight:700;min-height:18px;margin-bottom:16px;"></p>
+      <button class="btn-primary" onclick="closeSerieGameOverModal()">🔄 Recommencer une série</button>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 </div>
 
@@ -1093,7 +1088,7 @@ const MODE_DETAIL = {
   // qu'on répond juste — une erreur remet le compteur à zéro.
   serie: {
     emoji:"🔥", title:"Série de blindtest",
-    desc:"Enchaîne un maximum de bonnes réponses d'affilée, en solo — une erreur remet le compteur à zéro. Pioche dans le pool communautaire ou ta propre playlist, comme le Blindtest solo.",
+    desc:"Enchaîne un maximum de bonnes réponses d'affilée, en solo — une erreur remet le compteur à zéro. Pioche dans le pool communautaire de chansons déjà proposées par d'autres joueurs.",
     tag:"Solo · vraies données",
   },
 };
@@ -1344,68 +1339,75 @@ function stopBtSoloPlayer(){
 }
 
 // ---- Série de Blindtest (ajouté le 21/07/2026, idée notée le 19/07/2026) ----
-// Toujours solo (voir previewMode()), même principe de source de données que
-// le Blindtest solo (pool communautaire ou playlist perso, voir
-// startBtSoloFromPool()/startBtSoloFromPlaylist() ci-dessus) mais une
-// mécanique différente : pas de nombre de manches fixé à l'avance, on
-// enchaîne tant qu'on répond juste. Une erreur remet la série à 0 — jamais de
-// coupure automatique pour autant, on PROPOSE toujours de continuer ou de
-// recommencer via un bouton (même principe que le reste de l'app). Le
-// record (serieBest) n'est gardé que pour la session en cours — le garder
-// d'une visite à l'autre est l'idée séparée "historique des scores
-// personnels", pas encore construite (voir roadmap-et-idees.md).
+// Toujours solo (voir previewMode()), toujours le pool communautaire
+// (simplifié le 21/07/2026 : Rémi a demandé de retirer l'option "Ma
+// playlist", devenir bon sur ses PROPRES chansons a moins d'intérêt que sur
+// de vraies chansons proposées par d'autres). Pas de nombre de manches fixé
+// à l'avance, on enchaîne tant qu'on répond juste. Une erreur remet la série
+// à 0 — jamais de coupure automatique pour autant : un popup (pas une
+// coupure de musique, juste un écran d'information) montre le score, puis on
+// PROPOSE de recommencer via un bouton (même principe que le reste de
+// l'app). Le record du jour et le record total sont maintenant persistés en
+// base (table serie_scores, une ligne par série terminée) — l'ancien record
+// "de session" ne suffisait pas, demande de Rémi.
 let serieQueue = [];
 let seriePlayer = null;
 let serieStreak = 0;
-let serieBest = 0;
 let serieAnswered = false;
 let serieCurrentCorrect = null;
+let serieRecordToday = 0;
+let serieRecordAllTime = 0;
 const SERIE_MIN_TRACKS = 4; // il faut au moins 1 bonne réponse + 3 pièges
-
-async function goSerieBlindtest(){
-  document.getElementById("serieSourceHint").textContent = "";
-  showScreen("screen-serie-solo-source");
-}
 
 async function startSerieFromPool(){
   if(!currentUser){ showToast("Connecte-toi d'abord."); showScreen("screen-login"); return; }
-  const hint = document.getElementById("serieSourceHint");
-  hint.textContent = "Chargement du pool communautaire...";
+  document.getElementById("serieSourceHint").textContent = "Chargement du pool communautaire...";
+  showScreen("screen-serie");
   const { data, error } = await sb.from("blindtest_pool").select("*").limit(300);
-  if(error){ hint.textContent = "Erreur de chargement : " + error.message; return; }
+  if(error){ document.getElementById("serieSourceHint").textContent = "Erreur de chargement : " + error.message; return; }
   const tracks = data || [];
   if(tracks.length < SERIE_MIN_TRACKS){
-    hint.textContent = `Pas encore assez de chansons dans le pool communautaire (${tracks.length} pour l'instant) — invite des amis à jouer en multijoueur d'abord, ou choisis "Ma playlist".`;
+    document.getElementById("serieSourceHint").textContent = `Pas encore assez de chansons dans le pool communautaire (${tracks.length} pour l'instant) — invite des amis à jouer en multijoueur d'abord.`;
     return;
   }
-  beginSerieSession(tracks);
+  await beginSerieSession(tracks);
 }
 
-async function startSerieFromPlaylist(){
-  if(!currentUser){ showToast("Connecte-toi d'abord."); showScreen("screen-login"); return; }
-  const hint = document.getElementById("serieSourceHint");
-  if(!myImportedTracks.length){
-    hint.textContent = "Chargement de tes playlists...";
-    await loadMyImportedTracks();
-  }
-  if(myImportedTracks.length < SERIE_MIN_TRACKS){
-    hint.textContent = `Pas encore assez de titres importés (${myImportedTracks.length} pour l'instant) — importe au moins ${SERIE_MIN_TRACKS} titres depuis "Tes playlists", ou choisis "Chansons aléatoires".`;
-    return;
-  }
-  beginSerieSession(myImportedTracks);
-}
-
-function beginSerieSession(tracks){
+async function beginSerieSession(tracks){
   serieQueue = tracks.filter(t => t.youtube_id);
   serieStreak = 0;
+  document.getElementById("serieSourceHint").textContent = "Enchaîne un maximum de bonnes réponses sans te tromper !";
+  await loadSerieRecords();
   updateSerieCounters();
-  showScreen("screen-serie");
   startSerieRound();
+}
+
+// Charge le record du jour et le record total depuis serie_scores. Calculé
+// côté app (pas de fonction SQL dédiée) : peu de lignes par joueur, pas
+// besoin de complexifier le schéma pour ça.
+async function loadSerieRecords(){
+  if(!currentUser) return;
+  const { data, error } = await sb.from("serie_scores").select("streak, achieved_at").eq("user_id", currentUser.id).order("streak", { ascending: false }).limit(500);
+  if(error){ console.warn("[Harmonize] Erreur de chargement des records de série :", error.message); return; }
+  const rows = data || [];
+  const todayStr = new Date().toDateString();
+  serieRecordAllTime = rows.reduce((max, r) => Math.max(max, r.streak), 0);
+  serieRecordToday = rows.filter(r => new Date(r.achieved_at).toDateString() === todayStr).reduce((max, r) => Math.max(max, r.streak), 0);
+}
+
+// Enregistre le score une fois la série terminée (mauvaise réponse) — voir
+// pickSerieGuess(). Fait exprès de ne pas bloquer l'affichage du popup en
+// attendant l'écriture en base (déjà calculé localement juste avant).
+async function saveSerieScore(streak){
+  if(!currentUser) return;
+  const { error } = await sb.from("serie_scores").insert({ user_id: currentUser.id, streak });
+  if(error) console.warn("[Harmonize] Erreur d'enregistrement du score de série :", error.message);
 }
 
 function updateSerieCounters(){
   document.getElementById("serieStreak").textContent = serieStreak;
-  document.getElementById("serieBest").textContent = serieBest;
+  document.getElementById("serieRecordToday").textContent = serieRecordToday;
+  document.getElementById("serieRecordAllTime").textContent = serieRecordAllTime;
 }
 
 function startSerieRound(){
@@ -1445,26 +1447,45 @@ function stopSeriePlayer(){
   if(seriePlayer){ try { seriePlayer.destroy(); } catch(e){} seriePlayer = null; }
 }
 
-function pickSerieGuess(youtubeId){
+async function pickSerieGuess(youtubeId){
   if(serieAnswered) return;
   serieAnswered = true;
   document.querySelectorAll("#serieGuessGrid button").forEach(btn => { btn.onclick = null; btn.disabled = true; });
   const correct = youtubeId === serieCurrentCorrect.youtube_id;
-  const btn = document.getElementById("serieContinueBtn");
   if(correct){
     serieStreak++;
-    if(serieStreak > serieBest) serieBest = serieStreak;
     updateSerieCounters();
     document.getElementById("serieResultText").textContent = `✅ Bonne réponse ! Série en cours : ${serieStreak}.`;
-    btn.textContent = "➡️ Chanson suivante";
+    document.getElementById("serieContinueBtn").textContent = "➡️ Chanson suivante";
+    document.getElementById("serieGuessBox").style.display = "none";
+    document.getElementById("serieResultPanel").style.display = "block";
   } else {
-    document.getElementById("serieResultText").textContent = `❌ Raté — c'était "${serieCurrentCorrect.title}". Ta série de ${serieStreak} s'arrête ici.`;
-    serieStreak = 0;
-    updateSerieCounters();
-    btn.textContent = "🔄 Recommencer une série";
+    await showSerieGameOver();
   }
-  document.getElementById("serieGuessBox").style.display = "none";
-  document.getElementById("serieResultPanel").style.display = "block";
+}
+
+// Popup de fin de série (ajouté le 21/07/2026, demande de Rémi, remplace
+// l'ancien panneau inline pour ce cas précis) : montre le score obtenu,
+// enregistre le score en base, et signale si c'est un nouveau record.
+async function showSerieGameOver(){
+  const finalStreak = serieStreak;
+  const isNewToday = finalStreak > serieRecordToday;
+  const isNewAllTime = finalStreak > serieRecordAllTime;
+  document.getElementById("serieGameOverText").textContent = `Ta série s'arrête à ${finalStreak} — c'était "${serieCurrentCorrect.title}".`;
+  document.getElementById("serieGameOverRecordNote").textContent = isNewAllTime
+    ? "🎉 Nouveau record absolu !"
+    : (isNewToday ? "🎉 Nouveau record du jour !" : "");
+  document.getElementById("serieGameOverModal").classList.add("open");
+  await saveSerieScore(finalStreak);
+  serieStreak = 0;
+  if(isNewToday) serieRecordToday = finalStreak;
+  if(isNewAllTime) serieRecordAllTime = finalStreak;
+  updateSerieCounters();
+}
+
+function closeSerieGameOverModal(){
+  document.getElementById("serieGameOverModal").classList.remove("open");
+  startSerieRound();
 }
 
 function nextSerieRound(){
@@ -1693,8 +1714,9 @@ let pendingMode = null;
 function previewMode(mode){
   // "Série de blindtest" (ajouté le 21/07/2026) est TOUJOURS solo, comme
   // "Le jeu des questions"/Blindtest quand ils étaient encore 100% démo —
-  // pas besoin d'un vrai salon, on saute directement l'écran de confirmation.
-  if(mode === "serie"){ goSerieBlindtest(); return; }
+  // pas besoin d'un vrai salon ni d'un choix de source (toujours le pool
+  // communautaire, simplifié le 21/07/2026), on lance directement.
+  if(mode === "serie"){ startSerieFromPool(); return; }
   pendingMode = mode;
   const d = MODE_DETAIL[mode];
   document.getElementById("confirmTitle").textContent = `Créer ce salon : ${d.emoji} ${d.title} ?`;
@@ -1716,8 +1738,21 @@ function previewMode(mode){
 // lecteur actif au passage (ajouté le 19/07/2026, nécessaire depuis que le
 // Blindtest solo peut jouer du vrai son — auparavant "screen-game" n'avait
 // jamais besoin d'être arrêté en quittant vers l'accueil).
+// Corrigé le 21/07/2026 (bug réel remonté par Rémi : la musique continuait à
+// jouer après être revenu à l'accueil) — stopAnyPlayback() seul ne suffisait
+// pas : le filet de sécurité qui relit le salon toutes les 4 secondes
+// (startQueuePolling) et l'abonnement temps réel (realtimeChannel) n'étaient
+// JAMAIS arrêtés en quittant vers l'accueil. Toutes les quelques secondes,
+// l'un ou l'autre redessinait donc l'écran du salon/jeu qu'on venait de
+// quitter — ce qui RECRÉAIT le lecteur YouTube qu'on venait pourtant de
+// détruire, et la musique repartait. enterRealRoom()/enterMockRoom()
+// faisaient déjà ce nettoyage en ENTRANT dans un salon (pour repartir d'une
+// base propre) ; il manquait le même nettoyage en sortant vers l'accueil.
 function goHome(){
+  if(realtimeChannel){ sb.removeChannel(realtimeChannel); realtimeChannel = null; }
+  stopQueuePolling();
   stopAnyPlayback();
+  currentRoom = null;
   showScreen("screen-lobby");
 }
 
