@@ -179,6 +179,11 @@
     max-height:75vh;overflow-y:auto;border-top:1px solid var(--border);
   }
   .modal-handle{width:36px;height:4px;background:var(--border);border-radius:3px;margin:0 auto 16px;}
+  /* Popup de fin de série (ajouté le 21/07/2026, demande de Rémi) : centré à
+     l'écran plutôt qu'en tiroir du bas comme les autres modales — c'est un
+     écran de résultat, pas une liste dans laquelle on choisit quelque chose. */
+  #serieGameOverModal{align-items:center;padding:20px;}
+  #serieGameOverModal .modal{border-radius:20px;max-height:none;}
   .search-result{
     display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid var(--border);
   }
@@ -364,6 +369,8 @@
         <div id="serieYtPlayer" style="display:none;"></div>
         <div style="font-size:34px;">🎧</div>
         <p style="font-size:12.5px;color:var(--text-dim);margin:8px 0 0;">Écoute et devine de quelle chanson il s'agit !</p>
+        <p style="font-size:22px;font-weight:700;margin:10px 0 0;" id="serieCountdown">15</p>
+        <button class="btn-ghost" style="margin-top:10px;font-size:12.5px;" onclick="serieSkipForward()">⏩ +1 min (intro trop longue)</button>
       </div>
       <div id="serieGuessBox">
         <div class="guess-grid" id="serieGuessGrid"></div>
@@ -1358,6 +1365,12 @@ let serieCurrentCorrect = null;
 let serieRecordToday = 0;
 let serieRecordAllTime = 0;
 const SERIE_MIN_TRACKS = 4; // il faut au moins 1 bonne réponse + 3 pièges
+// Chrono de vote (ajouté le 21/07/2026, demande de Rémi) : 15s pour répondre,
+// sinon la série s'arrête — même traitement qu'une mauvaise réponse, jamais
+// de manche suivante automatique (voir CLAUDE.md).
+const SERIE_VOTE_SECONDS = 15;
+let serieVoteTimer = null;
+let serieVoteDeadline = 0;
 
 async function startSerieFromPool(){
   if(!currentUser){ showToast("Connecte-toi d'abord."); showScreen("screen-login"); return; }
@@ -1426,6 +1439,48 @@ function startSerieRound(){
     </button>
   `).join("");
   ensureSeriePlayer(correct.youtube_id);
+  startSerieVoteTimer();
+}
+
+function startSerieVoteTimer(){
+  stopSerieVoteTimer();
+  serieVoteDeadline = Date.now() + SERIE_VOTE_SECONDS * 1000;
+  updateSerieVoteCountdown();
+  serieVoteTimer = setInterval(() => {
+    const secondsLeft = Math.ceil((serieVoteDeadline - Date.now()) / 1000);
+    if(secondsLeft <= 0){
+      stopSerieVoteTimer();
+      serieTimeExpired();
+      return;
+    }
+    updateSerieVoteCountdown(secondsLeft);
+  }, 250);
+}
+
+function updateSerieVoteCountdown(secondsLeft){
+  const el = document.getElementById("serieCountdown");
+  if(!el) return;
+  const left = secondsLeft ?? Math.max(0, Math.ceil((serieVoteDeadline - Date.now()) / 1000));
+  el.textContent = left;
+}
+
+function stopSerieVoteTimer(){
+  if(serieVoteTimer){ clearInterval(serieVoteTimer); serieVoteTimer = null; }
+}
+
+// Avance de 60s dans la vidéo en cours — pensé pour les chansons enregistrées
+// sous forme de clip officiel avec une intro sans musique reconnaissable.
+function serieSkipForward(){
+  if(!seriePlayer || typeof seriePlayer.getCurrentTime !== "function") return;
+  const current = seriePlayer.getCurrentTime();
+  seriePlayer.seekTo(current + 60, true);
+}
+
+async function serieTimeExpired(){
+  if(serieAnswered) return;
+  serieAnswered = true;
+  document.querySelectorAll("#serieGuessGrid button").forEach(btn => { btn.onclick = null; btn.disabled = true; });
+  await showSerieGameOver(true);
 }
 
 // Lecteur local, comme celui du Blindtest solo (ensureBtSoloPlayer) — pas de
@@ -1444,12 +1499,14 @@ function ensureSeriePlayer(youtubeId){
 }
 
 function stopSeriePlayer(){
+  stopSerieVoteTimer();
   if(seriePlayer){ try { seriePlayer.destroy(); } catch(e){} seriePlayer = null; }
 }
 
 async function pickSerieGuess(youtubeId){
   if(serieAnswered) return;
   serieAnswered = true;
+  stopSerieVoteTimer();
   document.querySelectorAll("#serieGuessGrid button").forEach(btn => { btn.onclick = null; btn.disabled = true; });
   const correct = youtubeId === serieCurrentCorrect.youtube_id;
   if(correct){
@@ -1467,11 +1524,16 @@ async function pickSerieGuess(youtubeId){
 // Popup de fin de série (ajouté le 21/07/2026, demande de Rémi, remplace
 // l'ancien panneau inline pour ce cas précis) : montre le score obtenu,
 // enregistre le score en base, et signale si c'est un nouveau record.
-async function showSerieGameOver(){
+// timedOut distingue le message affiché quand les 15s de vote sont écoulées
+// (serieTimeExpired) d'une vraie mauvaise réponse (pickSerieGuess).
+async function showSerieGameOver(timedOut){
+  stopSerieVoteTimer();
   const finalStreak = serieStreak;
   const isNewToday = finalStreak > serieRecordToday;
   const isNewAllTime = finalStreak > serieRecordAllTime;
-  document.getElementById("serieGameOverText").textContent = `Ta série s'arrête à ${finalStreak} — c'était "${serieCurrentCorrect.title}".`;
+  document.getElementById("serieGameOverText").textContent = timedOut
+    ? `⏱️ Temps écoulé ! Ta série s'arrête à ${finalStreak} — c'était "${serieCurrentCorrect.title}".`
+    : `Ta série s'arrête à ${finalStreak} — c'était "${serieCurrentCorrect.title}".`;
   document.getElementById("serieGameOverRecordNote").textContent = isNewAllTime
     ? "🎉 Nouveau record absolu !"
     : (isNewToday ? "🎉 Nouveau record du jour !" : "");
