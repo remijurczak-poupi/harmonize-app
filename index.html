@@ -365,20 +365,7 @@
         <span class="pill">📅 Record du jour : <span id="serieRecordToday">0</span></span>
         <span class="pill">🏆 Record total : <span id="serieRecordAllTime">0</span></span>
       </div>
-      <!-- Expérimental (Round 41, 21/07/2026) : nouvelle tentative après
-           l'échec du Round 40 (un clic sur NOTRE bouton, suivi d'un
-           playVideo() par code, ne changeait rien). Cette fois, un vrai clic
-           sur le bouton ▶ NATIF de YouTube (vraie vidéo visible, vrais
-           contrôles) — pas un appel de fonction JS. Comme la vidéo est
-           montrée en entier (titre, vignette), elle ne peut pas servir de
-           vraie manche de devinette : c'est une chanson "clé" à part, qui ne
-           compte pas dans la série, juste pour tester si un vrai clic natif
-           change quelque chose pour la suite. À retirer si aucun effet. -->
-      <div id="serieWarmupBox" style="display:none;text-align:center;padding:20px 0;">
-        <p style="font-size:12.5px;color:var(--text-dim);margin-bottom:12px;">Test en cours pour limiter les pubs : clique sur ▶ pour lancer cette chanson de démarrage (elle ne compte pas dans ta série) :</p>
-        <div id="serieWarmupPlayerEl" style="margin:0 auto;"></div>
-      </div>
-      <div class="card" id="serieGameCard" style="display:none;text-align:center;padding:24px;margin-bottom:16px;">
+      <div class="card" style="text-align:center;padding:24px;margin-bottom:16px;">
         <div style="position:relative;display:inline-block;">
           <div id="serieYtPlayer" style="display:none;"></div>
           <!-- Bandeau partiel (ajouté le 21/07/2026, même principe que
@@ -1418,49 +1405,6 @@ async function beginSerieSession(tracks){
   document.getElementById("serieSourceHint").textContent = "Enchaîne un maximum de bonnes réponses sans te tromper !";
   await loadSerieRecords();
   updateSerieCounters();
-  showSerieWarmup();
-}
-
-// Expérimental (Round 41) : voir le commentaire sur serieWarmupBox dans
-// screen-serie. Une chanson "clé" doit être lancée d'un vrai clic natif
-// YouTube avant que le vrai jeu (caché, en autoplay) ne démarre.
-let serieWarmupPlayer = null;
-let serieWarmupDone = false;
-
-function showSerieWarmup(){
-  serieWarmupDone = false;
-  document.getElementById("serieGameCard").style.display = "none";
-  document.getElementById("serieGuessBox").style.display = "none";
-  document.getElementById("serieResultPanel").style.display = "none";
-  document.getElementById("serieWarmupBox").style.display = "block";
-  const warmupTrack = serieQueue[Math.floor(Math.random() * serieQueue.length)];
-  ensureSerieWarmupPlayer(warmupTrack.youtube_id);
-}
-
-function ensureSerieWarmupPlayer(youtubeId){
-  if(!ytApiReady || typeof YT === "undefined" || !YT.Player){ setTimeout(() => ensureSerieWarmupPlayer(youtubeId), 300); return; }
-  serieWarmupPlayer = new YT.Player("serieWarmupPlayerEl", {
-    height: "158", width: "280",
-    videoId: youtubeId,
-    playerVars: { autoplay: 0, controls: 1, playsinline: 1, rel: 0, modestbranding: 1 },
-    events: {
-      onStateChange: (e) => {
-        // YT.PlayerState.PLAYING === 1 — ne se déclenche que sur un vrai
-        // démarrage de lecture (donc un vrai clic, puisqu'il n'y a pas
-        // d'autoplay ici), jamais sur pause/buffering/fin.
-        if(e.data === 1 && !serieWarmupDone){
-          serieWarmupDone = true;
-          setTimeout(finishSerieWarmup, 2000);
-        }
-      },
-    },
-  });
-}
-
-function finishSerieWarmup(){
-  document.getElementById("serieWarmupBox").style.display = "none";
-  if(serieWarmupPlayer){ try { serieWarmupPlayer.destroy(); } catch(e){} serieWarmupPlayer = null; }
-  document.getElementById("serieGameCard").style.display = "block";
   startSerieRound();
 }
 
@@ -1615,7 +1559,6 @@ function stopSeriePlayer(){
   stopSerieVoteTimer();
   resetSerieAdSkipUI();
   if(seriePlayer){ try { seriePlayer.destroy(); } catch(e){} seriePlayer = null; }
-  if(serieWarmupPlayer){ try { serieWarmupPlayer.destroy(); } catch(e){} serieWarmupPlayer = null; }
 }
 
 async function pickSerieGuess(youtubeId){
