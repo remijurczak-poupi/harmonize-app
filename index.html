@@ -346,6 +346,57 @@
       <button class="btn-ghost" style="margin-top:16px;" onclick="showScreen('screen-confirm')">← Retour</button>
     </section>
 
+    <!-- SCREEN: SÉRIE DE BLINDTEST — choix de la source (ajouté le 21/07/2026).
+         Même principe que screen-blindtest-solo-source, toujours solo. -->
+    <section class="screen" id="screen-serie-solo-source">
+      <h1>🔥 Série de blindtest</h1>
+      <p class="sub">D'où viennent les chansons à deviner ?</p>
+      <div class="stack">
+        <button class="mode-card" onclick="startSerieFromPool()">
+          <div class="mode-icon">🎲</div>
+          <div>
+            <div class="mode-title">Chansons aléatoires</div>
+            <div class="mode-desc">Pioche dans le pool communautaire — toutes les chansons déjà proposées par des joueurs lors de vraies parties en groupe.</div>
+          </div>
+        </button>
+        <button class="mode-card" onclick="startSerieFromPlaylist()">
+          <div class="mode-icon">🎵</div>
+          <div>
+            <div class="mode-title">Ma playlist</div>
+            <div class="mode-desc">Pioche dans tes propres titres importés (écran "Tes playlists").</div>
+          </div>
+        </button>
+      </div>
+      <p id="serieSourceHint" style="font-size:12px;color:var(--text-faint);text-align:center;margin-top:14px;"></p>
+      <button class="btn-ghost" style="margin-top:16px;" onclick="showScreen('screen-lobby')">← Retour</button>
+    </section>
+
+    <!-- SCREEN: SÉRIE DE BLINDTEST — la partie elle-même (ajouté le 21/07/2026).
+         Pas de nombre de manches fixé : on enchaîne tant qu'on répond juste,
+         une erreur remet la série à 0 (mais ne coupe jamais automatiquement —
+         toujours un bouton pour continuer ou recommencer, voir CLAUDE.md). -->
+    <section class="screen" id="screen-serie">
+      <h1>🔥 Série de blindtest</h1>
+      <p class="sub">Enchaîne un maximum de bonnes réponses sans te tromper !</p>
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <span class="pill">🔥 Série : <span id="serieStreak">0</span></span>
+        <span class="pill">🏆 Record de la session : <span id="serieBest">0</span></span>
+      </div>
+      <div class="card" style="text-align:center;padding:24px;margin-bottom:16px;">
+        <div id="serieYtPlayer" style="display:none;"></div>
+        <div style="font-size:34px;">🎧</div>
+        <p style="font-size:12.5px;color:var(--text-dim);margin:8px 0 0;">Écoute et devine de quelle chanson il s'agit !</p>
+      </div>
+      <div id="serieGuessBox">
+        <div class="guess-grid" id="serieGuessGrid"></div>
+      </div>
+      <div id="serieResultPanel" style="display:none;text-align:center;">
+        <p id="serieResultText" style="font-size:14px;margin-bottom:14px;"></p>
+        <button class="btn-primary" id="serieContinueBtn" onclick="nextSerieRound()"></button>
+      </div>
+      <button class="btn-ghost" style="margin-top:20px;" onclick="goHome()">← Retour à l'accueil</button>
+    </section>
+
     <!-- SCREEN: PLAYLISTS IMPORTÉES (rattachées au compte, réutilisables dans tous les salons) -->
     <section class="screen" id="screen-playlists">
       <h1>🎵 Tes playlists</h1>
@@ -671,9 +722,16 @@
            des questions) — pas de mode de sélection ici, pas de catalogue fixe. -->
       <div id="btPhaseLobby" style="display:none;">
         <div id="btLobbyCreatorFlow">
+          <!-- Curseur 1-20 (ajouté le 21/07/2026, remplace les boutons à choix
+               fixe 2/3/4/5) : plus flexible pour un petit salon (1-2 chansons
+               chacun) comme pour un grand groupe qui veut une longue partie. -->
           <div id="btStepSongs" class="card" style="margin-bottom:16px;">
             <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">Combien de chansons chacun propose-t-il ?</p>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;" id="btSongsPicker"></div>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+              <input type="range" id="btSongsSlider" min="1" max="20" value="3" oninput="onBtSongsSliderInput(this.value)" style="flex:1;accent-color:var(--accent1);" />
+              <span class="pill" id="btSongsSliderValue" style="min-width:32px;text-align:center;">3</span>
+            </div>
+            <button class="btn-primary" onclick="confirmBtSongsCount()">Valider</button>
           </div>
           <!-- Pas de choix "vidéo visible" ici (contrairement au jeu des
                questions) : toujours audio seulement, voir confirmBtSettings()
@@ -1001,7 +1059,7 @@ const badgeLabel = {spotify:"SPOTIFY", deezer:"DEEZER", apple:"APPLE MUSIC", you
 // 2 catégories principales, chacune avec ses sous-modes
 const CATEGORY_MODES = {
   ecoute: ["soiree", "distance"],
-  jeux: ["owner", "questions", "blindtest"],
+  jeux: ["owner", "questions", "blindtest", "serie"],
 };
 
 const MODE_DETAIL = {
@@ -1029,6 +1087,14 @@ const MODE_DETAIL = {
     emoji:"🎧", title:"Blindtest",
     desc:"En groupe : chacun propose quelques chansons, puis on les écoute une par une et on devine de quel titre il s'agit parmi plusieurs choix. En solo : pioche dans le pool communautaire de chansons déjà proposées par d'autres, ou dans ta propre playlist importée.",
     tag:"Connecté à une vraie base de données",
+  },
+  // Ajouté le 21/07/2026, idée notée le 19/07/2026 : toujours solo (pas de
+  // salon à créer), enchaîne les manches de blindtest sans limite tant
+  // qu'on répond juste — une erreur remet le compteur à zéro.
+  serie: {
+    emoji:"🔥", title:"Série de blindtest",
+    desc:"Enchaîne un maximum de bonnes réponses d'affilée, en solo — une erreur remet le compteur à zéro. Pioche dans le pool communautaire ou ta propre playlist, comme le Blindtest solo.",
+    tag:"Solo · vraies données",
   },
 };
 
@@ -1277,6 +1343,134 @@ function stopBtSoloPlayer(){
   if(btSoloPlayer){ try { btSoloPlayer.destroy(); } catch(e){} btSoloPlayer = null; }
 }
 
+// ---- Série de Blindtest (ajouté le 21/07/2026, idée notée le 19/07/2026) ----
+// Toujours solo (voir previewMode()), même principe de source de données que
+// le Blindtest solo (pool communautaire ou playlist perso, voir
+// startBtSoloFromPool()/startBtSoloFromPlaylist() ci-dessus) mais une
+// mécanique différente : pas de nombre de manches fixé à l'avance, on
+// enchaîne tant qu'on répond juste. Une erreur remet la série à 0 — jamais de
+// coupure automatique pour autant, on PROPOSE toujours de continuer ou de
+// recommencer via un bouton (même principe que le reste de l'app). Le
+// record (serieBest) n'est gardé que pour la session en cours — le garder
+// d'une visite à l'autre est l'idée séparée "historique des scores
+// personnels", pas encore construite (voir roadmap-et-idees.md).
+let serieQueue = [];
+let seriePlayer = null;
+let serieStreak = 0;
+let serieBest = 0;
+let serieAnswered = false;
+let serieCurrentCorrect = null;
+const SERIE_MIN_TRACKS = 4; // il faut au moins 1 bonne réponse + 3 pièges
+
+async function goSerieBlindtest(){
+  document.getElementById("serieSourceHint").textContent = "";
+  showScreen("screen-serie-solo-source");
+}
+
+async function startSerieFromPool(){
+  if(!currentUser){ showToast("Connecte-toi d'abord."); showScreen("screen-login"); return; }
+  const hint = document.getElementById("serieSourceHint");
+  hint.textContent = "Chargement du pool communautaire...";
+  const { data, error } = await sb.from("blindtest_pool").select("*").limit(300);
+  if(error){ hint.textContent = "Erreur de chargement : " + error.message; return; }
+  const tracks = data || [];
+  if(tracks.length < SERIE_MIN_TRACKS){
+    hint.textContent = `Pas encore assez de chansons dans le pool communautaire (${tracks.length} pour l'instant) — invite des amis à jouer en multijoueur d'abord, ou choisis "Ma playlist".`;
+    return;
+  }
+  beginSerieSession(tracks);
+}
+
+async function startSerieFromPlaylist(){
+  if(!currentUser){ showToast("Connecte-toi d'abord."); showScreen("screen-login"); return; }
+  const hint = document.getElementById("serieSourceHint");
+  if(!myImportedTracks.length){
+    hint.textContent = "Chargement de tes playlists...";
+    await loadMyImportedTracks();
+  }
+  if(myImportedTracks.length < SERIE_MIN_TRACKS){
+    hint.textContent = `Pas encore assez de titres importés (${myImportedTracks.length} pour l'instant) — importe au moins ${SERIE_MIN_TRACKS} titres depuis "Tes playlists", ou choisis "Chansons aléatoires".`;
+    return;
+  }
+  beginSerieSession(myImportedTracks);
+}
+
+function beginSerieSession(tracks){
+  serieQueue = tracks.filter(t => t.youtube_id);
+  serieStreak = 0;
+  updateSerieCounters();
+  showScreen("screen-serie");
+  startSerieRound();
+}
+
+function updateSerieCounters(){
+  document.getElementById("serieStreak").textContent = serieStreak;
+  document.getElementById("serieBest").textContent = serieBest;
+}
+
+function startSerieRound(){
+  serieAnswered = false;
+  document.getElementById("serieResultPanel").style.display = "none";
+  document.getElementById("serieGuessBox").style.display = "block";
+  const correct = serieQueue[Math.floor(Math.random() * serieQueue.length)];
+  const others = serieQueue.filter(t => t.youtube_id !== correct.youtube_id);
+  const decoys = shuffleArray(others).slice(0, Math.min(3, others.length));
+  const options = shuffleArray([correct, ...decoys]);
+  serieCurrentCorrect = correct;
+  document.getElementById("serieGuessGrid").innerHTML = options.map(o => `
+    <button class="guess-option" onclick="pickSerieGuess('${escJs(o.youtube_id)}')">
+      <div>${escapeHtml(o.title)}</div>
+      <div style="font-size:10.5px;color:var(--text-faint);">${escapeHtml(o.artist||"")}</div>
+    </button>
+  `).join("");
+  ensureSeriePlayer(correct.youtube_id);
+}
+
+// Lecteur local, comme celui du Blindtest solo (ensureBtSoloPlayer) — pas de
+// salon, pas de synchronisation entre appareils à gérer ici.
+function ensureSeriePlayer(youtubeId){
+  if(!ytApiReady || typeof YT === "undefined" || !YT.Player){ setTimeout(() => ensureSeriePlayer(youtubeId), 300); return; }
+  if(!seriePlayer){
+    seriePlayer = new YT.Player("serieYtPlayer", {
+      height: "1", width: "1",
+      videoId: youtubeId,
+      playerVars: { autoplay: 1, controls: 0, disablekb: 1, playsinline: 1, fs: 0, rel: 0, iv_load_policy: 3, modestbranding: 1 },
+    });
+  } else {
+    seriePlayer.loadVideoById(youtubeId);
+  }
+}
+
+function stopSeriePlayer(){
+  if(seriePlayer){ try { seriePlayer.destroy(); } catch(e){} seriePlayer = null; }
+}
+
+function pickSerieGuess(youtubeId){
+  if(serieAnswered) return;
+  serieAnswered = true;
+  document.querySelectorAll("#serieGuessGrid button").forEach(btn => { btn.onclick = null; btn.disabled = true; });
+  const correct = youtubeId === serieCurrentCorrect.youtube_id;
+  const btn = document.getElementById("serieContinueBtn");
+  if(correct){
+    serieStreak++;
+    if(serieStreak > serieBest) serieBest = serieStreak;
+    updateSerieCounters();
+    document.getElementById("serieResultText").textContent = `✅ Bonne réponse ! Série en cours : ${serieStreak}.`;
+    btn.textContent = "➡️ Chanson suivante";
+  } else {
+    document.getElementById("serieResultText").textContent = `❌ Raté — c'était "${serieCurrentCorrect.title}". Ta série de ${serieStreak} s'arrête ici.`;
+    serieStreak = 0;
+    updateSerieCounters();
+    btn.textContent = "🔄 Recommencer une série";
+  }
+  document.getElementById("serieGuessBox").style.display = "none";
+  document.getElementById("serieResultPanel").style.display = "block";
+}
+
+function nextSerieRound(){
+  startSerieRound();
+}
+
 let creationCategory = null; // catégorie en cours de création (avant d'avoir choisi le sous-mode)
 
 // Salons fictifs de démonstration (pour les modes pas encore connectés à Supabase).
@@ -1497,6 +1691,10 @@ function renderModeCards(){
 let pendingMode = null;
 
 function previewMode(mode){
+  // "Série de blindtest" (ajouté le 21/07/2026) est TOUJOURS solo, comme
+  // "Le jeu des questions"/Blindtest quand ils étaient encore 100% démo —
+  // pas besoin d'un vrai salon, on saute directement l'écran de confirmation.
+  if(mode === "serie"){ goSerieBlindtest(); return; }
   pendingMode = mode;
   const d = MODE_DETAIL[mode];
   document.getElementById("confirmTitle").textContent = `Créer ce salon : ${d.emoji} ${d.title} ?`;
@@ -2012,6 +2210,7 @@ function stopAnyPlayback(){
   stopGamePlayer();
   stopBtPlayer();
   stopBtSoloPlayer();
+  stopSeriePlayer();
 }
 
 // Construit le contenu du lecteur affiché dans un vrai salon — différent
@@ -4336,24 +4535,11 @@ function renderBlindtestLobby(){
    les réglages d'écoute anti-spoiler (même principe que "Le jeu des
    questions") — pas de "mode de sélection" ici, il n'y a pas de catalogue
    fixe dans lequel piocher. ---- */
-const BT_SONGS_CHOICES = [2, 3, 4, 5];
-
 function renderBtSongCountPicker(){
   const creator = isGameCreator();
   document.getElementById("btLobbyCreatorFlow").style.display = creator ? "block" : "none";
   document.getElementById("btLobbyWaitMsg").style.display = creator ? "none" : "block";
   if(!creator) return;
-
-  if(!document.getElementById("btSongsPicker").children.length){
-    document.getElementById("btSongsPicker").innerHTML = BT_SONGS_CHOICES.map(n => `
-      <button class="btn-ghost" style="width:auto;padding:10px 16px;" data-songs="${n}" onclick="pickBtSongsCount(${n})">${n}</button>
-    `).join("");
-  }
-  document.querySelectorAll("#btSongsPicker button").forEach(btn => {
-    const active = Number(btn.dataset.songs) === btSongsPerPersonTarget;
-    btn.style.borderColor = active ? "var(--accent1)" : "var(--border)";
-    btn.style.color = active ? "var(--text)" : "var(--text-dim)";
-  });
 
   if(!btSongsPerPersonTarget){
     document.getElementById("btStepSongs").style.display = "block";
@@ -4369,8 +4555,15 @@ function renderBtSongCountPicker(){
   });
 }
 
-function pickBtSongsCount(n){
-  btSongsPerPersonTarget = n;
+// Affiche juste la valeur en direct pendant qu'on fait glisser le curseur —
+// ne valide rien tant que le bouton "Valider" n'est pas cliqué.
+function onBtSongsSliderInput(value){
+  document.getElementById("btSongsSliderValue").textContent = value;
+}
+
+function confirmBtSongsCount(){
+  const value = Number(document.getElementById("btSongsSlider").value);
+  btSongsPerPersonTarget = value;
   btPlaybackStart = null;
   renderBtSongCountPicker();
 }
