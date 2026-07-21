@@ -365,7 +365,20 @@
         <span class="pill">📅 Record du jour : <span id="serieRecordToday">0</span></span>
         <span class="pill">🏆 Record total : <span id="serieRecordAllTime">0</span></span>
       </div>
-      <div class="card" style="text-align:center;padding:24px;margin-bottom:16px;">
+      <!-- Expérimental (Round 41, 21/07/2026) : nouvelle tentative après
+           l'échec du Round 40 (un clic sur NOTRE bouton, suivi d'un
+           playVideo() par code, ne changeait rien). Cette fois, un vrai clic
+           sur le bouton ▶ NATIF de YouTube (vraie vidéo visible, vrais
+           contrôles) — pas un appel de fonction JS. Comme la vidéo est
+           montrée en entier (titre, vignette), elle ne peut pas servir de
+           vraie manche de devinette : c'est une chanson "clé" à part, qui ne
+           compte pas dans la série, juste pour tester si un vrai clic natif
+           change quelque chose pour la suite. À retirer si aucun effet. -->
+      <div id="serieWarmupBox" style="display:none;text-align:center;padding:20px 0;">
+        <p style="font-size:12.5px;color:var(--text-dim);margin-bottom:12px;">Test en cours pour limiter les pubs : clique sur ▶ pour lancer cette chanson de démarrage (elle ne compte pas dans ta série) :</p>
+        <div id="serieWarmupPlayerEl" style="margin:0 auto;"></div>
+      </div>
+      <div class="card" id="serieGameCard" style="display:none;text-align:center;padding:24px;margin-bottom:16px;">
         <div style="position:relative;display:inline-block;">
           <div id="serieYtPlayer" style="display:none;"></div>
           <!-- Bandeau partiel (ajouté le 21/07/2026, même principe que
@@ -384,20 +397,6 @@
           <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12.5px;" onclick="serieSkipForward()">⏩ Avancer de 1 min</button>
           <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12.5px;" onclick="revealSerieAdSkip()">📺 Pub bloquée ?</button>
         </div>
-      </div>
-      <!-- Expérimental (Round 40, 21/07/2026) : Rémi soupçonne que les pubs
-           quasi systématiques en jeu viennent du fait que YouTube démarre
-           TOUJOURS nos vidéos par du code (autoplay), jamais par un vrai clic
-           sur la vidéo elle-même — contrairement à YouTube natif, où un clic
-           direct semble éviter ce traitement. Ce bloc ne sert qu'à LA TOUTE
-           PREMIÈRE chanson d'une série : un vrai clic démarre une vidéo de
-           taille normale (pas 1x1), sans autoplay, pour se rapprocher d'une
-           lecture "standard" — à comparer avec le comportement habituel sur
-           les manches suivantes (celles-là restent en autoplay comme avant).
-           À retirer si le test ne montre aucune différence. -->
-      <div id="serieManualStartBox" style="display:none;text-align:center;padding:12px 0;">
-        <p style="font-size:12.5px;color:var(--text-dim);margin-bottom:12px;">Pour cette toute première chanson, lance-la toi-même (test en cours pour limiter les pubs) :</p>
-        <button class="btn-primary" onclick="startSerieFirstRoundManually()">▶️ Lancer la première chanson</button>
       </div>
       <div id="serieGuessBox">
         <div class="guess-grid" id="serieGuessGrid"></div>
@@ -1392,9 +1391,6 @@ let serieCurrentCorrect = null;
 let serieRecordToday = 0;
 let serieRecordAllTime = 0;
 const SERIE_MIN_TRACKS = 4; // il faut au moins 1 bonne réponse + 3 pièges
-// Expérimental (Round 40) : true tant que la toute première chanson d'une
-// session n'a pas été lancée d'un vrai clic (voir startSerieFirstRoundManually).
-let serieIsFirstRound = true;
 // Chrono de vote (ajouté le 21/07/2026, demande de Rémi) : 15s pour répondre,
 // sinon la série s'arrête — même traitement qu'une mauvaise réponse, jamais
 // de manche suivante automatique (voir CLAUDE.md).
@@ -1419,10 +1415,52 @@ async function startSerieFromPool(){
 async function beginSerieSession(tracks){
   serieQueue = tracks.filter(t => t.youtube_id);
   serieStreak = 0;
-  serieIsFirstRound = true;
   document.getElementById("serieSourceHint").textContent = "Enchaîne un maximum de bonnes réponses sans te tromper !";
   await loadSerieRecords();
   updateSerieCounters();
+  showSerieWarmup();
+}
+
+// Expérimental (Round 41) : voir le commentaire sur serieWarmupBox dans
+// screen-serie. Une chanson "clé" doit être lancée d'un vrai clic natif
+// YouTube avant que le vrai jeu (caché, en autoplay) ne démarre.
+let serieWarmupPlayer = null;
+let serieWarmupDone = false;
+
+function showSerieWarmup(){
+  serieWarmupDone = false;
+  document.getElementById("serieGameCard").style.display = "none";
+  document.getElementById("serieGuessBox").style.display = "none";
+  document.getElementById("serieResultPanel").style.display = "none";
+  document.getElementById("serieWarmupBox").style.display = "block";
+  const warmupTrack = serieQueue[Math.floor(Math.random() * serieQueue.length)];
+  ensureSerieWarmupPlayer(warmupTrack.youtube_id);
+}
+
+function ensureSerieWarmupPlayer(youtubeId){
+  if(!ytApiReady || typeof YT === "undefined" || !YT.Player){ setTimeout(() => ensureSerieWarmupPlayer(youtubeId), 300); return; }
+  serieWarmupPlayer = new YT.Player("serieWarmupPlayerEl", {
+    height: "158", width: "280",
+    videoId: youtubeId,
+    playerVars: { autoplay: 0, controls: 1, playsinline: 1, rel: 0, modestbranding: 1 },
+    events: {
+      onStateChange: (e) => {
+        // YT.PlayerState.PLAYING === 1 — ne se déclenche que sur un vrai
+        // démarrage de lecture (donc un vrai clic, puisqu'il n'y a pas
+        // d'autoplay ici), jamais sur pause/buffering/fin.
+        if(e.data === 1 && !serieWarmupDone){
+          serieWarmupDone = true;
+          setTimeout(finishSerieWarmup, 2000);
+        }
+      },
+    },
+  });
+}
+
+function finishSerieWarmup(){
+  document.getElementById("serieWarmupBox").style.display = "none";
+  if(serieWarmupPlayer){ try { serieWarmupPlayer.destroy(); } catch(e){} serieWarmupPlayer = null; }
+  document.getElementById("serieGameCard").style.display = "block";
   startSerieRound();
 }
 
@@ -1469,29 +1507,8 @@ function startSerieRound(){
       <div style="font-size:10.5px;color:var(--text-faint);">${escapeHtml(o.artist||"")}</div>
     </button>
   `).join("");
-  // Expérimental (Round 40) : la toute première chanson d'une session attend
-  // un vrai clic (voir startSerieFirstRoundManually) au lieu de démarrer
-  // automatiquement — le reste de la fonction reprend alors la main.
-  if(serieIsFirstRound){
-    document.getElementById("serieGuessBox").style.display = "none";
-    document.getElementById("serieManualStartBox").style.display = "block";
-    return;
-  }
   document.getElementById("serieGuessBox").style.display = "block";
   ensureSeriePlayer(correct.youtube_id);
-  startSerieVoteTimer();
-}
-
-// Démarre la toute première chanson d'une session sur un vrai clic — lecteur
-// de taille normale (pas 1x1) et sans autoplay, pour se rapprocher d'une
-// lecture "standard" plutôt que "scriptée" (voir le commentaire sur
-// serieManualStartBox dans screen-serie). Se recache ensuite comme
-// d'habitude, une fois la lecture réellement démarrée.
-function startSerieFirstRoundManually(){
-  serieIsFirstRound = false;
-  document.getElementById("serieManualStartBox").style.display = "none";
-  document.getElementById("serieGuessBox").style.display = "block";
-  ensureSeriePlayer(serieCurrentCorrect.youtube_id, { manualFirstPlay: true });
   startSerieVoteTimer();
 }
 
@@ -1581,54 +1598,24 @@ async function serieTimeExpired(){
 
 // Lecteur local, comme celui du Blindtest solo (ensureBtSoloPlayer) — pas de
 // salon, pas de synchronisation entre appareils à gérer ici.
-// opts.manualFirstPlay (expérimental, Round 40) : la toute première chanson
-// d'une session démarre en taille normale et SANS autoplay — la lecture est
-// déclenchée par onReady juste après le vrai clic de l'utilisateur (voir
-// startSerieFirstRoundManually), pour tester si un vrai déclenchement natif
-// change le traitement publicitaire par rapport à l'autoplay habituel.
-function ensureSeriePlayer(youtubeId, opts){
-  opts = opts || {};
-  if(!ytApiReady || typeof YT === "undefined" || !YT.Player){ setTimeout(() => ensureSeriePlayer(youtubeId, opts), 300); return; }
+function ensureSeriePlayer(youtubeId){
+  if(!ytApiReady || typeof YT === "undefined" || !YT.Player){ setTimeout(() => ensureSeriePlayer(youtubeId), 300); return; }
   if(!seriePlayer){
-    if(opts.manualFirstPlay){
-      seriePlayer = new YT.Player("serieYtPlayer", {
-        height: "158", width: "280",
-        videoId: youtubeId,
-        playerVars: { autoplay: 0, controls: 0, disablekb: 1, playsinline: 1, fs: 0, rel: 0, iv_load_policy: 3, modestbranding: 1 },
-        events: {
-          onReady: (e) => { e.target.playVideo(); scheduleSerieManualPlayerShrink(); },
-        },
-      });
-      const el = document.getElementById("serieYtPlayer");
-      if(el) el.style.display = "block";
-    } else {
-      seriePlayer = new YT.Player("serieYtPlayer", {
-        height: "1", width: "1",
-        videoId: youtubeId,
-        playerVars: { autoplay: 1, controls: 0, disablekb: 1, playsinline: 1, fs: 0, rel: 0, iv_load_policy: 3, modestbranding: 1 },
-      });
-    }
+    seriePlayer = new YT.Player("serieYtPlayer", {
+      height: "1", width: "1",
+      videoId: youtubeId,
+      playerVars: { autoplay: 1, controls: 0, disablekb: 1, playsinline: 1, fs: 0, rel: 0, iv_load_policy: 3, modestbranding: 1 },
+    });
   } else {
     seriePlayer.loadVideoById(youtubeId);
   }
 }
 
-// Laisse la vidéo apparente une fraction de seconde après le vrai clic (le
-// temps que la lecture démarre réellement), puis la recache — même règle
-// anti-spoiler que pour toutes les autres manches.
-function scheduleSerieManualPlayerShrink(){
-  setTimeout(() => {
-    if(seriePlayer && typeof seriePlayer.setSize === "function") seriePlayer.setSize(1, 1);
-    const el = document.getElementById("serieYtPlayer");
-    if(el) el.style.display = "none";
-  }, 1500);
-}
-
 function stopSeriePlayer(){
   stopSerieVoteTimer();
   resetSerieAdSkipUI();
-  serieIsFirstRound = true;
   if(seriePlayer){ try { seriePlayer.destroy(); } catch(e){} seriePlayer = null; }
+  if(serieWarmupPlayer){ try { serieWarmupPlayer.destroy(); } catch(e){} serieWarmupPlayer = null; }
 }
 
 async function pickSerieGuess(youtubeId){
