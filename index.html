@@ -18,6 +18,12 @@
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="0" />
 <title>Harmonize</title>
+<!-- PWA (ajouté le 19/07/2026) : rend l'app installable sur téléphone/ordinateur,
+     voir manifest.json et sw.js. Le service worker ne met rien en cache (voir son
+     propre commentaire) pour ne pas revenir sur le bug de cache du 13/07/2026. -->
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<meta name="theme-color" content="#0f0d17" />
 <style>
   :root{
     --bg:#0f0d17;
@@ -173,6 +179,11 @@
     max-height:75vh;overflow-y:auto;border-top:1px solid var(--border);
   }
   .modal-handle{width:36px;height:4px;background:var(--border);border-radius:3px;margin:0 auto 16px;}
+  /* Popup de fin de série (ajouté le 21/07/2026, demande de Rémi) : centré à
+     l'écran plutôt qu'en tiroir du bas comme les autres modales — c'est un
+     écran de résultat, pas une liste dans laquelle on choisit quelque chose. */
+  #serieGameOverModal{align-items:center;padding:20px;}
+  #serieGameOverModal .modal{border-radius:20px;max-height:none;}
   .search-result{
     display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid var(--border);
   }
@@ -193,7 +204,7 @@
   }
   .guess-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;}
   .guess-option{
-    background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-sm);
+    background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);
     padding:12px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12.5px;font-weight:600;
   }
   .guess-option.correct{border-color:var(--success);background:#22c55e18;}
@@ -306,7 +317,85 @@
       <p class="sub">Un vrai code sera généré pour que tes amis puissent te rejoindre. Rien n'est créé tant que tu n'as pas confirmé.</p>
       <div class="mode-card" id="confirmCard" style="cursor:default;"></div>
       <button class="btn-primary" onclick="confirmCreateRoom()">🚀 Créer le salon</button>
+      <!-- Bouton solo (ajouté le 19/07/2026), affiché uniquement pour le
+           Blindtest — voir previewMode()/goSoloBlindtest(). Pas besoin d'amis
+           ni de vrai salon : on pioche directement dans le pool communautaire
+           ou dans sa propre playlist importée. -->
+      <button class="btn-ghost" style="margin-top:10px;display:none;" id="btSoloInstead" onclick="goSoloBlindtest()">🎧 Jouer en solo à la place</button>
       <button class="btn-ghost" style="margin-top:10px;" onclick="showScreen('screen-modes')">← Choisir un autre mode</button>
+    </section>
+
+    <!-- SCREEN: BLINDTEST SOLO — choix de la source (ajouté le 19/07/2026).
+         Pas de salon créé ici : on reste en local, comme l'ancien mode démo,
+         mais avec de vraies chansons et du vrai son. -->
+    <section class="screen" id="screen-blindtest-solo-source">
+      <h1>🎧 Blindtest solo</h1>
+      <p class="sub">D'où viennent les chansons à deviner ?</p>
+      <div class="stack">
+        <button class="mode-card" onclick="startBtSoloFromPool()">
+          <div class="mode-icon">🎲</div>
+          <div>
+            <div class="mode-title">Chansons aléatoires</div>
+            <div class="mode-desc">Pioche dans le pool communautaire — toutes les chansons déjà proposées par des joueurs lors de vraies parties en groupe.</div>
+          </div>
+        </button>
+        <button class="mode-card" onclick="startBtSoloFromPlaylist()">
+          <div class="mode-icon">🎵</div>
+          <div>
+            <div class="mode-title">Ma playlist</div>
+            <div class="mode-desc">Pioche dans tes propres titres importés (écran "Tes playlists") — de quoi tester si tu reconnais tes propres chansons !</div>
+          </div>
+        </button>
+      </div>
+      <p id="btSoloSourceHint" style="font-size:12px;color:var(--text-faint);text-align:center;margin-top:14px;"></p>
+      <button class="btn-ghost" style="margin-top:16px;" onclick="showScreen('screen-confirm')">← Retour</button>
+    </section>
+
+    <!-- SCREEN: SÉRIE DE BLINDTEST — la partie elle-même (ajouté le
+         21/07/2026, simplifié le même jour : plus d'écran de choix de source,
+         toujours le pool communautaire — voir previewMode()). Pas de nombre
+         de manches fixé : on enchaîne tant qu'on répond juste, une erreur
+         remet la série à 0 (mais ne coupe jamais automatiquement — toujours
+         un bouton pour continuer ou recommencer, voir CLAUDE.md). -->
+    <section class="screen" id="screen-serie">
+      <h1>🔥 Série de blindtest</h1>
+      <p class="sub" id="serieSourceHint">Enchaîne un maximum de bonnes réponses sans te tromper !</p>
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+        <span class="pill">🔥 Série : <span id="serieStreak">0</span></span>
+        <span class="pill">📅 Record du jour : <span id="serieRecordToday">0</span></span>
+        <span class="pill">🏆 Record total : <span id="serieRecordAllTime">0</span></span>
+      </div>
+      <div class="card" style="text-align:center;padding:24px;margin-bottom:16px;">
+        <div style="position:relative;display:inline-block;">
+          <div id="serieYtPlayer" style="display:none;"></div>
+          <!-- Bandeau partiel (ajouté le 21/07/2026, même principe que
+               btAdSkipBanner/gqAdSkipBanner) : pendant la fenêtre de "Pub
+               bloquée ?", le lecteur agrandi resterait sinon visible en
+               entier et spoilerait le titre/la vignette de la vraie chanson.
+               Ce bandeau ne couvre que le haut (là où YouTube affiche le
+               titre) sans bloquer aucun clic (pointer-events:none), pour ne
+               jamais gêner le bouton natif "Ignorer" en dessous. -->
+          <div id="serieAdSkipBanner" style="display:none;position:absolute;top:0;left:0;right:0;height:55%;pointer-events:none;background:linear-gradient(160deg,var(--accent1),var(--accent2));border-radius:8px 8px 0 0;"></div>
+        </div>
+        <div style="font-size:34px;">🎧</div>
+        <p style="font-size:12.5px;color:var(--text-dim);margin:8px 0 0;">Écoute et devine de quelle chanson il s'agit !</p>
+        <p style="font-size:22px;font-weight:700;margin:10px 0 0;" id="serieCountdown">15</p>
+        <div style="display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap;">
+          <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12.5px;" onclick="serieSkipForward()">⏩ Avancer de 1 min</button>
+          <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12.5px;" onclick="revealSerieAdSkip()">📺 Pub bloquée ?</button>
+        </div>
+      </div>
+      <div id="serieGuessBox">
+        <div class="guess-grid" id="serieGuessGrid"></div>
+      </div>
+      <!-- Ne sert plus qu'aux BONNES réponses (ajouté le 21/07/2026) — une
+           mauvaise réponse ouvre désormais le popup serieGameOverModal
+           ci-dessous, à la demande de Rémi. -->
+      <div id="serieResultPanel" style="display:none;text-align:center;">
+        <p id="serieResultText" style="font-size:14px;margin-bottom:14px;"></p>
+        <button class="btn-primary" id="serieContinueBtn" onclick="nextSerieRound()"></button>
+      </div>
+      <button class="btn-ghost" style="margin-top:20px;" onclick="goHome()">← Retour à l'accueil</button>
     </section>
 
     <!-- SCREEN: PLAYLISTS IMPORTÉES (rattachées au compte, réutilisables dans tous les salons) -->
@@ -387,7 +476,14 @@
           <span class="pill" id="roundTimerLabel" title="Juste indicatif — répondez à votre rythme, la musique tourne !">⏱ 0s</span>
         </div>
         <div class="game-card">
-          <div class="game-art">🎵</div>
+          <!-- Vrai lecteur YouTube (ajouté le 19/07/2026), affiché uniquement
+               pour le Blindtest solo sur de vraies données (pool communautaire
+               ou playlist perso) — voir ensureBtSoloPlayer(). Cache visuel
+               par-dessus pour ne rien révéler (même principe que gqAudioCover),
+               puisque le but est justement de deviner sans voir le titre. -->
+          <div id="btSoloYtPlayer" style="display:none;"></div>
+          <div id="btSoloAudioCover" style="display:none;font-size:34px;padding:20px 0;">🎧</div>
+          <div class="game-art" id="gameArtEmoji">🎵</div>
           <div style="font-size:11px;font-weight:700;color:var(--accent1);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;" id="mysteryCategory"></div>
           <div style="font-weight:700;font-size:16px;" id="mysteryTitle">???</div>
           <div style="color:var(--text-dim);font-size:13px;margin-top:2px;" id="mysteryArtist">???</div>
@@ -408,8 +504,14 @@
         </div>
       </div>
 
-      <h2 style="margin-top:24px;">Scores</h2>
-      <div id="scoreBoard"></div>
+      <!-- Masqué en Blindtest solo réel (ajouté le 19/07/2026) : un
+           "classement" n'a pas de sens quand on joue seul contre de vraies
+           données — voir beginBtSoloSession()/startGame(). Reste affiché pour
+           les autres jeux encore en démo (avec les amis fictifs). -->
+      <div id="gameScoresSection">
+        <h2 style="margin-top:24px;">Scores</h2>
+        <div id="scoreBoard"></div>
+      </div>
     </section>
 
     <!-- SCREEN: JEU DES QUESTIONS — VRAI salon (ajouté le 12/07/2026).
@@ -488,6 +590,7 @@
         </div>
       </div>
 
+
       <!-- Phase 3 : la partie — écoute manche par manche + vote en direct +
            points selon la vitesse de réponse (construite le 12/07/2026). -->
       <div id="gqPhasePlaying" style="display:none;">
@@ -526,10 +629,17 @@
                    clics vers le vrai bouton pause d'Harmonize (celui qui
                    prévient bien tout le monde), plutôt que de dépendre des
                    boutons natifs de YouTube. -->
-              <div onclick="toggleGamePlayPause()" style="position:absolute;inset:0;cursor:pointer;" title="Cliquer pour mettre en pause / reprendre — pour tout le monde"></div>
+              <!-- Bandeau partiel (ajouté le 19/07/2026) — voir son jumeau
+                   btAdSkipBanner côté Blindtest pour le pourquoi. -->
+              <div id="gqAdSkipBanner" style="display:none;position:absolute;top:0;left:0;right:0;height:55%;pointer-events:none;background:linear-gradient(160deg,var(--accent1),var(--accent2));border-radius:12px 12px 0 0;"></div>
+              <div id="gqClickBlocker" onclick="toggleGamePlayPause()" style="position:absolute;inset:0;cursor:pointer;" title="Cliquer pour mettre en pause / reprendre — pour tout le monde"></div>
             </div>
             <div style="display:flex;gap:8px;margin-top:10px;">
               <button class="btn-ghost" style="width:auto;padding:8px 14px;" onclick="toggleGamePlayPause()" id="gamePlayPauseBtn">⏸ Pause</button>
+              <!-- Ajouté le 19/07/2026, même correctif que le Blindtest
+                   (revealAdSkipButton()) : les 2 couches ci-dessus bloquent
+                   aussi le bouton natif "Passer" d'une éventuelle pub. -->
+              <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="revealGameAdSkipButton()">📺 Pub bloquée ?</button>
             </div>
           </div>
 
@@ -597,13 +707,154 @@
       </div>
     </section>
 
+    <!-- SCREEN: BLINDTEST — VRAI salon multijoueur (ajouté le 19/07/2026).
+         Même principe que screen-game-lobby ("Le jeu des questions") : ici
+         chacun PROPOSE quelques chansons de son choix (pas de catégories
+         fixes), puis on les devine une par une en choix multiple. -->
+    <section class="screen" id="screen-blindtest-lobby">
+      <div class="room-hero">
+        <div class="code">Salon · <span id="btRoomCode">------</span> <span class="real-badge">RÉEL</span></div>
+        <div class="name">🎧 Blindtest</div>
+        <div class="avatars-inline" id="btRoomAvatars"></div>
+      </div>
+
+      <!-- Phase 1 : le créateur choisit combien de chansons chacun propose,
+           puis les réglages d'écoute anti-spoiler (même principe que le jeu
+           des questions) — pas de mode de sélection ici, pas de catalogue fixe. -->
+      <div id="btPhaseLobby" style="display:none;">
+        <div id="btLobbyCreatorFlow">
+          <!-- Curseur 1-20 (ajouté le 21/07/2026, remplace les boutons à choix
+               fixe 2/3/4/5) : plus flexible pour un petit salon (1-2 chansons
+               chacun) comme pour un grand groupe qui veut une longue partie. -->
+          <div id="btStepSongs" class="card" style="margin-bottom:16px;">
+            <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">Combien de chansons chacun propose-t-il ?</p>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+              <input type="range" id="btSongsSlider" min="1" max="20" value="3" oninput="onBtSongsSliderInput(this.value)" style="flex:1;accent-color:var(--accent1);" />
+              <span class="pill" id="btSongsSliderValue" style="min-width:32px;text-align:center;">3</span>
+            </div>
+            <button class="btn-primary" onclick="confirmBtSongsCount()">Valider</button>
+          </div>
+          <!-- Pas de choix "vidéo visible" ici (contrairement au jeu des
+               questions) : toujours audio seulement, voir confirmBtSettings()
+               dans index.html pour le pourquoi. -->
+          <div id="btStepPlayback" class="card" style="display:none;margin-bottom:16px;">
+            <p style="font-size:13px;color:var(--text-dim);margin-bottom:10px;">Où démarrer la lecture de chaque chanson ?</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;" id="btPlaybackStartPicker">
+              <button class="btn-ghost" style="width:auto;flex:1;padding:10px 8px;" data-start="start" onclick="pickBtPlaybackStart('start')">⏮ Depuis le début</button>
+              <button class="btn-ghost" style="width:auto;flex:1;padding:10px 8px;" data-start="middle" onclick="pickBtPlaybackStart('middle')">⏭ Vers ~45 secondes</button>
+            </div>
+            <button class="btn-ghost" style="margin-top:10px;" onclick="backToBtSongsCountStep()">← Changer le nombre de chansons</button>
+          </div>
+        </div>
+        <p id="btLobbyWaitMsg" style="display:none;font-size:13px;color:var(--text-faint);text-align:center;margin-top:14px;">En attente que le créateur du salon choisisse les réglages...</p>
+      </div>
+
+      <!-- Phase 2 : chacun propose ses chansons -->
+      <div id="btPhaseAnswering" style="display:none;">
+        <h2 style="margin-top:0;">Tes propositions</h2>
+        <div id="btMyAnswers" class="stack" style="margin-bottom:24px;"></div>
+
+        <h2>Qui a proposé ses chansons ?</h2>
+        <p style="font-size:12px;color:var(--text-faint);margin-top:-6px;margin-bottom:12px;">Le contenu des propositions reste secret jusqu'au lancement de la partie — seule la progression est visible.</p>
+        <div id="btProgress" class="stack" style="margin-bottom:20px;"></div>
+
+        <div id="btCreatorControls" style="display:none;text-align:center;">
+          <button class="btn-primary" id="btLaunchBtn" onclick="launchBlindtest()" disabled>🚀 Lancer la partie</button>
+          <p id="btLaunchHint" style="font-size:12px;color:var(--text-faint);margin-top:8px;"></p>
+        </div>
+      </div>
+
+      <!-- Phase 3 : la partie — écoute manche par manche + choix multiple +
+           points selon la vitesse. -->
+      <div id="btPhasePlaying" style="display:none;">
+        <div id="btRoundIntro" style="display:none;position:fixed;inset:0;z-index:50;align-items:center;justify-content:center;background:linear-gradient(160deg,var(--accent1),var(--accent2));padding:24px;text-align:center;">
+          <div>
+            <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.75);margin-bottom:10px;" id="btRoundIntroCounter"></div>
+            <div style="font-size:23px;font-weight:800;color:#fff;line-height:1.35;">🎧 Devine la chanson !</div>
+          </div>
+        </div>
+        <div id="btPlayingActive" style="display:none;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+            <span class="pill" id="btRoundCounter">Manche 1/5</span>
+          </div>
+          <div class="card" style="margin-bottom:16px;">
+            <div style="position:relative;">
+              <div id="btYtPlayer"></div>
+              <div id="btAudioCover" onclick="toggleBtPlayPause()" style="display:none;position:absolute;inset:0;cursor:pointer;background:linear-gradient(160deg,var(--accent1),var(--accent2));align-items:center;justify-content:center;flex-direction:column;gap:6px;border-radius:12px;color:#fff;text-align:center;padding:12px;">
+                <div style="font-size:28px;">🎧</div>
+                <div style="font-size:12.5px;font-weight:600;">Écoute en cours — devine de quelle chanson il s'agit !</div>
+              </div>
+              <!-- Bandeau partiel (ajouté le 19/07/2026) : affiché à la place
+                   du cache complet pendant les 10s de "Pub bloquée ?" — ne
+                   couvre que le haut (là où YouTube affiche le titre/la
+                   vignette de la vraie chanson une fois la pub passée) sans
+                   bloquer aucun clic (pointer-events:none), pour ne jamais
+                   gêner le bouton natif "Ignorer" de la pub, où qu'il soit. -->
+              <div id="btAdSkipBanner" style="display:none;position:absolute;top:0;left:0;right:0;height:55%;pointer-events:none;background:linear-gradient(160deg,var(--accent1),var(--accent2));border-radius:12px 12px 0 0;"></div>
+              <div id="btClickBlocker" onclick="toggleBtPlayPause()" style="position:absolute;inset:0;cursor:pointer;" title="Cliquer pour mettre en pause / reprendre — pour tout le monde"></div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:10px;">
+              <button class="btn-ghost" style="width:auto;padding:8px 14px;" onclick="toggleBtPlayPause()" id="btPlayPauseBtn">⏸ Pause</button>
+              <!-- Ajouté le 19/07/2026 : les 2 couches ci-dessus recouvrent
+                   TOUTE la vidéo (y compris le bouton natif "Passer" d'une
+                   éventuelle pub YouTube), les rendant impossibles à
+                   atteindre. Ce bouton les désactive quelques secondes pour
+                   pouvoir taper directement sur "Passer" en dessous — voir
+                   revealAdSkipButton(). -->
+              <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="revealAdSkipButton()">📺 Pub bloquée ?</button>
+            </div>
+          </div>
+
+          <div id="btOwnerNote" class="card" style="display:none;text-align:center;margin-bottom:16px;">
+            <p style="font-size:13px;color:var(--text-dim);margin:0;">🎵 C'est l'une de tes propositions ! Profite du morceau — les autres devinent de quelle chanson il s'agit.</p>
+          </div>
+
+          <div id="btGuessBox" style="display:none;margin-bottom:16px;">
+            <h2 style="margin-top:0;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <span>C'est quelle chanson ?</span>
+              <span class="pill" id="btVoteCountdown" style="font-size:12px;"></span>
+            </h2>
+            <p style="font-size:12px;color:var(--text-faint);margin-top:-6px;margin-bottom:10px;">Clique sur UNE proposition — ça s'enregistre tout de suite, et ta réponse est ensuite définitive pour cette manche. Plus tu réponds vite, plus tu marques de points. Tu as 20 secondes pour deviner (la musique, elle, continue de jouer).</p>
+            <div id="btGuessOptions"></div>
+            <p id="btGuessTimeUpHint" style="display:none;font-size:12px;color:var(--text-faint);text-align:center;margin-top:12px;">⏰ Temps écoulé pour deviner sur cette manche — révélation dans un instant.</p>
+          </div>
+
+          <div id="btRevealBox" style="display:none;margin-bottom:16px;"></div>
+
+          <div id="btNextBox" style="display:none;text-align:center;margin-bottom:20px;">
+            <button class="btn-ghost" id="btRevealBtn"></button>
+            <p style="font-size:11px;color:var(--text-faint);margin-top:8px;">N'importe qui peut passer à la chanson suivante — pas besoin d'attendre le créateur.</p>
+          </div>
+
+          <div id="btScoreboardBox" style="display:none;">
+            <h2>Classement</h2>
+            <div id="btScoreboard" class="stack"></div>
+          </div>
+        </div>
+
+        <div id="btPhaseFinished" style="display:none;">
+          <div class="card" style="text-align:center;padding:28px;">
+            <div style="font-size:32px;margin-bottom:10px;">🏆</div>
+            <p style="font-size:15px;font-weight:700;margin-bottom:6px;">Partie terminée !</p>
+          </div>
+          <div id="btPodium" style="display:flex;align-items:flex-end;justify-content:center;gap:10px;margin:24px 0;"></div>
+          <h2 style="margin-top:8px;">Classement final</h2>
+          <div id="btFinalScoreboard" class="stack"></div>
+          <div style="text-align:center;margin-top:20px;">
+            <button class="btn-primary" style="width:auto;padding:12px 24px;" onclick="rejouerBtMemeSalon()">🔄 Rejouer dans ce salon</button>
+            <p style="font-size:11px;color:var(--text-faint);margin-top:8px;">Retour au choix des réglages, avec les mêmes amis, sans quitter le salon.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <nav class="tabbar" id="tabbar" style="display:none;">
     <button class="tab active" onclick="goToCurrentScreen()" id="tab-current">
       <span class="ic" id="tabCurrentIcon">🎧</span><span id="tabCurrentLabel">Salon</span>
     </button>
-    <button class="tab" onclick="showScreen('screen-lobby')" id="tab-lobby"><span class="ic">🏠</span>Accueil</button>
+    <button class="tab" onclick="goHome()" id="tab-lobby"><span class="ic">🏠</span>Accueil</button>
   </nav>
 
   <!-- SEARCH / ADD MODAL (2 onglets : recherche libre, ou playlists déjà importées) -->
@@ -652,6 +903,20 @@
       <div id="gameAnswerResults" style="margin-top:14px;"></div>
       <p style="font-size:11px;color:var(--text-faint);margin-top:10px;">Ta réponse reste secrète pour les autres jusqu'au lancement de la partie. Tu peux la changer tant que la partie n'a pas commencé.</p>
       <button class="btn-ghost" style="margin-top:10px;" onclick="closeGameAnswerModal()">Fermer</button>
+    </div>
+  </div>
+
+  <!-- Popup de fin de série (ajouté le 21/07/2026, demande de Rémi) — affiché
+       à la place de l'ancien panneau inline dès qu'on se trompe, avec le
+       score obtenu et une mention si c'est un nouveau record. -->
+  <div class="modal-backdrop" id="serieGameOverModal">
+    <div class="modal" style="text-align:center;">
+      <div class="modal-handle"></div>
+      <div style="font-size:34px;margin-bottom:8px;">💥</div>
+      <h2 style="margin-bottom:6px;">Série terminée !</h2>
+      <p id="serieGameOverText" style="font-size:15px;color:var(--text-dim);margin-bottom:6px;"></p>
+      <p id="serieGameOverRecordNote" style="font-size:13px;color:var(--accent1);font-weight:700;min-height:18px;margin-bottom:16px;"></p>
+      <button class="btn-primary" onclick="closeSerieGameOverModal()">🔄 Recommencer une série</button>
     </div>
   </div>
 
@@ -752,6 +1017,23 @@ function escapeHtml(str){
   return String(str ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
 
+// Décode les entités HTML (ajouté le 19/07/2026, bug repéré par Rémi :
+// "L&#39;ALLEMAND" au lieu de "L'ALLEMAND"). L'API YouTube (search.list ET
+// playlistItems.list) renvoie parfois les titres/artistes avec des entités
+// HTML brutes (apostrophes, esperluettes...) au lieu du caractère réel — pas
+// un souci d'encodage de fichier, l'API renvoie littéralement ce texte.
+// Technique standard et sûre : on fait décoder le texte par le navigateur
+// lui-même via un <textarea> jamais affiché, puis on relit sa valeur en
+// texte brut (jamais réinjecté tel quel dans le HTML sans passer par
+// escapeHtml() ensuite, donc aucun risque d'injection).
+let htmlEntityDecoder = null;
+function decodeHtmlEntities(str){
+  if(!str) return str;
+  if(!htmlEntityDecoder) htmlEntityDecoder = document.createElement("textarea");
+  htmlEntityDecoder.innerHTML = str;
+  return htmlEntityDecoder.value;
+}
+
 // Bascule un champ de texte en majuscules AU FUR ET À MESURE qu'on tape
 // (ajouté le 12/07/2026, retour de Rémi pour le champ "Code du salon") — les
 // codes de salon sont déjà comparés en majuscules côté joinRoom(), donc ça ne
@@ -792,7 +1074,7 @@ const badgeLabel = {spotify:"SPOTIFY", deezer:"DEEZER", apple:"APPLE MUSIC", you
 // 2 catégories principales, chacune avec ses sous-modes
 const CATEGORY_MODES = {
   ecoute: ["soiree", "distance"],
-  jeux: ["owner", "questions", "blindtest"],
+  jeux: ["owner", "questions", "blindtest", "serie"],
 };
 
 const MODE_DETAIL = {
@@ -817,9 +1099,17 @@ const MODE_DETAIL = {
     tag:"Connecté à une vraie base de données",
   },
   blindtest: {
-    emoji:"🎧", title:"Blindtest solo",
-    desc:"Un extrait mystère est \"joué\" (visuellement pour l'instant — le vrai son arrive avec l'intégration Spotify) et tu dois retrouver le bon titre parmi plusieurs choix. Jouable seul, aucun ami requis.",
-    tag:"Jouable en solo · démo",
+    emoji:"🎧", title:"Blindtest",
+    desc:"En groupe : chacun propose quelques chansons, puis on les écoute une par une et on devine de quel titre il s'agit parmi plusieurs choix. En solo : pioche dans le pool communautaire de chansons déjà proposées par d'autres, ou dans ta propre playlist importée.",
+    tag:"Connecté à une vraie base de données",
+  },
+  // Ajouté le 21/07/2026, idée notée le 19/07/2026 : toujours solo (pas de
+  // salon à créer), enchaîne les manches de blindtest sans limite tant
+  // qu'on répond juste — une erreur remet le compteur à zéro.
+  serie: {
+    emoji:"🔥", title:"Série de blindtest",
+    desc:"Enchaîne un maximum de bonnes réponses d'affilée, en solo — une erreur remet le compteur à zéro. Pioche dans le pool communautaire de chansons déjà proposées par d'autres joueurs.",
+    tag:"Solo · vraies données",
   },
 };
 
@@ -958,18 +1248,384 @@ let gameMyGuessSelection = new Set();
 let gameGuessSelectionRoundIdx = -1; // dernière manche pour laquelle gameMyGuessSelection a été initialisée depuis la base
 let gamePlayer = null; // lecteur YouTube de CET appareil pour la manche en cours
 
+// État du VRAI Blindtest multijoueur (ajouté le 19/07/2026) — même principe
+// que le bloc ci-dessus pour "Le jeu des questions", dont on réutilise
+// d'ailleurs directement isGameCreator()/getGameParticipantIds()/
+// getPseudoForUserId()/shuffleArray()/computePoints()/GAME_VOTE_SECONDS/
+// gameVoteSecondsLeft()/loadGameAnswers() (100% génériques, aucune raison de
+// les dupliquer). gameAnswers est également réutilisé tel quel : chaque
+// chanson proposée y est stockée avec un question_id "synthétique" ('bt1',
+// 'bt2'...) au lieu d'une vraie catégorie. Ce qui suit est propre au
+// Blindtest car la mécanique de devinette diffère (deviner la CHANSON, pas la
+// personne qui l'a proposée) — voir blindtest_guesses dans harmonize-schema.sql.
+let btGuesses = [];
+let btPickingSlot = null; // le "slot" ('bt1', 'bt2'...) pour lequel la fenêtre de proposition est ouverte
+let btSongsPerPersonTarget = null; // réglage du créateur : combien de chansons chacun doit proposer
+let btPlaybackStart = null; // 'start' | 'middle' | null — même principe que gamePlaybackStart
+let btGuessSelectionRoundIdx = -1;
+let btMyGuess = null; // youtube_id choisi pour la manche en cours (un seul choix, pas un Set comme gameMyGuessSelection)
+let btGuessOptionsCache = []; // ordre mélangé des choix, figé pour la manche en cours (voir ensureBtGuessSelectionForRound)
+let btAutoRevealRoundIdx = -1;
+let btRoundIntroIdx = -1;
+let btVoteTimerInterval = null;
+let btVoteTimerRoundIdx = -1;
+let btPlayer = null; // lecteur YouTube de CET appareil, distinct de gamePlayer (écran différent)
+let btAnswerSearchResults = [];
+let btAnswerSearchDebounce = null;
+
+
+// ---- Blindtest SOLO sur vraies données (ajouté le 19/07/2026) ----
+// Contrairement au multijoueur ci-dessus, pas de salon/Supabase-realtime ici :
+// juste une file de vraies chansons (pool communautaire OU playlist perso)
+// piochée une fois au démarrage, rejouée localement dans screen-game (la même
+// coquille que l'ancien mode 100% démo — voir startBlindtestRound() plus bas).
+// btSoloQueue vide = on retombe sur l'ancien catalogue de démo (CATALOG),
+// utile uniquement en filet de sécurité si jamais aucune vraie donnée n'a pu
+// être chargée.
+let btSoloQueue = [];
+let btSoloPlayer = null;
+
+const BT_SOLO_MIN_TRACKS = 4; // il faut au moins 1 bonne réponse + 3 pièges
+
+async function goSoloBlindtest(){
+  document.getElementById("btSoloSourceHint").textContent = "";
+  showScreen("screen-blindtest-solo-source");
+}
+
+// Source 1 : pool communautaire (blindtest_pool), alimenté à la fin de
+// chaque partie multijoueur — voir populateBtPool(). Peut être vide au tout
+// début du projet, voir la note dans harmonize-schema.sql.
+async function startBtSoloFromPool(){
+  if(!currentUser){ showToast("Connecte-toi d'abord."); showScreen("screen-login"); return; }
+  const hint = document.getElementById("btSoloSourceHint");
+  hint.textContent = "Chargement du pool communautaire...";
+  const { data, error } = await sb.from("blindtest_pool").select("*").limit(300);
+  if(error){ hint.textContent = "Erreur de chargement : " + error.message; return; }
+  const tracks = data || [];
+  if(tracks.length < BT_SOLO_MIN_TRACKS){
+    hint.textContent = `Pas encore assez de chansons dans le pool communautaire (${tracks.length} pour l'instant) — invite des amis à jouer en multijoueur d'abord, ou choisis "Ma playlist".`;
+    return;
+  }
+  beginBtSoloSession(tracks);
+}
+
+// Source 2 : ma propre playlist importée (imported_tracks, déjà chargée par
+// ailleurs dans myImportedTracks — voir loadMyImportedTracks()).
+async function startBtSoloFromPlaylist(){
+  if(!currentUser){ showToast("Connecte-toi d'abord."); showScreen("screen-login"); return; }
+  const hint = document.getElementById("btSoloSourceHint");
+  if(!myImportedTracks.length){
+    hint.textContent = "Chargement de tes playlists...";
+    await loadMyImportedTracks();
+  }
+  if(myImportedTracks.length < BT_SOLO_MIN_TRACKS){
+    hint.textContent = `Pas encore assez de titres importés (${myImportedTracks.length} pour l'instant) — importe au moins ${BT_SOLO_MIN_TRACKS} titres depuis "Tes playlists", ou choisis "Chansons aléatoires".`;
+    return;
+  }
+  beginBtSoloSession(myImportedTracks);
+}
+
+function beginBtSoloSession(tracks){
+  btSoloQueue = shuffleArray(tracks.filter(t => t.youtube_id));
+  state.mode = "blindtest";
+  state.category = "jeux";
+  document.getElementById("gameTitle").textContent = "🎧 Blindtest";
+  document.getElementById("gameSub").textContent = "Écoute l'extrait et devine de quelle chanson il s'agit parmi les choix proposés.";
+  document.getElementById("gameOver").style.display = "none";
+  document.getElementById("gameActive").style.display = "none";
+  document.getElementById("gameIdle").style.display = "block";
+  showScreen("screen-game");
+}
+
+// Lecteur YouTube du Blindtest solo réel — séparé de btPlayer (multijoueur,
+// synchronisé via Supabase) puisqu'ici tout reste local à cet appareil, sans
+// salon. Redémarre systématiquement une nouvelle vidéo à chaque manche (pas de
+// reprise de position à gérer, contrairement au multijoueur).
+function ensureBtSoloPlayer(youtubeId){
+  if(!ytApiReady || typeof YT === "undefined" || !YT.Player){ setTimeout(() => startBlindtestRound(), 300); return; }
+  if(!btSoloPlayer){
+    btSoloPlayer = new YT.Player("btSoloYtPlayer", {
+      height: "1", width: "1",
+      videoId: youtubeId,
+      playerVars: { autoplay: 1, controls: 0, disablekb: 1, playsinline: 1, fs: 0, rel: 0, iv_load_policy: 3, modestbranding: 1 },
+    });
+  } else {
+    btSoloPlayer.loadVideoById(youtubeId);
+  }
+}
+
+function stopBtSoloPlayer(){
+  if(btSoloPlayer){ try { btSoloPlayer.destroy(); } catch(e){} btSoloPlayer = null; }
+}
+
+// ---- Série de Blindtest (ajouté le 21/07/2026, idée notée le 19/07/2026) ----
+// Toujours solo (voir previewMode()), toujours le pool communautaire
+// (simplifié le 21/07/2026 : Rémi a demandé de retirer l'option "Ma
+// playlist", devenir bon sur ses PROPRES chansons a moins d'intérêt que sur
+// de vraies chansons proposées par d'autres). Pas de nombre de manches fixé
+// à l'avance, on enchaîne tant qu'on répond juste. Une erreur remet la série
+// à 0 — jamais de coupure automatique pour autant : un popup (pas une
+// coupure de musique, juste un écran d'information) montre le score, puis on
+// PROPOSE de recommencer via un bouton (même principe que le reste de
+// l'app). Le record du jour et le record total sont maintenant persistés en
+// base (table serie_scores, une ligne par série terminée) — l'ancien record
+// "de session" ne suffisait pas, demande de Rémi.
+let serieQueue = [];
+let seriePlayer = null;
+let serieStreak = 0;
+let serieAnswered = false;
+let serieCurrentCorrect = null;
+let serieRecordToday = 0;
+let serieRecordAllTime = 0;
+const SERIE_MIN_TRACKS = 4; // il faut au moins 1 bonne réponse + 3 pièges
+// Chrono de vote (ajouté le 21/07/2026, demande de Rémi) : 15s pour répondre,
+// sinon la série s'arrête — même traitement qu'une mauvaise réponse, jamais
+// de manche suivante automatique (voir CLAUDE.md).
+const SERIE_VOTE_SECONDS = 15;
+let serieVoteTimer = null;
+let serieVoteDeadline = 0;
+
+async function startSerieFromPool(){
+  if(!currentUser){ showToast("Connecte-toi d'abord."); showScreen("screen-login"); return; }
+  document.getElementById("serieSourceHint").textContent = "Chargement du pool communautaire...";
+  showScreen("screen-serie");
+  const { data, error } = await sb.from("blindtest_pool").select("*").limit(300);
+  if(error){ document.getElementById("serieSourceHint").textContent = "Erreur de chargement : " + error.message; return; }
+  const tracks = data || [];
+  if(tracks.length < SERIE_MIN_TRACKS){
+    document.getElementById("serieSourceHint").textContent = `Pas encore assez de chansons dans le pool communautaire (${tracks.length} pour l'instant) — invite des amis à jouer en multijoueur d'abord.`;
+    return;
+  }
+  await beginSerieSession(tracks);
+}
+
+async function beginSerieSession(tracks){
+  serieQueue = tracks.filter(t => t.youtube_id);
+  serieStreak = 0;
+  document.getElementById("serieSourceHint").textContent = "Enchaîne un maximum de bonnes réponses sans te tromper !";
+  await loadSerieRecords();
+  updateSerieCounters();
+  startSerieRound();
+}
+
+// Charge le record du jour et le record total depuis serie_scores. Calculé
+// côté app (pas de fonction SQL dédiée) : peu de lignes par joueur, pas
+// besoin de complexifier le schéma pour ça.
+async function loadSerieRecords(){
+  if(!currentUser) return;
+  const { data, error } = await sb.from("serie_scores").select("streak, achieved_at").eq("user_id", currentUser.id).order("streak", { ascending: false }).limit(500);
+  if(error){ console.warn("[Harmonize] Erreur de chargement des records de série :", error.message); return; }
+  const rows = data || [];
+  const todayStr = new Date().toDateString();
+  serieRecordAllTime = rows.reduce((max, r) => Math.max(max, r.streak), 0);
+  serieRecordToday = rows.filter(r => new Date(r.achieved_at).toDateString() === todayStr).reduce((max, r) => Math.max(max, r.streak), 0);
+}
+
+// Enregistre le score une fois la série terminée (mauvaise réponse) — voir
+// pickSerieGuess(). Fait exprès de ne pas bloquer l'affichage du popup en
+// attendant l'écriture en base (déjà calculé localement juste avant).
+async function saveSerieScore(streak){
+  if(!currentUser) return;
+  const { error } = await sb.from("serie_scores").insert({ user_id: currentUser.id, streak });
+  if(error) console.warn("[Harmonize] Erreur d'enregistrement du score de série :", error.message);
+}
+
+function updateSerieCounters(){
+  document.getElementById("serieStreak").textContent = serieStreak;
+  document.getElementById("serieRecordToday").textContent = serieRecordToday;
+  document.getElementById("serieRecordAllTime").textContent = serieRecordAllTime;
+}
+
+function startSerieRound(){
+  serieAnswered = false;
+  resetSerieAdSkipUI();
+  document.getElementById("serieResultPanel").style.display = "none";
+  document.getElementById("serieGuessBox").style.display = "block";
+  const correct = serieQueue[Math.floor(Math.random() * serieQueue.length)];
+  const others = serieQueue.filter(t => t.youtube_id !== correct.youtube_id);
+  const decoys = shuffleArray(others).slice(0, Math.min(3, others.length));
+  const options = shuffleArray([correct, ...decoys]);
+  serieCurrentCorrect = correct;
+  document.getElementById("serieGuessGrid").innerHTML = options.map(o => `
+    <button class="guess-option" onclick="pickSerieGuess('${escJs(o.youtube_id)}')">
+      <div>${escapeHtml(o.title)}</div>
+      <div style="font-size:10.5px;color:var(--text-faint);">${escapeHtml(o.artist||"")}</div>
+    </button>
+  `).join("");
+  ensureSeriePlayer(correct.youtube_id);
+  startSerieVoteTimer();
+}
+
+function startSerieVoteTimer(){
+  stopSerieVoteTimer();
+  serieVoteDeadline = Date.now() + SERIE_VOTE_SECONDS * 1000;
+  updateSerieVoteCountdown();
+  serieVoteTimer = setInterval(() => {
+    const secondsLeft = Math.ceil((serieVoteDeadline - Date.now()) / 1000);
+    if(secondsLeft <= 0){
+      stopSerieVoteTimer();
+      serieTimeExpired();
+      return;
+    }
+    updateSerieVoteCountdown(secondsLeft);
+  }, 250);
+}
+
+function updateSerieVoteCountdown(secondsLeft){
+  const el = document.getElementById("serieCountdown");
+  if(!el) return;
+  const left = secondsLeft ?? Math.max(0, Math.ceil((serieVoteDeadline - Date.now()) / 1000));
+  el.textContent = left;
+}
+
+function stopSerieVoteTimer(){
+  if(serieVoteTimer){ clearInterval(serieVoteTimer); serieVoteTimer = null; }
+}
+
+// Avance de 60s dans la vidéo en cours — pensé pour les chansons enregistrées
+// sous forme de clip officiel avec une intro sans musique reconnaissable.
+function serieSkipForward(){
+  if(!seriePlayer || typeof seriePlayer.getCurrentTime !== "function") return;
+  const current = seriePlayer.getCurrentTime();
+  seriePlayer.seekTo(current + 60, true);
+}
+
+// "Pub bloquée ?" (ajouté le 21/07/2026, demande de Rémi après avoir perdu une
+// série à cause d'une pub) — même principe que revealAdSkipButton() côté
+// Blindtest, mais adapté : ici le lecteur reste normalement en 1x1 (invisible,
+// puisque Série ne montre jamais la vidéo pour ne pas spoiler le titre), donc
+// le bouton natif "Ignorer" de YouTube n'est de toute façon jamais atteignable
+// vu sa taille. On agrandit temporairement le lecteur via setSize() pour le
+// rendre cliquable, et on repousse d'autant l'échéance du chrono de réponse
+// pour ne pas perdre la série à cause du temps pris par la pub elle-même.
+let serieAdSkipActive = false;
+let serieAdSkipRestoreTimer = null;
+function revealSerieAdSkip(){
+  if(!seriePlayer || typeof seriePlayer.setSize !== "function") return;
+  serieAdSkipActive = true;
+  seriePlayer.setSize(280, 158);
+  // Le conteneur garde le "display:none" du placeholder d'origine (voir
+  // screen-serie) — setSize() seul ne suffit donc pas à le rendre visible.
+  const el = document.getElementById("serieYtPlayer");
+  if(el) el.style.display = "block";
+  // Bandeau partiel (voir screen-serie) : couvre le haut du lecteur agrandi
+  // (là où YouTube affiche le titre/la vignette) sans bloquer le clic, pour
+  // ne pas spoiler la chanson pendant qu'on cherche le bouton "Ignorer".
+  const banner = document.getElementById("serieAdSkipBanner");
+  if(banner) banner.style.display = "block";
+  serieVoteDeadline += 10000;
+  updateSerieVoteCountdown();
+  showToast("Tape directement sur le bouton \"Ignorer\" de la pub si tu le vois — le lecteur revient à la normale dans 10 secondes, et ton chrono de réponse est repoussé d'autant.");
+  clearTimeout(serieAdSkipRestoreTimer);
+  serieAdSkipRestoreTimer = setTimeout(resetSerieAdSkipUI, 10000);
+}
+
+// Partagé entre le timeout automatique (10s), le début d'une nouvelle manche
+// et la sortie de l'écran — remet toujours le lecteur en 1x1/masqué et
+// cache le bandeau, quel que soit le moment où c'est déclenché.
+function resetSerieAdSkipUI(){
+  clearTimeout(serieAdSkipRestoreTimer);
+  serieAdSkipActive = false;
+  if(seriePlayer && typeof seriePlayer.setSize === "function") seriePlayer.setSize(1, 1);
+  const el = document.getElementById("serieYtPlayer");
+  if(el) el.style.display = "none";
+  const banner = document.getElementById("serieAdSkipBanner");
+  if(banner) banner.style.display = "none";
+}
+
+async function serieTimeExpired(){
+  if(serieAnswered) return;
+  serieAnswered = true;
+  document.querySelectorAll("#serieGuessGrid button").forEach(btn => { btn.onclick = null; btn.disabled = true; });
+  await showSerieGameOver(true);
+}
+
+// Lecteur local, comme celui du Blindtest solo (ensureBtSoloPlayer) — pas de
+// salon, pas de synchronisation entre appareils à gérer ici.
+function ensureSeriePlayer(youtubeId){
+  if(!ytApiReady || typeof YT === "undefined" || !YT.Player){ setTimeout(() => ensureSeriePlayer(youtubeId), 300); return; }
+  if(!seriePlayer){
+    seriePlayer = new YT.Player("serieYtPlayer", {
+      height: "1", width: "1",
+      videoId: youtubeId,
+      playerVars: { autoplay: 1, controls: 0, disablekb: 1, playsinline: 1, fs: 0, rel: 0, iv_load_policy: 3, modestbranding: 1 },
+    });
+  } else {
+    seriePlayer.loadVideoById(youtubeId);
+  }
+}
+
+function stopSeriePlayer(){
+  stopSerieVoteTimer();
+  resetSerieAdSkipUI();
+  if(seriePlayer){ try { seriePlayer.destroy(); } catch(e){} seriePlayer = null; }
+}
+
+async function pickSerieGuess(youtubeId){
+  if(serieAnswered) return;
+  serieAnswered = true;
+  stopSerieVoteTimer();
+  document.querySelectorAll("#serieGuessGrid button").forEach(btn => { btn.onclick = null; btn.disabled = true; });
+  const correct = youtubeId === serieCurrentCorrect.youtube_id;
+  if(correct){
+    serieStreak++;
+    updateSerieCounters();
+    document.getElementById("serieResultText").textContent = `✅ Bonne réponse ! Série en cours : ${serieStreak}.`;
+    document.getElementById("serieContinueBtn").textContent = "➡️ Chanson suivante";
+    document.getElementById("serieGuessBox").style.display = "none";
+    document.getElementById("serieResultPanel").style.display = "block";
+  } else {
+    await showSerieGameOver();
+  }
+}
+
+// Popup de fin de série (ajouté le 21/07/2026, demande de Rémi, remplace
+// l'ancien panneau inline pour ce cas précis) : montre le score obtenu,
+// enregistre le score en base, et signale si c'est un nouveau record.
+// timedOut distingue le message affiché quand les 15s de vote sont écoulées
+// (serieTimeExpired) d'une vraie mauvaise réponse (pickSerieGuess).
+async function showSerieGameOver(timedOut){
+  stopSerieVoteTimer();
+  const finalStreak = serieStreak;
+  const isNewToday = finalStreak > serieRecordToday;
+  const isNewAllTime = finalStreak > serieRecordAllTime;
+  document.getElementById("serieGameOverText").textContent = timedOut
+    ? `⏱️ Temps écoulé ! Ta série s'arrête à ${finalStreak} — c'était "${serieCurrentCorrect.title}".`
+    : `Ta série s'arrête à ${finalStreak} — c'était "${serieCurrentCorrect.title}".`;
+  document.getElementById("serieGameOverRecordNote").textContent = isNewAllTime
+    ? "🎉 Nouveau record absolu !"
+    : (isNewToday ? "🎉 Nouveau record du jour !" : "");
+  document.getElementById("serieGameOverModal").classList.add("open");
+  await saveSerieScore(finalStreak);
+  serieStreak = 0;
+  if(isNewToday) serieRecordToday = finalStreak;
+  if(isNewAllTime) serieRecordAllTime = finalStreak;
+  updateSerieCounters();
+}
+
+function closeSerieGameOverModal(){
+  document.getElementById("serieGameOverModal").classList.remove("open");
+  startSerieRound();
+}
+
+function nextSerieRound(){
+  startSerieRound();
+}
+
 let creationCategory = null; // catégorie en cours de création (avant d'avoir choisi le sous-mode)
 
-// Salons fictifs de démonstration (pour les modes pas encore connectés à Supabase)
+// Salons fictifs de démonstration (pour les modes pas encore connectés à Supabase).
+// "SOLO4U" (blindtest) retiré le 19/07/2026 : le Blindtest est maintenant un
+// vrai mode (multijoueur ou solo sur de vraies données, voir plus bas) — le
+// garder ici aurait pu resservir de vieilles données de démo par erreur.
 const MOCK_ROOMS = {
   "COSMOS7": "distance",
   "VELVET3": "owner",
   "ORACLE9": "questions",
-  "SOLO4U": "blindtest",
 };
 
 function modeForUnknownCode(code){
-  const modes = ["distance", "owner", "questions", "blindtest"];
+  const modes = ["distance", "owner", "questions"];
   let h = 0;
   for(let i=0;i<code.length;i++){ h = (h * 31 + code.charCodeAt(i)) >>> 0; }
   return modes[h % modes.length];
@@ -1113,16 +1769,17 @@ function showScreen(id){
   document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
   document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
-  const tabMap = {"screen-room":"tab-current","screen-game":"tab-current","screen-game-lobby":"tab-current","screen-lobby":"tab-lobby"};
+  const tabMap = {"screen-room":"tab-current","screen-game":"tab-current","screen-game-lobby":"tab-current","screen-blindtest-lobby":"tab-current","screen-lobby":"tab-lobby"};
   if(tabMap[id]) document.getElementById(tabMap[id]).classList.add("active");
 }
 
 // Retour à l'écran du salon courant depuis l'onglet du bas — différent selon
 // qu'on est dans un vrai salon "jeu des questions" (son propre écran, ajouté
-// le 12/07/2026), un autre jeu encore en démo (screen-game), ou un mode
-// d'écoute (screen-room).
+// le 12/07/2026), un vrai salon "blindtest" (le sien, ajouté le 19/07/2026),
+// un autre jeu encore en démo (screen-game), ou un mode d'écoute (screen-room).
 function goToCurrentScreen(){
   if(currentRoom && currentRoom.mode === "questions"){ showScreen("screen-game-lobby"); return; }
+  if(currentRoom && currentRoom.mode === "blindtest"){ showScreen("screen-blindtest-lobby"); return; }
   showScreen(state.category === "jeux" ? "screen-game" : "screen-room");
 }
 
@@ -1175,6 +1832,11 @@ function renderModeCards(){
 let pendingMode = null;
 
 function previewMode(mode){
+  // "Série de blindtest" (ajouté le 21/07/2026) est TOUJOURS solo, comme
+  // "Le jeu des questions"/Blindtest quand ils étaient encore 100% démo —
+  // pas besoin d'un vrai salon ni d'un choix de source (toujours le pool
+  // communautaire, simplifié le 21/07/2026), on lance directement.
+  if(mode === "serie"){ startSerieFromPool(); return; }
   pendingMode = mode;
   const d = MODE_DETAIL[mode];
   document.getElementById("confirmTitle").textContent = `Créer ce salon : ${d.emoji} ${d.title} ?`;
@@ -1186,7 +1848,32 @@ function previewMode(mode){
       <span class="mode-tag">${d.tag}</span>
     </div>
   `;
+  // Le Blindtest solo (ajouté le 19/07/2026) ne nécessite pas de vrai salon —
+  // voir goSoloBlindtest(). Les autres modes n'ont pas cette alternative.
+  document.getElementById("btSoloInstead").style.display = mode === "blindtest" ? "block" : "none";
   showScreen("screen-confirm");
+}
+
+// Quitte n'importe quel écran vers l'accueil en coupant proprement tout
+// lecteur actif au passage (ajouté le 19/07/2026, nécessaire depuis que le
+// Blindtest solo peut jouer du vrai son — auparavant "screen-game" n'avait
+// jamais besoin d'être arrêté en quittant vers l'accueil).
+// Corrigé le 21/07/2026 (bug réel remonté par Rémi : la musique continuait à
+// jouer après être revenu à l'accueil) — stopAnyPlayback() seul ne suffisait
+// pas : le filet de sécurité qui relit le salon toutes les 4 secondes
+// (startQueuePolling) et l'abonnement temps réel (realtimeChannel) n'étaient
+// JAMAIS arrêtés en quittant vers l'accueil. Toutes les quelques secondes,
+// l'un ou l'autre redessinait donc l'écran du salon/jeu qu'on venait de
+// quitter — ce qui RECRÉAIT le lecteur YouTube qu'on venait pourtant de
+// détruire, et la musique repartait. enterRealRoom()/enterMockRoom()
+// faisaient déjà ce nettoyage en ENTRANT dans un salon (pour repartir d'une
+// base propre) ; il manquait le même nettoyage en sortant vers l'accueil.
+function goHome(){
+  if(realtimeChannel){ sb.removeChannel(realtimeChannel); realtimeChannel = null; }
+  stopQueuePolling();
+  stopAnyPlayback();
+  currentRoom = null;
+  showScreen("screen-lobby");
 }
 
 async function confirmCreateRoom(){
@@ -1209,7 +1896,11 @@ async function confirmCreateRoom(){
 // titre par question, avant que la partie ne commence). La partie elle-même
 // (écoute des réponses + vote en direct + score) arrive dans une prochaine
 // mise à jour.
-const REAL_MODES = ["soiree", "distance", "questions"];
+// "blindtest" ajouté le 19/07/2026 : le VRAI Blindtest multijoueur — voir la
+// section "Blindtest (VRAI salon)" plus bas. Réutilise tout le mécanisme du
+// "jeu des questions" (colonnes game_*, table game_answers), voir le
+// commentaire dans harmonize-schema.sql pour le détail de cette réutilisation.
+const REAL_MODES = ["soiree", "distance", "questions", "blindtest"];
 
 // Le créateur choisit un mode : Soirée et À distance créent un VRAI salon
 // en base, les autres restent en démo pour l'instant.
@@ -1278,8 +1969,8 @@ async function enterRealRoom(room, toastMsg){
   stopQueuePolling();
   stopAnyPlayback(); // on repart d'un lecteur arrêté (Soirée ou À distance) si on venait d'un autre salon
   currentRoom = room;
-  state.mode = room.mode === "distance" ? "distance" : (room.mode === "questions" ? "questions" : "soiree");
-  state.category = room.mode === "questions" ? "jeux" : "ecoute";
+  state.mode = room.mode === "distance" ? "distance" : (room.mode === "questions" || room.mode === "blindtest" ? room.mode : "soiree");
+  state.category = (room.mode === "questions" || room.mode === "blindtest") ? "jeux" : "ecoute";
   document.getElementById("roomCode").textContent = room.code;
   document.getElementById("roomRealBadge").textContent = "RÉEL";
   updateModeUI();
@@ -1309,6 +2000,25 @@ async function enterRealRoom(room, toastMsg){
     await loadGameAnswers(room.id);
     await loadGameGuesses(room.id);
     renderGameLobby();
+    return;
+  }
+
+  // Le VRAI Blindtest multijoueur (ajouté le 19/07/2026) a, lui aussi, son
+  // propre écran — voir la section "Blindtest (VRAI salon)" plus bas.
+  if(room.mode === "blindtest"){
+    document.getElementById("playerCard").style.display = "none";
+    document.getElementById("btRoomCode").textContent = room.code;
+    btSongsPerPersonTarget = null;
+    btPlaybackStart = null;
+    btGuessSelectionRoundIdx = -1;
+    btMyGuess = null;
+    btAutoRevealRoundIdx = -1;
+    btRoundIntroIdx = -1;
+    renderRoomAvatars("btRoomAvatars");
+    showScreen("screen-blindtest-lobby");
+    await loadGameAnswers(room.id);
+    await loadBtGuesses(room.id);
+    renderBlindtestLobby();
     return;
   }
 
@@ -1428,21 +2138,30 @@ function subscribeQueue(roomId){
       currentRoom = payload.new;
       if(state.mode === "distance") applyDistancePlaybackState();
       if(state.mode === "questions") renderGameLobby();
+      if(state.mode === "blindtest") renderBlindtestLobby();
     })
-    // Réponses du "jeu des questions" (ajouté le 12/07/2026) : dès qu'un
-    // participant choisit ou change un titre pour une question, tout le
+    // Réponses/propositions (ajouté le 12/07/2026, étendu au Blindtest le
+    // 19/07/2026) : dès qu'un participant choisit ou change un titre, tout le
     // monde revoit la progression se mettre à jour sans recharger la page.
+    // Table partagée par les deux jeux (voir harmonize-schema.sql).
     .on("postgres_changes", { event:"*", schema:"public", table:"game_answers", filter:"room_id=eq." + roomId }, () => {
       if(state.mode === "questions") loadGameAnswers(roomId).then(renderGameLobby);
+      if(state.mode === "blindtest") loadGameAnswers(roomId).then(renderBlindtestLobby);
     })
     // Votes de la partie (ajouté le 12/07/2026) : dès que quelqu'un devine qui
     // a répondu quoi, le classement se met à jour en direct chez tout le monde.
     .on("postgres_changes", { event:"*", schema:"public", table:"game_guesses", filter:"room_id=eq." + roomId }, () => {
       if(state.mode === "questions") loadGameGuesses(roomId).then(renderGameLobby);
     })
+    // Votes du Blindtest (ajouté le 19/07/2026, table distincte de
+    // game_guesses — voir harmonize-schema.sql).
+    .on("postgres_changes", { event:"*", schema:"public", table:"blindtest_guesses", filter:"room_id=eq." + roomId }, () => {
+      if(state.mode === "blindtest") loadBtGuesses(roomId).then(renderBlindtestLobby);
+    })
     .on("presence", { event: "sync" }, () => {
       renderRoomAvatars();
       if(state.mode === "questions") renderGameLobby();
+      if(state.mode === "blindtest") renderBlindtestLobby();
     })
     .subscribe(async (status) => {
       if(status === "SUBSCRIBED"){
@@ -1483,6 +2202,17 @@ function startQueuePolling(roomId){
       await loadGameAnswers(roomId);
       await loadGameGuesses(roomId);
       renderGameLobby();
+      return;
+    }
+    if(state.mode === "blindtest"){
+      // Même filet de sécurité que "questions" ci-dessus (ajouté le
+      // 19/07/2026) — c'est justement l'absence de ce bloc qui obligeait à
+      // actualiser la page manuellement pour voir les propositions des autres.
+      const { data } = await sb.from("rooms").select("*").eq("id", roomId).maybeSingle();
+      if(data) currentRoom = data;
+      await loadGameAnswers(roomId);
+      await loadBtGuesses(roomId);
+      renderBlindtestLobby();
       return;
     }
     await loadRealQueue(roomId);
@@ -1633,6 +2363,9 @@ function stopAnyPlayback(){
   stopBroadcast();
   stopDistanceListening();
   stopGamePlayer();
+  stopBtPlayer();
+  stopBtSoloPlayer();
+  stopSeriePlayer();
 }
 
 // Construit le contenu du lecteur affiché dans un vrai salon — différent
@@ -2062,8 +2795,8 @@ async function searchYouTube(q){
     throw new Error(data?.error?.message || ("erreur " + res.status));
   }
   return (data.items || []).map(item => ({
-    title: item.snippet.title,
-    artist: item.snippet.channelTitle,
+    title: decodeHtmlEntities(item.snippet.title),
+    artist: decodeHtmlEntities(item.snippet.channelTitle),
     youtubeId: item.id.videoId,
     thumbnail: item.snippet.thumbnails?.default?.url || item.snippet.thumbnails?.medium?.url || "",
   }));
@@ -2277,10 +3010,10 @@ async function fetchPlaylistTracks(playlist){
     .map(it => ({
       user_id: currentUser.id,
       platform: "youtube",
-      playlist_title: playlist.snippet.title,
+      playlist_title: decodeHtmlEntities(playlist.snippet.title),
       youtube_playlist_id: playlist.id, // gardé pour pouvoir actualiser cette playlist plus tard sans se tromper si son nom change
-      title: it.snippet.title,
-      artist: it.snippet.videoOwnerChannelTitle || it.snippet.channelTitle || "",
+      title: decodeHtmlEntities(it.snippet.title),
+      artist: decodeHtmlEntities(it.snippet.videoOwnerChannelTitle || it.snippet.channelTitle || ""),
       youtube_id: it.snippet.resourceId.videoId,
       thumbnail: it.snippet.thumbnails?.default?.url || "",
     }));
@@ -3180,6 +3913,9 @@ function updateLaunchButton(questionIds){
   }
 }
 
+// Réutilisée par "Le jeu des questions" ET le Blindtest (ajouté le
+// 19/07/2026) — game_excluded_user_ids est une colonne générique de "rooms",
+// currentRoom.mode dit lequel des deux écrans redessiner ensuite.
 async function excludeParticipant(userId){
   if(!isGameCreator()) return;
   const current = new Set(currentRoom.game_excluded_user_ids || []);
@@ -3188,7 +3924,7 @@ async function excludeParticipant(userId){
   if(error){ showToast("Erreur : " + error.message); return; }
   currentRoom = data;
   showToast(`${getPseudoForUserId(userId)} exclu(e) de cette partie.`);
-  renderGameLobby();
+  if(currentRoom.mode === "blindtest") renderBlindtestLobby(); else renderGameLobby();
 }
 
 async function includeParticipant(userId){
@@ -3198,7 +3934,7 @@ async function includeParticipant(userId){
   const { data, error } = await sb.from("rooms").update({ game_excluded_user_ids: [...current] }).eq("id", currentRoom.id).select().single();
   if(error){ showToast("Erreur : " + error.message); return; }
   currentRoom = data;
-  renderGameLobby();
+  if(currentRoom.mode === "blindtest") renderBlindtestLobby(); else renderGameLobby();
 }
 
 // Construit l'ordre des manches à partir des réponses enregistrées.
@@ -3238,16 +3974,22 @@ function computeGameRounds(){
 // réponses identiques, voir computeGameRounds()) une seule fois, l'écrit en
 // base pour que TOUT LE MONDE voie exactement le même déroulé, et démarre la
 // première manche.
+// Manche de chauffe RETIRÉE le 19/07/2026 : ajoutée plus tôt dans la même
+// session pour absorber une pub potentielle avant le début de la partie,
+// elle a été soupçonnée (retour de Rémi : des pubs revenaient en boucle à
+// chaque manche, "comportement pas normal YouTube", qui n'existait pas avant
+// cet ajout) de faire l'inverse de l'effet recherché : le lecteur de chauffe
+// était DÉTRUIT (destroy()) dès le délai écoulé, y compris si une pub était
+// encore en train de jouer dessus à ce moment-là — ce qui peut empêcher
+// YouTube d'enregistrer qu'elle a été vue jusqu'au bout, et le pousser à la
+// reproposer sur la vidéo suivante. Retiré pour vérifier cette hypothèse ;
+// voir Round 27 de idees.md. Le bouton "📺 Pub bloquée ?" (Round 23), qui ne
+// détruit jamais rien en plein milieu, reste en place.
 async function launchGame(){
   if(!isGameCreator()) return;
   const rounds = computeGameRounds();
   if(!rounds.length){ showToast("Aucune réponse à jouer — attends que tout le monde ait répondu."); return; }
   const nowIso = new Date().toISOString();
-  // "game_playback_start" (réglé au lobby, voir gqStepPlayback) : si 'middle',
-  // chaque manche démarre vers ~45 secondes plutôt que dès le début, pour
-  // éviter une intro trop reconnaissable. Limite connue : une chanson plus
-  // courte que 45s ira directement vers sa fin — acceptable pour l'instant,
-  // pas de quoi interroger l'API YouTube pour la durée exacte de chaque titre.
   const startSeconds = currentRoom.game_playback_start === "middle" ? 45 : 0;
   const { data, error } = await sb.from("rooms").update({
     game_phase: "playing",
@@ -3308,9 +4050,19 @@ function renderGamePlaying(){
   // faire côté lecteur, seul l'affichage change. Le cache disparaît dès la
   // révélation (ajusté le 13/07/2026) : une fois qu'on sait qui a répondu, il
   // n'y a plus rien à cacher, autant remontrer la vidéo.
+  // gameAdSkipActive (voir revealGameAdSkipButton()) : pendant la fenêtre de
+  // déblocage de 10 secondes, on ne réaffiche ni le cache ni la couche de
+  // clic, même si ce rendu est déclenché par une mise à jour reçue entre-temps.
   const audioOnly = currentRoom.game_display_mode === "audio";
   const cover = document.getElementById("gqAudioCover");
-  if(cover) cover.style.display = (audioOnly && !revealed) ? "flex" : "none";
+  if(cover) cover.style.display = (audioOnly && !revealed && !gameAdSkipActive) ? "flex" : "none";
+  const blocker = document.getElementById("gqClickBlocker");
+  if(blocker) blocker.style.display = gameAdSkipActive ? "none" : "block";
+  // Bandeau partiel (voir revealGameAdSkipButton()) : remplace le cache
+  // complet pendant la fenêtre de déblocage, pour ne pas dévoiler le titre
+  // une fois la pub passée (la vraie vidéo redevient visible en dessous).
+  const banner = document.getElementById("gqAdSkipBanner");
+  if(banner) banner.style.display = (gameAdSkipActive && audioOnly && !revealed) ? "block" : "none";
 
   ensureGamePlayer(round);
 
@@ -3448,6 +4200,33 @@ function stopGamePlayer(){
   stopGameVoteTimer();
 }
 
+// Même correctif que revealAdSkipButton() (Blindtest) — voir son commentaire
+// pour le pourquoi (bouton natif "Ignorer" d'une pub bloqué par nos propres
+// couches de recouvrement, et pourquoi une simple opacité ne suffisait pas).
+let gameAdSkipRestoreTimer = null;
+let gameAdSkipActive = false;
+// Chrono personnel remis à zéro (ajouté le 19/07/2026, demande de Rémi :
+// "sinon il perd du temps") : le temps passé sur une pub ne doit pas pénaliser
+// le bonus de rapidité de CETTE personne. On mémorise à quel moment elle a
+// cliqué "Pub bloquée ?", pour CETTE manche précise, et son propre calcul de
+// points repart de ce moment plutôt que du vrai début de manche partagé
+// (voir submitGameGuess()) — n'affecte que son propre score, jamais celui
+// des autres (chacun garde son propre elapsed_seconds).
+let gameAdSkipClickedAtRound = null;
+let gameAdSkipClickedAtTime = null;
+function revealGameAdSkipButton(){
+  gameAdSkipActive = true;
+  gameAdSkipClickedAtRound = currentRoom?.game_current_round ?? null;
+  gameAdSkipClickedAtTime = Date.now();
+  renderGamePlaying(); // applique tout de suite (cover + blocker gérés par renderGamePlaying, voir plus haut)
+  showToast("Tape directement sur le bouton \"Ignorer\" de la pub si tu le vois — ça revient à la normale dans 10 secondes. Ton chrono personnel repart de zéro, tu ne perds pas de temps sur le bonus de rapidité.");
+  clearTimeout(gameAdSkipRestoreTimer);
+  gameAdSkipRestoreTimer = setTimeout(() => {
+    gameAdSkipActive = false;
+    renderGamePlaying();
+  }, 10000);
+}
+
 /* ---- Minuteur de vote : 20 secondes pour voter sur chaque manche (la
    musique continue de jouer après, seul le vote se ferme) ---- */
 function ensureGameVoteTimer(idx){
@@ -3470,19 +4249,35 @@ function gameVoteSecondsLeft(){
   return Math.max(0, Math.ceil(GAME_VOTE_SECONDS - elapsed));
 }
 
+// Révélation anticipée (ajoutée le 19/07/2026, demande de Rémi "sur tous les
+// modes de jeux") : si tout le monde qui devait deviner a déjà répondu, pas
+// besoin d'attendre la fin des 20 secondes pour révéler — sert aussi bien au
+// jeu des questions (gameGuesses) qu'au Blindtest (btGuesses), d'où le
+// paramètre "guesses" générique. Les propriétaires de la manche (qui ne
+// votent pas) ne comptent pas parmi les gens attendus.
+function allExpectedGuessersHaveVoted(round, roundIndex, guesses){
+  const owners = new Set(round?.owner_user_ids || []);
+  const expected = getGameParticipantIds().filter(uid => !owners.has(uid));
+  if(!expected.length) return false;
+  const voted = new Set(guesses.filter(g => g.round_index === roundIndex).map(g => g.guesser_user_id));
+  return expected.every(uid => voted.has(uid));
+}
+
 function updateGameVoteCountdown(){
   if(!currentRoom || currentRoom.game_phase !== "playing") { stopGameVoteTimer(); return; }
   const secondsLeft = gameVoteSecondsLeft();
   const timeUp = secondsLeft <= 0;
+  const everyoneVoted = allExpectedGuessersHaveVoted(currentGameRound(), currentRoom.game_current_round, gameGuesses);
 
   // Révélation automatique (remplace le bouton "🔍 Révéler" manuel, retiré le
-  // 13/07/2026 à la demande de Rémi) : dès que le temps de vote est écoulé,
-  // n'importe quel appareil déclenche la révélation pour tout le monde — un
-  // seul appel suffit (les autres appareils, à quelques centaines de ms près,
+  // 13/07/2026 à la demande de Rémi) : dès que le temps de vote est écoulé —
+  // OU dès que tout le monde a déjà répondu (ajouté le 19/07/2026) — n'importe
+  // quel appareil déclenche la révélation pour tout le monde — un seul appel
+  // suffit (les autres appareils, à quelques centaines de ms près,
   // arriveront au même total et essaieront la même chose ; sans risque,
   // c'est juste une mise à jour idempotente). gameAutoRevealRoundIdx évite de
   // le refaire à chaque tick une fois que c'est fait pour cette manche.
-  if(timeUp && !currentRoom.game_round_revealed && gameAutoRevealRoundIdx !== currentRoom.game_current_round){
+  if((timeUp || everyoneVoted) && !currentRoom.game_round_revealed && gameAutoRevealRoundIdx !== currentRoom.game_current_round){
     gameAutoRevealRoundIdx = currentRoom.game_current_round;
     revealGameRound();
   }
@@ -3552,9 +4347,12 @@ async function submitGameGuess(){
   const roundIndex = currentRoom.game_current_round;
   const alreadySaved = gameGuesses.some(g => g.round_index === roundIndex && g.guesser_user_id === currentUser.id);
   if(alreadySaved) return; // filet de sécurité : une réponse déjà enregistrée pour cette manche ne se remplace plus
-  const elapsed = currentRoom.game_round_started_at
-    ? Math.max(0, (Date.now() - new Date(currentRoom.game_round_started_at).getTime()) / 1000)
-    : 0;
+  // Chrono personnel remis à zéro par "Pub bloquée ?" (voir revealGameAdSkipButton()) :
+  // si CETTE personne l'a cliqué pour CETTE manche, son temps repart de ce
+  // clic plutôt que du vrai début de manche — n'affecte que son propre score.
+  const elapsed = (gameAdSkipClickedAtRound === roundIndex && gameAdSkipClickedAtTime)
+    ? Math.max(0, (Date.now() - gameAdSkipClickedAtTime) / 1000)
+    : (currentRoom.game_round_started_at ? Math.max(0, (Date.now() - new Date(currentRoom.game_round_started_at).getTime()) / 1000) : 0);
   const rows = [...gameMyGuessSelection].map(uid => ({
     room_id: currentRoom.id,
     round_index: roundIndex,
@@ -3637,6 +4435,8 @@ async function nextGameRound(){
   currentRoom = data;
   gameGuessSelectionRoundIdx = -1;
   gameMyGuessSelection = new Set();
+  gameAdSkipClickedAtRound = null;
+  gameAdSkipClickedAtTime = null;
   if(currentRoom.game_phase === "playing") applyGamePlaybackState();
   renderGameLobby();
 }
@@ -3724,8 +4524,13 @@ async function rejouerMemeSalon(){
   await sb.from("game_guesses").delete().eq("room_id", currentRoom.id);
   const { data, error } = await sb.from("rooms").update({
     game_phase: "lobby",
-    game_question_ids: null,
-    game_rounds: null,
+    // "[]" et non "null" (corrigé le 19/07/2026) : ces 2 colonnes sont NOT
+    // NULL en base (voir harmonize-schema.sql) — un "null" explicite ici
+    // faisait échouer TOUTE la requête (donc tout le bouton "🔄 Rejouer dans
+    // ce salon"), sans jamais avoir été repéré car ce bouton n'avait été
+    // testé que statiquement, jamais en conditions réelles (Round 18).
+    game_question_ids: [],
+    game_rounds: [],
     game_current_round: 0,
     game_round_started_at: null,
     game_round_revealed: false,
@@ -3755,10 +4560,15 @@ async function rejouerMemeSalon(){
 let gameAnswerSearchResults = [];
 let gameAnswerSearchDebounce = null;
 
+// Réutilisée par "Le jeu des questions" ET le Blindtest (ajouté le
+// 19/07/2026, questionId vaut alors 'bt1', 'bt2'... — voir
+// harmonize-schema.sql) : la recherche/proposition d'un titre YouTube est
+// exactement la même mécanique dans les deux jeux, seul le libellé affiché change.
 function openGameAnswerModal(questionId){
   gamePickingQuestionId = questionId;
   const q = GAME_QUESTIONS.find(x => x.id === questionId);
-  document.getElementById("gameAnswerModalTitle").textContent = q ? q.label : "Réponds à la question";
+  const label = q ? q.label : (String(questionId).startsWith("bt") ? `🎵 Chanson n°${String(questionId).slice(2)}` : "Réponds à la question");
+  document.getElementById("gameAnswerModalTitle").textContent = label;
   document.getElementById("gameAnswerSearchInput").value = "";
   document.getElementById("gameAnswerResults").innerHTML = `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Tape le nom d'un titre ou d'un artiste...</p>`;
   document.getElementById("gameAnswerModal").classList.add("open");
@@ -3831,7 +4641,773 @@ async function pickGameAnswer(index){
   showToast(`Réponse enregistrée : "${track.title}"`);
   closeGameAnswerModal();
   await loadGameAnswers(currentRoom.id);
-  renderGameLobby();
+  if(currentRoom.mode === "blindtest") renderBlindtestLobby(); else renderGameLobby();
+}
+
+/* ============================================================
+   Blindtest (VRAI salon multijoueur, ajouté le 19/07/2026)
+   ============================================================
+   Principe (décidé avec Rémi le 19/07/2026) : comme "Le jeu des questions",
+   mais au lieu de répondre à des catégories, chacun PROPOSE quelques
+   chansons de son choix. Une fois lancée, la partie joue chaque chanson
+   proposée une par une, et chacun (sauf la ou les personnes qui l'ont
+   proposée) devine de quel titre il s'agit parmi plusieurs choix — un choix
+   multiple dont les pièges (decoys) viennent des AUTRES chansons proposées
+   dans le même salon, pas d'un faux catalogue. Réutilise largement le même
+   mécanisme que "Le jeu des questions" (voir harmonize-schema.sql) :
+   isGameCreator(), getGameParticipantIds(), getPseudoForUserId(),
+   shuffleArray(), computePoints(), GAME_VOTE_SECONDS, gameVoteSecondsLeft(),
+   loadGameAnswers(), gameAnswers, ainsi que les colonnes game_phase/
+   game_question_ids/game_rounds/game_current_round/game_round_started_at/
+   game_round_revealed/game_display_mode/game_playback_start/
+   game_excluded_user_ids et les colonnes playback_* de "rooms" — tout ça est
+   générique, currentRoom.mode dit lequel des deux jeux est en cours. */
+
+async function loadBtGuesses(roomId){
+  const { data, error } = await sb.from("blindtest_guesses").select("*").eq("room_id", roomId);
+  if(error){ showToast("Erreur de chargement des votes : " + error.message); return; }
+  btGuesses = data || [];
+}
+
+/* ---- Point d'entrée : affiche la bonne phase (lobby / propositions / partie) ---- */
+function renderBlindtestLobby(){
+  if(!currentRoom) return;
+  renderRoomAvatars("btRoomAvatars");
+  const phase = currentRoom.game_phase || "lobby";
+  document.getElementById("btPhaseLobby").style.display = phase === "lobby" ? "block" : "none";
+  document.getElementById("btPhaseAnswering").style.display = phase === "answering" ? "block" : "none";
+  document.getElementById("btPhasePlaying").style.display = (phase === "playing" || phase === "finished") ? "block" : "none";
+  document.getElementById("btPlayingActive").style.display = phase === "playing" ? "block" : "none";
+  document.getElementById("btPhaseFinished").style.display = phase === "finished" ? "block" : "none";
+
+  if(phase === "lobby") renderBtSongCountPicker();
+  else if(phase === "answering") renderBtAnsweringPhase();
+  else if(phase === "playing") renderBtPlaying();
+  else renderBtFinished();
+}
+
+/* ---- Phase 1 : le créateur choisit combien de chansons chacun propose, puis
+   les réglages d'écoute anti-spoiler (même principe que "Le jeu des
+   questions") — pas de "mode de sélection" ici, il n'y a pas de catalogue
+   fixe dans lequel piocher. ---- */
+function renderBtSongCountPicker(){
+  const creator = isGameCreator();
+  document.getElementById("btLobbyCreatorFlow").style.display = creator ? "block" : "none";
+  document.getElementById("btLobbyWaitMsg").style.display = creator ? "none" : "block";
+  if(!creator) return;
+
+  if(!btSongsPerPersonTarget){
+    document.getElementById("btStepSongs").style.display = "block";
+    document.getElementById("btStepPlayback").style.display = "none";
+    return;
+  }
+  document.getElementById("btStepSongs").style.display = "none";
+  document.getElementById("btStepPlayback").style.display = "block";
+  document.querySelectorAll("#btPlaybackStartPicker button").forEach(btn => {
+    const active = btn.dataset.start === btPlaybackStart;
+    btn.style.borderColor = active ? "var(--accent1)" : "var(--border)";
+    btn.style.color = active ? "var(--text)" : "var(--text-dim)";
+  });
+}
+
+// Affiche juste la valeur en direct pendant qu'on fait glisser le curseur —
+// ne valide rien tant que le bouton "Valider" n'est pas cliqué.
+function onBtSongsSliderInput(value){
+  document.getElementById("btSongsSliderValue").textContent = value;
+}
+
+function confirmBtSongsCount(){
+  const value = Number(document.getElementById("btSongsSlider").value);
+  btSongsPerPersonTarget = value;
+  btPlaybackStart = null;
+  renderBtSongCountPicker();
+}
+
+function pickBtPlaybackStart(mode){
+  btPlaybackStart = mode;
+  renderBtSongCountPicker();
+  confirmBtSettings();
+}
+
+function backToBtSongsCountStep(){
+  btSongsPerPersonTarget = null;
+  btPlaybackStart = null;
+  renderBtSongCountPicker();
+}
+
+// Les "slots" ('bt1', 'bt2'...) jouent le même rôle que les vraies catégories
+// dans game_question_ids pour "Le jeu des questions" : savoir combien de
+// propositions chacun doit encore faire, et suivre qui a fini.
+//
+// game_display_mode toujours forcé à 'audio' (changé le 19/07/2026, suite à
+// un vrai test) : en mode "vidéo visible", YouTube affiche son propre titre
+// de vidéo par-dessus le lecteur (impossible à masquer de façon fiable, voir
+// la leçon du Round 12/13 dans idees.md) — ce qui donnait directement la
+// réponse. Contrairement au jeu des questions (où voir le titre ne gâche pas
+// grand-chose), ici deviner LE TITRE est tout l'intérêt du jeu : l'option
+// "vidéo visible" n'a donc plus lieu d'être pour le Blindtest.
+async function confirmBtSettings(){
+  if(!isGameCreator()) return;
+  const slots = Array.from({ length: btSongsPerPersonTarget }, (_, i) => `bt${i + 1}`);
+  const { data, error } = await sb.from("rooms").update({
+    game_question_ids: slots,
+    game_phase: "answering",
+    game_display_mode: "audio",
+    game_playback_start: btPlaybackStart || "start",
+  }).eq("id", currentRoom.id).select().single();
+  if(error){ showToast("Erreur à la validation des réglages : " + error.message); return; }
+  currentRoom = data;
+  showToast(`${btSongsPerPersonTarget} chanson(s) chacun — à vos propositions !`);
+  renderBlindtestLobby();
+}
+
+/* ---- Phase 2 : chacun propose ses chansons, le créateur suit la progression ---- */
+function renderBtAnsweringPhase(){
+  const slots = currentRoom.game_question_ids || [];
+  const myAnswers = gameAnswers.filter(a => a.user_id === currentUser?.id);
+
+  document.getElementById("btMyAnswers").innerHTML = slots.map(slot => {
+    const label = `🎵 Chanson n°${slot.slice(2)}`;
+    const mine = myAnswers.find(a => a.question_id === slot);
+    return `
+      <div class="search-result" style="align-items:flex-start;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:600;">${escapeHtml(label)}</div>
+          ${mine
+            ? `<div style="font-size:12.5px;color:var(--text-dim);margin-top:2px;">✅ ${escapeHtml(mine.title)} — ${escapeHtml(mine.artist||"")}</div>`
+            : `<div style="font-size:12.5px;color:var(--text-faint);margin-top:2px;">Pas encore proposée</div>`}
+        </div>
+        <button class="add-btn" onclick="openGameAnswerModal('${slot}')" title="${mine ? "Changer ta proposition" : "Proposer"}" style="width:auto;padding:0 12px;">${mine ? "✏️ Modifier" : "➕ Proposer"}</button>
+      </div>
+    `;
+  }).join("");
+
+  renderBtProgress(slots);
+
+  const creator = isGameCreator();
+  document.getElementById("btCreatorControls").style.display = creator ? "block" : "none";
+  if(creator) updateBtLaunchButton(slots);
+}
+
+function renderBtProgress(slots){
+  const creator = isGameCreator();
+  const participantIds = getGameParticipantIds();
+  const excluded = new Set(currentRoom.game_excluded_user_ids || []);
+
+  const rows = participantIds.map(uid => {
+    const answered = gameAnswers.filter(a => a.user_id === uid && slots.includes(a.question_id)).length;
+    const total = slots.length;
+    const done = total > 0 && answered >= total;
+    const pseudo = getPseudoForUserId(uid);
+    const excludeBtn = (creator && uid !== currentUser?.id)
+      ? `<button class="add-btn" onclick="excludeParticipant('${uid}')" title="Exclure ${escapeHtml(pseudo)} (AFK)" style="width:auto;padding:0 10px;font-size:11px;">🚫 Exclure</button>`
+      : "";
+    return `
+      <div class="search-result">
+        <div class="avatar" style="width:30px;height:30px;background:var(--accent1);font-size:12px;">${escapeHtml((pseudo||"?")[0].toUpperCase())}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:600;">${escapeHtml(pseudo)}${uid === currentUser?.id ? " (toi)" : ""}</div>
+          <div style="font-size:11.5px;color:var(--text-faint);">${answered}/${total} chanson(s)${done ? " ✅" : ""}</div>
+        </div>
+        ${excludeBtn}
+      </div>
+    `;
+  }).join("");
+
+  const excludedRows = [...excluded].map(uid => `
+    <div class="search-result" style="opacity:.6;">
+      <div class="avatar" style="width:30px;height:30px;background:var(--text-faint);font-size:12px;">${escapeHtml((getPseudoForUserId(uid)||"?")[0].toUpperCase())}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;">${escapeHtml(getPseudoForUserId(uid))} — exclu(e)</div>
+      </div>
+      ${creator ? `<button class="add-btn" onclick="includeParticipant('${uid}')" title="Réintégrer" style="width:auto;padding:0 10px;font-size:11px;">↩️ Réintégrer</button>` : ""}
+    </div>
+  `).join("");
+
+  document.getElementById("btProgress").innerHTML = rows + excludedRows;
+}
+
+function updateBtLaunchButton(slots){
+  const participantIds = getGameParticipantIds();
+  const total = slots.length;
+  const missing = participantIds.filter(uid =>
+    gameAnswers.filter(a => a.user_id === uid && slots.includes(a.question_id)).length < total
+  );
+  const btn = document.getElementById("btLaunchBtn");
+  const hint = document.getElementById("btLaunchHint");
+  if(missing.length === 0 && participantIds.length > 0){
+    btn.disabled = false;
+    hint.textContent = "Tout le monde a proposé ses chansons — c'est prêt !";
+  } else {
+    btn.disabled = true;
+    const names = missing.map(uid => getPseudoForUserId(uid)).join(", ");
+    hint.textContent = missing.length
+      ? `En attente de propositions : ${names} (ou exclus-les s'ils sont AFK).`
+      : "En attente de participants.";
+  }
+}
+
+// Construit l'ordre des manches à partir de TOUTES les chansons proposées
+// dans le salon (peu importe le slot — contrairement à "Le jeu des
+// questions", il n'y a pas de catégorie à respecter). Comme là-bas, 2
+// propositions identiques (même vidéo YouTube) ne sont jouées qu'une seule
+// fois, avec plusieurs "propriétaires" possibles.
+//
+// Pièges (decoys) — retravaillé le 19/07/2026 suite à 2 vrais tests :
+// 1) Les pièges venaient au départ des AUTRES chansons du salon, donc d'une
+//    manche à l'autre, on finissait par voir en avance le titre d'une
+//    chanson qui n'était pas encore jouée pour de vrai (spoiler à quelques
+//    manches d'écart) — corrigé en passant au catalogue de démo (CATALOG).
+// 2) Mais les titres de CATALOG sont "propres" (titre et artiste séparés),
+//    alors qu'une vraie recherche YouTube donne des titres "bruts" (ex.
+//    *"Dja Dja - Aya Nakamura - Clip Officiel (VEVO)"*) — Rémi a repéré
+//    qu'on reconnaissait donc la bonne réponse rien qu'au FORMAT, sans même
+//    avoir besoin d'écouter. Nouvelle source : le pool communautaire
+//    (blindtest_pool, voir harmonize-schema.sql) contient de VRAIES
+//    chansons YouTube au même format que les vraies réponses, tout en
+//    excluant explicitement les chansons de CETTE partie (donc toujours
+//    aucun risque de spoiler). CATALOG ne sert plus qu'en complément si le
+//    pool est trop petit (tout début du projet, avant la première vraie
+//    partie terminée).
+// Calculés une seule fois au lancement (pas à l'affichage) pour rester
+// stables et identiques pour tout le monde — voir renderBtGuessOptions().
+async function computeBtRounds(){
+  const groups = new Map();
+  gameAnswers.forEach(a => {
+    const key = a.youtube_id || ("title:" + a.title);
+    if(!groups.has(key)){
+      groups.set(key, {
+        youtube_id: a.youtube_id || null,
+        title: a.title,
+        artist: a.artist || "",
+        thumbnail: a.thumbnail || "",
+        owner_user_ids: [],
+      });
+    }
+    groups.get(key).owner_user_ids.push(a.user_id);
+  });
+  const rounds = shuffleArray([...groups.values()]);
+  const realAnswerIds = new Set(rounds.map(r => r.youtube_id).filter(Boolean));
+
+  let poolCandidates = [];
+  try {
+    const { data } = await sb.from("blindtest_pool").select("youtube_id,title,artist").limit(300);
+    poolCandidates = (data || []).filter(t => !realAnswerIds.has(t.youtube_id));
+  } catch(e){
+    console.warn("[Harmonize] Pool communautaire indisponible, pièges tirés du catalogue de démo uniquement :", e);
+  }
+
+  return rounds.map(round => {
+    const poolChoices = shuffleArray(poolCandidates.filter(c => c.title !== round.title)).slice(0, 3);
+    const stillNeeded = 3 - poolChoices.length;
+    const catalogChoices = stillNeeded > 0
+      ? shuffleArray(CATALOG.filter(c => c.title !== round.title)).slice(0, stillNeeded)
+          .map(c => ({ youtube_id: c.youtubeId, title: c.title, artist: c.artist }))
+      : [];
+    const decoys = shuffleArray([...poolChoices, ...catalogChoices]);
+    return { ...round, decoys };
+  });
+}
+
+// Manche de chauffe RETIRÉE le 19/07/2026 — voir le commentaire jumeau sur
+// launchGame() pour l'explication complète (soupçonnée de causer des pubs en
+// boucle en détruisant le lecteur de chauffe en plein milieu d'une pub).
+async function launchBlindtest(){
+  if(!isGameCreator()) return;
+  const rounds = await computeBtRounds();
+  if(!rounds.length){ showToast("Aucune chanson à jouer — attends que tout le monde ait proposé."); return; }
+  const nowIso = new Date().toISOString();
+  const startSeconds = currentRoom.game_playback_start === "middle" ? 45 : 0;
+  const { data, error } = await sb.from("rooms").update({
+    game_phase: "playing",
+    game_rounds: rounds,
+    game_current_round: 0,
+    game_round_started_at: nowIso,
+    game_round_revealed: false,
+    playback_state: "playing",
+    playback_position: startSeconds,
+    playback_started_at: nowIso,
+  }).eq("id", currentRoom.id).select().single();
+  if(error){ showToast("Erreur au lancement de la partie : " + error.message); return; }
+  currentRoom = data;
+  showToast(`🚀 Partie lancée ! ${rounds.length} manche(s).`);
+  renderBlindtestLobby();
+}
+
+/* ---- Phase 3 : la partie — écoute manche par manche + choix multiple +
+   points selon la vitesse (même barème que "Le jeu des questions", voir
+   computePoints()). ---- */
+function currentBtRound(){
+  const rounds = currentRoom?.game_rounds || [];
+  return rounds[currentRoom?.game_current_round] || null;
+}
+
+function renderBtPlaying(){
+  const rounds = currentRoom.game_rounds || [];
+  const idx = currentRoom.game_current_round || 0;
+  const round = rounds[idx];
+  const total = rounds.length;
+  if(!round) return;
+
+  document.getElementById("btRoundCounter").textContent = `Manche ${Math.min(idx + 1, total)}/${total}`;
+  showBtRoundIntro(idx, total);
+
+  const revealed = !!currentRoom.game_round_revealed;
+
+  // btAdSkipActive (voir revealAdSkipButton()) : pendant la fenêtre de
+  // déblocage de 10 secondes, on ne réaffiche ni le cache ni la couche de
+  // clic par-dessus, même si ce rendu est déclenché par une mise à jour
+  // reçue entre-temps (vote d'un autre participant, etc.).
+  const audioOnly = currentRoom.game_display_mode === "audio";
+  const cover = document.getElementById("btAudioCover");
+  if(cover) cover.style.display = (audioOnly && !revealed && !btAdSkipActive) ? "flex" : "none";
+  const blocker = document.getElementById("btClickBlocker");
+  if(blocker) blocker.style.display = btAdSkipActive ? "none" : "block";
+  // Bandeau partiel (voir revealAdSkipButton()) : remplace le cache complet
+  // pendant la fenêtre de déblocage, pour ne pas dévoiler le titre une fois
+  // la pub passée (la vraie vidéo redevient visible en dessous).
+  const banner = document.getElementById("btAdSkipBanner");
+  if(banner) banner.style.display = (btAdSkipActive && audioOnly && !revealed) ? "block" : "none";
+
+  ensureBtPlayer(round);
+
+  const iAmOwner = (round.owner_user_ids || []).includes(currentUser?.id);
+
+  document.getElementById("btOwnerNote").style.display = (!revealed && iAmOwner) ? "block" : "none";
+  document.getElementById("btGuessBox").style.display = (!revealed && !iAmOwner) ? "block" : "none";
+  document.getElementById("btRevealBox").style.display = revealed ? "block" : "none";
+
+  if(!revealed && !iAmOwner){
+    ensureBtGuessSelectionForRound(idx);
+    renderBtGuessOptions(round);
+  }
+  if(revealed){
+    renderBtReveal(round);
+  }
+
+  ensureBtVoteTimer(idx);
+
+  const isLast = idx >= total - 1;
+  document.getElementById("btNextBox").style.display = revealed ? "block" : "none";
+  if(revealed){
+    const actionBtn = document.getElementById("btRevealBtn");
+    actionBtn.textContent = isLast ? "🏁 Voir le classement final" : "➡️ Chanson suivante";
+    actionBtn.onclick = nextBtRound;
+  }
+
+  document.getElementById("btScoreboardBox").style.display = revealed ? "block" : "none";
+  if(revealed) renderBtScoreboard();
+}
+
+// Animation d'annonce de manche (même principe que showGameQuestionIntro()) —
+// purement locale, pas besoin de la synchroniser entre appareils.
+function showBtRoundIntro(idx, total){
+  if(btRoundIntroIdx === idx) return;
+  btRoundIntroIdx = idx;
+  const el = document.getElementById("btRoundIntro");
+  if(!el) return;
+  document.getElementById("btRoundIntroCounter").textContent = `Manche ${idx + 1}/${total}`;
+  el.style.display = "flex";
+  el.classList.remove("gq-anim");
+  void el.offsetWidth;
+  el.classList.add("gq-anim");
+  setTimeout(() => { el.style.display = "none"; el.classList.remove("gq-anim"); }, 2200);
+}
+
+/* ---- Lecteur synchronisé de la manche en cours — même principe que
+   ensureGamePlayer()/applyGamePlaybackState(), mais avec son propre lecteur
+   (btPlayer) puisque c'est un écran différent. ---- */
+function ensureBtPlayer(round){
+  if(!ytApiReady || typeof YT === "undefined" || !YT.Player){ setTimeout(() => renderBlindtestLobby(), 300); return; }
+  if(!round || !round.youtube_id) return;
+  if(!btPlayer){
+    btPlayer = new YT.Player("btYtPlayer", {
+      height: "180",
+      width: "100%",
+      videoId: round.youtube_id,
+      playerVars: { autoplay: 1, controls: 0, disablekb: 1, playsinline: 1, fs: 0, rel: 0, iv_load_policy: 3, modestbranding: 1 },
+      events: {
+        onReady: () => { applyBtPlaybackState(); },
+        onStateChange: (e) => {
+          if(e.data === YT.PlayerState.PLAYING) updateBtPlayPauseLabel(true);
+          if(e.data === YT.PlayerState.PAUSED) updateBtPlayPauseLabel(false);
+        },
+      },
+    });
+  } else {
+    applyBtPlaybackState();
+  }
+}
+
+function applyBtPlaybackState(){
+  if(!currentRoom || !btPlayer || !btPlayer.seekTo) return;
+  const round = currentBtRound();
+  if(!round || !round.youtube_id) return;
+
+  const playing = currentRoom.playback_state === "playing";
+  const basePosition = Number(currentRoom.playback_position) || 0;
+  const targetSeconds = playing && currentRoom.playback_started_at
+    ? basePosition + Math.max(0, (Date.now() - new Date(currentRoom.playback_started_at).getTime()) / 1000)
+    : basePosition;
+
+  const loadedId = btPlayer.getVideoData?.()?.video_id;
+  if(loadedId !== round.youtube_id){
+    btPlayer.loadVideoById(round.youtube_id, targetSeconds);
+    if(!playing) setTimeout(() => { try { btPlayer.pauseVideo(); } catch(e){} }, 300);
+  } else {
+    const current = btPlayer.getCurrentTime?.() || 0;
+    if(Math.abs(current - targetSeconds) > 1.5) btPlayer.seekTo(targetSeconds, true);
+    const playerState = btPlayer.getPlayerState?.();
+    if(playing && playerState !== YT.PlayerState.PLAYING) btPlayer.playVideo();
+    if(!playing && playerState === YT.PlayerState.PLAYING) btPlayer.pauseVideo();
+  }
+  updateBtPlayPauseLabel(playing);
+}
+
+function updateBtPlayPauseLabel(playing){
+  const btn = document.getElementById("btPlayPauseBtn");
+  if(btn) btn.textContent = playing ? "⏸ Pause" : "▶️ Lecture";
+}
+
+async function toggleBtPlayPause(){
+  if(!currentRoom) return;
+  const playing = currentRoom.playback_state === "playing";
+  let update;
+  if(playing){
+    const basePosition = Number(currentRoom.playback_position) || 0;
+    const elapsed = currentRoom.playback_started_at
+      ? Math.max(0, (Date.now() - new Date(currentRoom.playback_started_at).getTime()) / 1000)
+      : 0;
+    update = { playback_state: "paused", playback_position: basePosition + elapsed, playback_started_at: null };
+  } else {
+    update = { playback_state: "playing", playback_started_at: new Date().toISOString() };
+  }
+  const { data, error } = await sb.from("rooms").update(update).eq("id", currentRoom.id).select().single();
+  if(error){ showToast("Erreur : " + error.message); return; }
+  currentRoom = data;
+  applyBtPlaybackState();
+}
+
+function stopBtPlayer(){
+  if(btPlayer){ try { btPlayer.destroy(); } catch(e) {} btPlayer = null; }
+  stopBtVoteTimer();
+}
+
+// Ajouté le 19/07/2026 : remonté par Rémi en testant sur téléphone — une pub
+// YouTube peut se lancer avant la musique, et son bouton natif "Passer" est
+// alors totalement bloqué par btAudioCover + btClickBlocker (les 2 couches
+// qui recouvrent la vidéo pour l'anti-spoiler et la synchro pause/lecture),
+// rendant la pub impossible à passer. Il n'existe pas de moyen fiable de
+// détecter qu'une pub est en cours via l'API YouTube (aucun événement public
+// pour ça) — la solution la plus robuste reste donc de laisser la main à la
+// personne : ce bouton désactive temporairement les 2 couches pour qu'elle
+// puisse taper directement sur "Passer" si elle le voit, avant qu'elles ne
+// se réactivent toutes seules.
+let adSkipRestoreTimer = null;
+// btAdSkipActive (ajouté le 19/07/2026, corrige un vrai bug remonté par
+// Rémi) : mettre le cache juste en transparent (opacity) ne suffisait pas,
+// il restait cliquable PAR-DESSUS le vrai bouton "Ignorer" de la pub — donc
+// le tap atterrissait sur notre cache (qui ne fait rien d'utile ici) plutôt
+// que sur YouTube en dessous. Il faut vraiment le cacher (display:none). Et
+// comme renderBtPlaying() réaffiche ce cache à CHAQUE rendu (y compris ceux
+// déclenchés par le temps réel pendant ces 10 secondes), ce drapeau lui dit
+// de ne pas le faire tant que la fenêtre de déblocage est active.
+let btAdSkipActive = false;
+// Chrono personnel remis à zéro — voir son jumeau gameAdSkipClickedAtRound
+// (jeu des questions) pour l'explication complète.
+let btAdSkipClickedAtRound = null;
+let btAdSkipClickedAtTime = null;
+function revealAdSkipButton(){
+  btAdSkipActive = true;
+  btAdSkipClickedAtRound = currentRoom?.game_current_round ?? null;
+  btAdSkipClickedAtTime = Date.now();
+  renderBtPlaying(); // applique tout de suite (cover + blocker gérés par renderBtPlaying, voir plus haut)
+  showToast("Tape directement sur le bouton \"Ignorer\" de la pub si tu le vois — ça revient à la normale dans 10 secondes. Ton chrono personnel repart de zéro, tu ne perds pas de temps sur le bonus de rapidité.");
+  clearTimeout(adSkipRestoreTimer);
+  adSkipRestoreTimer = setTimeout(() => {
+    btAdSkipActive = false;
+    renderBtPlaying();
+  }, 10000);
+}
+
+/* ---- Minuteur de vote : 20 secondes, même principe que le jeu des
+   questions (gameVoteSecondsLeft() est déjà générique, réutilisé tel quel). ---- */
+function ensureBtVoteTimer(idx){
+  if(btVoteTimerRoundIdx !== idx){
+    btVoteTimerRoundIdx = idx;
+    stopBtVoteTimer();
+    btVoteTimerInterval = setInterval(updateBtVoteCountdown, 1000);
+  }
+  updateBtVoteCountdown();
+}
+
+function stopBtVoteTimer(){
+  if(btVoteTimerInterval){ clearInterval(btVoteTimerInterval); btVoteTimerInterval = null; }
+  btVoteTimerRoundIdx = -1;
+}
+
+function updateBtVoteCountdown(){
+  if(!currentRoom || currentRoom.game_phase !== "playing") { stopBtVoteTimer(); return; }
+  const secondsLeft = gameVoteSecondsLeft();
+  const timeUp = secondsLeft <= 0;
+  // Révélation anticipée si tout le monde a déjà répondu (ajoutée le
+  // 19/07/2026, voir allExpectedGuessersHaveVoted() — mutualisée avec le jeu
+  // des questions).
+  const everyoneVoted = allExpectedGuessersHaveVoted(currentBtRound(), currentRoom.game_current_round, btGuesses);
+
+  if((timeUp || everyoneVoted) && !currentRoom.game_round_revealed && btAutoRevealRoundIdx !== currentRoom.game_current_round){
+    btAutoRevealRoundIdx = currentRoom.game_current_round;
+    revealBtRound();
+  }
+
+  const el = document.getElementById("btVoteCountdown");
+  if(el) el.textContent = secondsLeft > 0 ? `⏳ ${secondsLeft}s pour deviner` : "⏰ Temps écoulé";
+  document.querySelectorAll("#btGuessOptions button").forEach(btn => { btn.disabled = timeUp; });
+  const timeUpHint = document.getElementById("btGuessTimeUpHint");
+  if(timeUpHint) timeUpHint.style.display = timeUp ? "block" : "none";
+}
+
+/* ---- Choix multiple : c'est quelle chanson ? Un seul choix possible par
+   manche (contrairement à "Le jeu des questions" où plusieurs suspects sont
+   possibles) — voir blindtest_guesses dans harmonize-schema.sql. ---- */
+// btGuessOptionsCache mémorise l'ORDRE mélangé des choix pour la manche
+// affichée (ajouté le 19/07/2026, corrige un vrai bug remonté par Rémi : les
+// options changeaient de place à chaque nouveau rendu, parce que
+// renderBtGuessOptions() les re-mélangeait à chaque appel — donc à chaque
+// mise à jour reçue en temps réel, y compris juste en votant soi-même).
+// Calculé UNE SEULE FOIS par manche ici, comme btMyGuess juste au-dessus.
+function ensureBtGuessSelectionForRound(idx){
+  if(btGuessSelectionRoundIdx === idx) return;
+  btGuessSelectionRoundIdx = idx;
+  const mine = btGuesses.find(g => g.round_index === idx && g.guesser_user_id === currentUser?.id);
+  btMyGuess = mine ? mine.guessed_youtube_id : null;
+  const round = currentBtRound();
+  btGuessOptionsCache = round
+    ? shuffleArray([{ youtube_id: round.youtube_id, title: round.title, artist: round.artist }, ...(round.decoys || [])])
+    : [];
+}
+
+function renderBtGuessOptions(round){
+  const timeUp = gameVoteSecondsLeft() <= 0;
+  const locked = timeUp || !!btMyGuess;
+  const options = btGuessOptionsCache;
+  document.getElementById("btGuessOptions").innerHTML = options.map(opt => {
+    const active = btMyGuess === opt.youtube_id;
+    return `
+      <button
+        onclick="pickBtGuessOption('${escJs(opt.youtube_id || "")}')"
+        ${locked ? "disabled" : ""}
+        style="width:100%;text-align:left;padding:12px 14px;border-radius:12px;border:2px solid ${active ? "var(--accent1)" : "var(--border)"};background:${active ? "var(--accent1)" : "var(--bg-card)"};color:${active ? "#fff" : "var(--text)"};font-weight:600;font-size:13.5px;cursor:${locked ? "default" : "pointer"};opacity:${locked && !active ? "0.5" : "1"};transition:all .15s;margin-bottom:8px;"
+      >${active ? "✓ " : ""}${escapeHtml(opt.title)}${opt.artist ? " — " + escapeHtml(opt.artist) : ""}</button>
+    `;
+  }).join("");
+  const timeUpHint = document.getElementById("btGuessTimeUpHint");
+  if(timeUpHint) timeUpHint.style.display = timeUp ? "block" : "none";
+}
+
+function pickBtGuessOption(youtubeId){
+  if(btMyGuess) return; // déjà voté pour cette manche, plus modifiable
+  btMyGuess = youtubeId;
+  renderBtGuessOptions(currentBtRound());
+  submitBtGuess();
+}
+
+async function submitBtGuess(){
+  if(!currentRoom || !currentUser || !btMyGuess) return;
+  if(gameVoteSecondsLeft() <= 0) return;
+  const roundIndex = currentRoom.game_current_round;
+  const alreadySaved = btGuesses.some(g => g.round_index === roundIndex && g.guesser_user_id === currentUser.id);
+  if(alreadySaved) return;
+  // Chrono personnel remis à zéro par "Pub bloquée ?" — voir revealAdSkipButton().
+  const elapsed = (btAdSkipClickedAtRound === roundIndex && btAdSkipClickedAtTime)
+    ? Math.max(0, (Date.now() - btAdSkipClickedAtTime) / 1000)
+    : (currentRoom.game_round_started_at ? Math.max(0, (Date.now() - new Date(currentRoom.game_round_started_at).getTime()) / 1000) : 0);
+  const { error } = await sb.from("blindtest_guesses").insert({
+    room_id: currentRoom.id,
+    round_index: roundIndex,
+    guesser_user_id: currentUser.id,
+    guessed_youtube_id: btMyGuess,
+    elapsed_seconds: elapsed,
+  });
+  if(error){ showToast("Erreur d'enregistrement de ta réponse : " + error.message); return; }
+  await loadBtGuesses(currentRoom.id);
+  if(currentRoom.game_phase === "playing" && !currentRoom.game_round_revealed){
+    renderBtGuessOptions(currentBtRound());
+  }
+}
+
+/* ---- Révélation + score de la manche ---- */
+async function revealBtRound(){
+  if(!currentRoom) return;
+  const { data, error } = await sb.from("rooms").update({ game_round_revealed: true }).eq("id", currentRoom.id).select().single();
+  if(error){ showToast("Erreur : " + error.message); return; }
+  currentRoom = data;
+  await loadBtGuesses(currentRoom.id);
+  renderBlindtestLobby();
+}
+
+function renderBtReveal(round){
+  const myGuess = btGuesses.find(g => g.round_index === currentRoom.game_current_round && g.guesser_user_id === currentUser?.id);
+  let myPoints = 0;
+  let lightning = false;
+  if(myGuess && myGuess.guessed_youtube_id === round.youtube_id){
+    const pts = computePoints(Number(myGuess.elapsed_seconds) || 0);
+    myPoints = pts.total;
+    lightning = pts.lightning;
+  }
+  const owners = round.owner_user_ids || [];
+  const ownerNames = owners.map(uid => getPseudoForUserId(uid)).join(", ");
+  const iAmOwner = owners.includes(currentUser?.id);
+  document.getElementById("btRevealBox").innerHTML = `
+    <div class="card" style="text-align:center;">
+      <div style="font-size:15px;font-weight:700;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
+      <div style="font-size:12.5px;color:var(--text-dim);margin-top:6px;">Proposée par : ${escapeHtml(ownerNames || "quelqu'un")}</div>
+      ${myPoints > 0
+        ? `<div style="margin-top:8px;color:var(--accent1);font-weight:700;">${lightning ? "⚡ " : ""}+${myPoints} point(s) pour toi !</div>`
+        : (iAmOwner ? "" : `<div style="margin-top:8px;color:var(--text-faint);">0 point cette manche.</div>`)}
+    </div>
+  `;
+}
+
+async function nextBtRound(){
+  if(!currentRoom) return;
+  const rounds = currentRoom.game_rounds || [];
+  const next = (currentRoom.game_current_round || 0) + 1;
+  let update;
+  if(next >= rounds.length){
+    update = { game_phase: "finished", playback_state: "paused" };
+  } else {
+    const nowIso = new Date().toISOString();
+    const startSeconds = currentRoom.game_playback_start === "middle" ? 45 : 0;
+    update = {
+      game_current_round: next,
+      game_round_started_at: nowIso,
+      game_round_revealed: false,
+      playback_state: "playing",
+      playback_position: startSeconds,
+      playback_started_at: nowIso,
+    };
+  }
+  const { data, error } = await sb.from("rooms").update(update).eq("id", currentRoom.id).select().single();
+  if(error){ showToast("Erreur : " + error.message); return; }
+  currentRoom = data;
+  btGuessSelectionRoundIdx = -1;
+  btMyGuess = null;
+  btAdSkipClickedAtRound = null;
+  btAdSkipClickedAtTime = null;
+  if(currentRoom.game_phase === "playing") applyBtPlaybackState();
+  if(currentRoom.game_phase === "finished") await populateBtPool(rounds);
+  renderBlindtestLobby();
+}
+
+/* ---- Score : calculé à la volée, jamais stocké séparément. ---- */
+function computeBtScores(){
+  const rounds = currentRoom.game_rounds || [];
+  const currentIdx = currentRoom.game_current_round || 0;
+  const upTo = currentRoom.game_phase === "finished"
+    ? rounds.length
+    : (currentRoom.game_round_revealed ? currentIdx + 1 : currentIdx);
+  const scores = {};
+  for(let i = 0; i < upTo; i++){
+    const round = rounds[i];
+    if(!round) continue;
+    btGuesses.filter(g => g.round_index === i && g.guessed_youtube_id === round.youtube_id).forEach(g => {
+      const { total } = computePoints(Number(g.elapsed_seconds) || 0);
+      scores[g.guesser_user_id] = (scores[g.guesser_user_id] || 0) + total;
+    });
+  }
+  return scores;
+}
+
+function renderBtScoreboard(){
+  const scores = computeBtScores();
+  const entries = getGameParticipantIds()
+    .map(uid => [uid, getPseudoForUserId(uid), scores[uid] || 0])
+    .sort((a, b) => b[2] - a[2]);
+  document.getElementById("btScoreboard").innerHTML = entries.map(([uid, name, score]) => `
+    <div class="score-row"><span>${escapeHtml(name)}${uid === currentUser?.id ? " (toi)" : ""}</span><strong>${score} pts</strong></div>
+  `).join("");
+}
+
+function renderBtFinished(){
+  stopBtPlayer();
+  const scores = computeBtScores();
+  const entries = getGameParticipantIds()
+    .map(uid => [uid, getPseudoForUserId(uid), scores[uid] || 0])
+    .sort((a, b) => b[2] - a[2]);
+
+  const podiumEntries = entries.slice(0, 3);
+  const rest = entries.slice(3);
+  const heights = { 0: 104, 1: 78, 2: 60 };
+  const medals = { 0: "🥇", 1: "🥈", 2: "🥉" };
+  const visualOrder = [1, 0, 2].filter(i => podiumEntries[i]);
+  document.getElementById("btPodium").innerHTML = visualOrder.map(i => {
+    const [uid, name, score] = podiumEntries[i];
+    const initial = escapeHtml((name || "?")[0].toUpperCase());
+    const big = i === 0;
+    return `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:${big ? "96px" : "78px"};">
+        <div style="font-size:${big ? "26px" : "20px"};">${medals[i]}</div>
+        <div class="avatar" style="width:${big ? "52px" : "42px"};height:${big ? "52px" : "42px"};font-size:${big ? "18px" : "15px"};background:var(--accent1);">${initial}</div>
+        <div style="font-size:12.5px;font-weight:700;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${escapeHtml(name)}${uid === currentUser?.id ? " (toi)" : ""}</div>
+        <div style="font-size:11.5px;color:var(--text-faint);margin-bottom:4px;">${score} pts</div>
+        <div style="width:100%;height:${heights[i]}px;border-radius:10px 10px 0 0;background:linear-gradient(160deg,var(--accent1),var(--accent2));opacity:${big ? "1" : ".7"};"></div>
+      </div>
+    `;
+  }).join("");
+
+  document.getElementById("btFinalScoreboard").innerHTML = rest.map(([uid, name, score], i) => `
+    <div class="score-row"><span>${i + 4}. ${escapeHtml(name)}${uid === currentUser?.id ? " (toi)" : ""}</span><strong>${score} pts</strong></div>
+  `).join("");
+}
+
+// Alimente le pool communautaire (voir blindtest_pool dans
+// harmonize-schema.sql) avec toutes les chansons de cette partie, pour le
+// mode solo "chansons aléatoires". Doublons ignorés (ON CONFLICT côté
+// Supabase, contrainte "unique" sur youtube_id) — sans risque à rappeler
+// plusieurs fois (idempotent), utile puisque n'importe quel participant peut
+// déclencher la fin de partie (pas de "chef de salon").
+async function populateBtPool(rounds){
+  const rows = (rounds || [])
+    .filter(r => r.youtube_id)
+    .map(r => ({ youtube_id: r.youtube_id, title: r.title, artist: r.artist || "", thumbnail: r.thumbnail || "" }));
+  if(!rows.length) return;
+  const { error } = await sb.from("blindtest_pool").upsert(rows, { onConflict: "youtube_id", ignoreDuplicates: true });
+  if(error) console.warn("[Harmonize] Échec de l'alimentation du pool blindtest :", error.message);
+}
+
+// Relance une nouvelle partie dans le MÊME salon — même principe que
+// rejouerMemeSalon() pour "Le jeu des questions".
+async function rejouerBtMemeSalon(){
+  if(!currentRoom) return;
+  await sb.from("game_answers").delete().eq("room_id", currentRoom.id);
+  await sb.from("blindtest_guesses").delete().eq("room_id", currentRoom.id);
+  const { data, error } = await sb.from("rooms").update({
+    game_phase: "lobby",
+    // "[]" et non "null" (même correctif que rejouerMemeSalon(), voir son
+    // commentaire) : ces 2 colonnes sont NOT NULL en base.
+    game_question_ids: [],
+    game_rounds: [],
+    game_current_round: 0,
+    game_round_started_at: null,
+    game_round_revealed: false,
+    game_excluded_user_ids: [],
+    playback_state: "paused",
+    playback_position: 0,
+    playback_started_at: null,
+  }).eq("id", currentRoom.id).select().single();
+  if(error){ showToast("Erreur : " + error.message); return; }
+  currentRoom = data;
+  gameAnswers = [];
+  btGuesses = [];
+  btSongsPerPersonTarget = null;
+  btPlaybackStart = null;
+  btGuessSelectionRoundIdx = -1;
+  btMyGuess = null;
+  btAutoRevealRoundIdx = -1;
+  btRoundIntroIdx = -1;
+  showToast("🔄 Nouvelle partie ! Proposez de nouvelles chansons.");
+  renderBlindtestLobby();
 }
 
 /* ---------- Jeux : Qui a mis ça / Le jeu des questions / Blindtest solo ----------
@@ -3855,9 +5431,18 @@ function pickRounds(n){
 }
 
 function startGame(){
-  // on repart d'un tableau des scores à zéro pour cette nouvelle partie
-  state.scores = FRIENDS.reduce((acc,f)=>{acc[f.name]=0;return acc;},{});
-  state.scores[state.user] = 0;
+  // Blindtest solo réel (ajouté le 19/07/2026) : pas d'amis fictifs à
+  // afficher, on joue seul contre de vraies chansons — voir aussi
+  // resetBtSoloVisuals()/gameScoresSection ci-dessous.
+  const realBtSolo = state.mode === "blindtest" && btSoloQueue.length >= BT_SOLO_MIN_TRACKS;
+  document.getElementById("gameScoresSection").style.display = realBtSolo ? "none" : "block";
+  if(realBtSolo){
+    state.scores = { [state.user]: 0 };
+  } else {
+    // on repart d'un tableau des scores à zéro pour cette nouvelle partie
+    state.scores = FRIENDS.reduce((acc,f)=>{acc[f.name]=0;return acc;},{});
+    state.scores[state.user] = 0;
+  }
   renderScores();
   roundState.currentRound = 0;
   document.getElementById("gameOver").style.display = "none";
@@ -3885,6 +5470,7 @@ function nextRound(){
 
 function endGame(){
   clearRoundTimer();
+  stopBtSoloPlayer(); // le morceau de la dernière manche ne doit pas continuer à jouer sur l'écran de fin
   document.getElementById("gameActive").style.display = "none";
   document.getElementById("gameOver").style.display = "block";
   const myScore = state.scores[state.user] || 0;
@@ -3917,14 +5503,27 @@ function updateTimerUI(){
   if(label) label.textContent = "⏱ " + Math.floor(roundState.elapsed) + "s";
 }
 
+// Remet à zéro l'affichage propre au Blindtest solo réel (ajouté le
+// 19/07/2026) — utile si on arrive sur "Qui a mis ça"/"Le jeu des questions"
+// (démo) juste après une session de Blindtest solo, pour ne rien laisser
+// d'affiché/joué par erreur.
+function resetBtSoloVisuals(){
+  document.getElementById("gameArtEmoji").style.display = "block";
+  document.getElementById("btSoloAudioCover").style.display = "none";
+  document.getElementById("btSoloYtPlayer").style.display = "none";
+  stopBtSoloPlayer();
+}
+
 /* ---- Contenu de chaque type de manche ---- */
 function startOwnerRound(){
+  resetBtSoloVisuals();
   const track = CATALOG[Math.floor(Math.random()*CATALOG.length)];
   const correctOwner = FRIENDS[Math.floor(Math.random()*FRIENDS.length)];
   renderMysteryUI(track.title, track.artist + " " + track.emoji, buildFriendOptions(correctOwner.name));
 }
 
 function startQuestionRound(){
+  resetBtSoloVisuals();
   const category = QUESTIONS[Math.floor(Math.random()*QUESTIONS.length)];
   const answers = QUESTION_ANSWERS[category.id];
   const names = Object.keys(answers);
@@ -3935,10 +5534,38 @@ function startQuestionRound(){
 }
 
 // Blindtest solo : on ne révèle pas le titre (c'est justement la question) — on
-// devine directement le bon titre parmi 4 propositions tirées du catalogue.
+// devine directement le bon titre parmi 4 propositions. Ajouté le 19/07/2026 :
+// si btSoloQueue contient de vraies chansons (pool communautaire ou playlist
+// perso, voir beginBtSoloSession()), on joue du VRAI son via YouTube et les
+// pièges viennent de la même file plutôt que du catalogue de démo — sinon
+// (filet de sécurité) on retombe sur l'ancien comportement 100% démo.
 function startBlindtestRound(){
-  const correctTrack = CATALOG[Math.floor(Math.random()*CATALOG.length)];
   document.getElementById("mysteryCategory").textContent = "🎧 Extrait mystère";
+
+  if(btSoloQueue.length >= BT_SOLO_MIN_TRACKS){
+    const correctTrack = btSoloQueue[(roundState.currentRound - 1) % btSoloQueue.length];
+    const pool = btSoloQueue.filter(t => t.youtube_id !== correctTrack.youtube_id);
+    const decoys = shuffleArray(pool).slice(0, Math.min(3, pool.length));
+    const options = shuffleArray([correctTrack, ...decoys]);
+    const optionsHtml = options.map(o => `
+      <button class="guess-option" data-key="${escapeHtml(o.youtube_id)}" onclick="guess('${escJs(o.youtube_id)}','${escJs(correctTrack.youtube_id)}')">
+        <div>${escapeHtml(o.title)}</div>
+        <div style="font-size:10.5px;color:var(--text-faint);">${escapeHtml(o.artist||"")}</div>
+      </button>
+    `).join("");
+    document.getElementById("gameArtEmoji").style.display = "none";
+    document.getElementById("btSoloAudioCover").style.display = "block";
+    document.getElementById("btSoloYtPlayer").style.display = "block";
+    ensureBtSoloPlayer(correctTrack.youtube_id);
+    renderMysteryUI("???", "Écoute et devine de quelle chanson il s'agit !", optionsHtml);
+    return;
+  }
+
+  // Filet de sécurité : ancien catalogue de démo (aucune vraie donnée disponible).
+  document.getElementById("gameArtEmoji").style.display = "block";
+  document.getElementById("btSoloAudioCover").style.display = "none";
+  document.getElementById("btSoloYtPlayer").style.display = "none";
+  const correctTrack = CATALOG[Math.floor(Math.random()*CATALOG.length)];
   let options = [correctTrack];
   while(options.length < 4){
     const candidate = CATALOG[Math.floor(Math.random()*CATALOG.length)];
@@ -3980,11 +5607,15 @@ function escJs(str){
   return String(str).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
 }
 
-/* ---- Scoring : base + bonus de rapidité (dégressif, jamais négatif) + bonus éclair x2 ---- */
+/* ---- Scoring : base + bonus de rapidité (dégressif, jamais négatif) + bonus éclair x2 ----
+   Échelle passée de 10/10 à 1000/1000 le 19/07/2026 (demande de Rémi : "plus
+   précis et discriminant"), avec le temps écoulé gardé en décimales (plus de
+   Math.floor()) plutôt qu'arrondi à la seconde — deux réponses à 3,1s et
+   3,8s donnaient exactement le même score avant, ce n'est plus le cas. */
 function computePoints(elapsed){
-  const base = 10;
-  const speedBonus = Math.max(0, 10 - Math.floor(elapsed)); // jusqu'à +10 pts, fond à 0 après 10s — mais on peut toujours répondre après
-  let total = base + speedBonus;
+  const base = 1000;
+  const speedBonus = Math.max(0, 1000 - elapsed * 100); // 1000 pts à 0s, fond à 0 après 10s — mais on peut toujours répondre après
+  let total = Math.round(base + speedBonus);
   const lightning = elapsed <= 2; // répondu en 2 secondes ou moins
   if(lightning) total *= 2;
   return { total, lightning };
@@ -4045,6 +5676,13 @@ setInterval(()=>{
 
 renderScores();
 pickRounds(5);
+
+// Enregistrement du service worker (PWA, ajouté le 19/07/2026) — voir sw.js.
+if("serviceWorker" in navigator){
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(err => console.warn("[Harmonize] Échec d'enregistrement du service worker :", err));
+  });
+}
 </script>
 </body>
 </html>
