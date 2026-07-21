@@ -14,5 +14,11 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  event.respondWith(fetch(event.request));
+  // { cache: "no-store" } (ajouté le 21/07/2026) : un simple fetch(event.request)
+  // laisse le navigateur appliquer le Cache-Control envoyé par GitHub Pages
+  // (max-age=600) et servir une copie locale jusqu'à 10 minutes après chaque
+  // republication, sans repasser par le réseau — exactement le risque que ce
+  // service worker était censé éviter. no-store force un vrai aller-retour
+  // réseau à chaque requête.
+  event.respondWith(fetch(event.request, { cache: "no-store" }));
 });
