@@ -261,8 +261,17 @@
       <p class="sub">Connecte-toi, ou crée un compte si c'est ta première visite.</p>
       <div class="card stack">
         <button class="btn-ghost" onclick="handleGoogleLogin()">🔐 Continuer avec Google</button>
+        <!-- Ajouté le 22/07/2026, demande de Rémi : jouer (rejoindre OU créer
+             un salon) sans créer de compte. Auth anonyme Supabase — un vrai
+             auth.uid() est créé, donc toutes les policies RLS existantes
+             (déjà basées sur auth.uid(), jamais sur "authenticated" au sens
+             strict) fonctionnent sans aucun changement de schéma. Limite
+             assumée : ce compte est propre à cet appareil/navigateur, pas de
+             vraie reconnexion possible ailleurs, et l'import de playlists
+             YouTube reste réservé à un vrai compte Google. -->
+        <button class="btn-ghost" onclick="handleGuestLogin()">🎧 Jouer sans compte</button>
         <div class="divider-or">ou</div>
-        <input type="text" id="pseudoInput" placeholder="Ton pseudo (uniquement pour créer un compte)" />
+        <input type="text" id="pseudoInput" placeholder="Ton pseudo (pour créer un compte ou jouer sans compte)" />
         <input type="email" id="emailInput" placeholder="Email" />
         <input type="password" id="passwordInput" placeholder="Mot de passe (6 caractères min.)" />
         <button class="btn-primary" id="loginBtn" onclick="handleLogin()">Se connecter</button>
@@ -304,11 +313,13 @@
         <button class="btn-ghost" onclick="goToPlaylistsScreen()">📥 Gérer mes playlists</button>
       </div>
 
-      <!-- Réservé en pratique aux comptes admin (voir profiles.is_admin,
-           harmonize-schema.sql) — la suppression est bloquée par une policy
-           RLS pour tout le monde d'autre, le bouton reste donc visible sans
-           risque pour un compte normal (juste inutile). -->
-      <div class="card" style="margin-top:16px;">
+      <!-- Réservé aux comptes admin (profiles.is_admin, voir
+           harmonize-schema.sql) — la modération elle-même est de toute façon
+           bloquée côté base par une policy RLS pour tout autre compte, mais
+           depuis le 22/07/2026 (retour de Rémi après un test avec un 2e
+           compte) le bouton lui-même est aussi caché pour ne pas laisser
+           n'importe qui même OUVRIR cet écran — voir afterLogin(). -->
+      <div class="card" style="margin-top:16px;display:none;" id="poolAdminEntryCard">
         <button class="btn-ghost" onclick="goToPoolAdminScreen()">🛠 Gérer le pool communautaire</button>
       </div>
 
@@ -1082,6 +1093,13 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 
 let currentUser = null;       // utilisateur Supabase connecté (ou null)
+// Ajouté le 22/07/2026 : la protection RLS empêchait déjà tout compte non-admin
+// d'écrire sur blindtest_pool, mais l'écran "Gérer le pool communautaire"
+// restait ouvert à la navigation pour tout le monde (choix assumé au Round 44
+// pour rester simple). Retour de Rémi après un test avec un 2e compte : il ne
+// veut plus que l'écran soit même visible/accessible pour un compte non-admin
+// — voir afterLogin()/goToPoolAdminScreen().
+let currentUserIsAdmin = false;
 let currentRoom = null;       // ligne "rooms" en base si on est dans un VRAI salon, sinon null
 let realtimeChannel = null;   // abonnement temps réel actif sur la file d'attente
 let queuePollInterval = null; // filet de sécurité : relit la file toutes les 4s même si le temps réel ne pousse rien
@@ -1704,6 +1722,7 @@ async function handleSignup(){
   }
   currentUser = data.user;
   const profile = await ensureProfile(currentUser.id, pseudo);
+  currentUserIsAdmin = !!profile?.is_admin;
   await afterLogin(profile?.pseudo || pseudo);
 }
 
@@ -1717,6 +1736,7 @@ async function handleLogin(){
   if(error){ showAuthError(error.message); return; }
   currentUser = data.user;
   const profile = await ensureProfile(currentUser.id, null);
+  currentUserIsAdmin = !!profile?.is_admin;
   await afterLogin(profile?.pseudo || "Toi");
 }
 
@@ -1735,12 +1755,36 @@ async function handleGoogleLogin(){
   if(error){ showAuthError(error.message); }
 }
 
+// "Jouer sans compte" (ajouté le 22/07/2026, demande de Rémi) : auth anonyme
+// Supabase — crée un vrai auth.uid(), sans email/mot de passe. Reprend le
+// champ "pseudoInput" existant (déjà là pour la création de compte classique)
+// plutôt que d'ouvrir un second écran. Nécessite l'activation de "Anonymous
+// sign-ins" dans les réglages Auth du projet Supabase (case à cocher dans le
+// dashboard, pas une commande SQL) — sans ça, sb.auth.signInAnonymously()
+// renvoie une erreur explicite.
+async function handleGuestLogin(){
+  clearAuthError();
+  const pseudo = document.getElementById("pseudoInput").value.trim();
+  const { data, error } = await sb.auth.signInAnonymously();
+  if(error){ showAuthError(error.message); return; }
+  currentUser = data.user;
+  const profile = await ensureProfile(currentUser.id, pseudo || null);
+  currentUserIsAdmin = !!profile?.is_admin;
+  await afterLogin(profile?.pseudo || pseudo || "Toi");
+}
+
 async function handleSignOut(){
+  // Un compte "Jouer sans compte" (auth anonyme) n'a ni email ni mot de passe
+  // pour se reconnecter ensuite — se déconnecter le perd DÉFINITIVEMENT,
+  // contrairement à un vrai compte. Confirmation supplémentaire pour éviter
+  // une perte accidentelle (ajouté le 22/07/2026).
+  if(currentUser?.is_anonymous && !confirm("Tu joues sans compte : te déconnecter fera perdre l'accès à ce profil pour toujours (impossible de te reconnecter ensuite). Continuer ?")) return;
   if(realtimeChannel){ sb.removeChannel(realtimeChannel); realtimeChannel = null; }
   stopQueuePolling();
   stopAnyPlayback();
   await sb.auth.signOut();
   currentUser = null;
+  currentUserIsAdmin = false;
   currentRoom = null;
   clearLastRoom();
   document.getElementById("emailInput").value = "";
@@ -1754,6 +1798,7 @@ async function afterLogin(pseudo){
   state.user = pseudo;
   document.getElementById("userPill").textContent = "@" + pseudo.toLowerCase().replace(/\s+/g,"");
   document.getElementById("hiName").textContent = pseudo;
+  document.getElementById("poolAdminEntryCard").style.display = currentUserIsAdmin ? "block" : "none";
   loadMyImportedTracks(); // en tâche de fond, pour que le résumé de l'accueil soit prêt sans bloquer la connexion
 
   // Si on avait laissé un salon réel ouvert avant de recharger la page (ou de
@@ -1786,6 +1831,7 @@ async function afterLogin(pseudo){
     // pour un nouveau compte, plutôt que "Ami1234".
     const googleName = session.user.user_metadata?.full_name || session.user.user_metadata?.name || null;
     const profile = await ensureProfile(currentUser.id, googleName);
+    currentUserIsAdmin = !!profile?.is_admin;
     await afterLogin(profile?.pseudo || googleName || "Toi");
   }
 })();
@@ -3480,6 +3526,9 @@ let poolAdminApprovedShown = 40;
 const POOL_ADMIN_PAGE_SIZE = 40;
 
 async function goToPoolAdminScreen(){
+  // Défense en profondeur : le bouton d'entrée est déjà caché pour un compte
+  // non-admin (voir afterLogin()), mais on bloque aussi l'appel direct.
+  if(!currentUserIsAdmin){ showToast("Cet écran est réservé aux comptes admin."); return; }
   showScreen("screen-pool-admin");
   await switchPoolAdminView("pending");
 }
@@ -3522,8 +3571,15 @@ function renderPoolAdminPendingList(){
 }
 
 async function reviewPoolTrack(id, status){
-  const { error } = await sb.from("blindtest_pool").update({ status }).eq("id", id);
+  // .select() ajouté le 22/07/2026 (bug remonté par Rémi) : sans lui, une
+  // écriture bloquée par la policy RLS (compte non-admin) ne renvoie AUCUNE
+  // erreur — juste 0 ligne modifiée en silence. Le code affichait donc "fait"
+  // et retirait la chanson de la liste locale, alors qu'en base elle restait
+  // "pending" intacte. En vérifiant que data contient bien la ligne modifiée,
+  // on distingue maintenant un vrai succès d'un blocage RLS silencieux.
+  const { data, error } = await sb.from("blindtest_pool").update({ status }).eq("id", id).select();
   if(error){ showToast("Action impossible : " + error.message); return; }
+  if(!data || !data.length){ showToast("Action refusée : ton compte n'a pas les droits admin."); return; }
   poolAdminPendingTracks = poolAdminPendingTracks.filter(t => t.id !== id);
   document.getElementById("poolAdminPendingCount").textContent = poolAdminPendingTracks.length ? `(${poolAdminPendingTracks.length})` : "";
   renderPoolAdminPendingList();
@@ -3572,8 +3628,11 @@ function loadMorePoolAdminApproved(){
 }
 
 async function deletePoolTrack(id){
-  const { error } = await sb.from("blindtest_pool").delete().eq("id", id);
+  // Même correctif que reviewPoolTrack() : .select() pour distinguer un vrai
+  // succès d'un blocage RLS silencieux (0 ligne supprimée, aucune erreur).
+  const { data, error } = await sb.from("blindtest_pool").delete().eq("id", id).select();
   if(error){ showToast("Suppression impossible : " + error.message); return; }
+  if(!data || !data.length){ showToast("Suppression refusée : ton compte n'a pas les droits admin."); return; }
   poolAdminApprovedTracks = poolAdminApprovedTracks.filter(t => t.id !== id);
   renderPoolAdminApprovedList();
   showToast("Chanson retirée du pool.");
