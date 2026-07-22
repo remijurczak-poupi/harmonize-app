@@ -450,7 +450,7 @@
     <!-- SCREEN: ROOM -->
     <section class="screen" id="screen-room">
       <div class="room-hero">
-        <div class="code">Salon · <span id="roomCode">NEBULA42</span> <span class="real-badge" id="roomRealBadge">DÉMO</span></div>
+        <div class="code">Salon · <span id="roomCode">------</span> <span class="real-badge">RÉEL</span></div>
         <div class="name" id="roomModeName">🪩 Soirée</div>
         <div class="avatars-inline" id="roomAvatars"></div>
       </div>
@@ -558,14 +558,6 @@
         </div>
       </div>
 
-      <!-- Masqué en Blindtest solo réel (ajouté le 19/07/2026) : un
-           "classement" n'a pas de sens quand on joue seul contre de vraies
-           données — voir beginBtSoloSession()/startGame(). Reste affiché pour
-           les autres jeux encore en démo (avec les amis fictifs). -->
-      <div id="gameScoresSection">
-        <h2 style="margin-top:24px;">Scores</h2>
-        <div id="scoreBoard"></div>
-      </div>
     </section>
 
     <!-- SCREEN: JEU DES QUESTIONS — VRAI salon (ajouté le 12/07/2026).
@@ -1138,14 +1130,6 @@ function uppercaseInputLive(el){
   el.setSelectionRange(pos, pos);
 }
 
-/* ---------- Données factices (catalogue de recherche + amis de démo) ---------- */
-const FRIENDS = [
-  {name:"Sarah", color:"#ec4899", platform:"spotify"},
-  {name:"Léo", color:"#8b5cf6", platform:"deezer"},
-  {name:"Nina", color:"#22c55e", platform:"apple"},
-  {name:"Tom", color:"#f59e0b", platform:"youtube"},
-];
-
 // "youtubeId" = identifiant de la vidéo YouTube officielle (vérifié le 11/07/2026),
 // utilisé par le lecteur réel du mode Soirée (voir plus bas) pour vraiment jouer
 // le son quand quelqu'un active "Diffuser ici" dans un salon.
@@ -1205,44 +1189,8 @@ const MODE_DETAIL = {
   },
 };
 
-// Catégories du "jeu des questions" et réponses fictives de chaque ami (simulées pour la démo)
-const QUESTIONS = [
-  {id:"amour", label:"💘 Ta chanson d'amour préférée"},
-  {id:"francaise", label:"🇫🇷 Ta chanson française préférée"},
-  {id:"triste", label:"😢 Ta chanson la plus triste"},
-  {id:"nostalgie", label:"📼 Ta chanson la plus nostalgique"},
-];
-const QUESTION_ANSWERS = {
-  amour: {
-    Sarah:{title:"Cruel Summer", artist:"Taylor Swift", emoji:"☀️"},
-    Léo:{title:"Je veux", artist:"Zaz", emoji:"💛"},
-    Nina:{title:"As It Was", artist:"Harry Styles", emoji:"🌙"},
-    Tom:{title:"Formidable", artist:"Stromae", emoji:"💔"},
-  },
-  francaise: {
-    Sarah:{title:"La Vie en Rose", artist:"Édith Piaf", emoji:"🌹"},
-    Léo:{title:"Dernière Danse", artist:"Indila", emoji:"🕊️"},
-    Nina:{title:"Formidable", artist:"Stromae", emoji:"💔"},
-    Tom:{title:"Je veux", artist:"Zaz", emoji:"💛"},
-  },
-  triste: {
-    Sarah:{title:"Someone Like You", artist:"Adele", emoji:"💧"},
-    Léo:{title:"Fix You", artist:"Coldplay", emoji:"🌧️"},
-    Nina:{title:"Skinny Love", artist:"Bon Iver", emoji:"🥀"},
-    Tom:{title:"Everybody Hurts", artist:"R.E.M.", emoji:"😔"},
-  },
-  nostalgie: {
-    Sarah:{title:"Wonderwall", artist:"Oasis", emoji:"📼"},
-    Léo:{title:"Mr. Brightside", artist:"The Killers", emoji:"🌆"},
-    Nina:{title:"Africa", artist:"Toto", emoji:"🌍"},
-    Tom:{title:"Yellow", artist:"Coldplay", emoji:"💛"},
-  },
-};
-
 // Catalogue des 30 questions du VRAI "jeu des questions" (ajouté le 12/07/2026,
-// à la demande de Rémi). Distinct de QUESTIONS/QUESTION_ANSWERS ci-dessus, qui
-// restent utilisées telles quelles par la version DÉMO du jeu (salons de démo
-// ORACLE9, etc. — voir MOCK_ROOMS). Le créateur d'un vrai salon "questions"
+// à la demande de Rémi). Le créateur d'un vrai salon "questions"
 // choisit parmi ces 30 lesquelles utiliser pour sa partie (voir
 // renderQuestionPicker() / confirmQuestionSelection()). Identifiants stables
 // (q1..q30) : à ne jamais renuméroter, ils sont enregistrés dans
@@ -1284,9 +1232,8 @@ let state = {
   user: null,
   mode: "soiree",
   category: "ecoute",
-  queue: [],           // file d'attente MOCK (modes encore en démo)
   realQueueItems: [],  // file d'attente RÉELLE (mode Soirée, depuis Supabase)
-  scores: FRIENDS.reduce((acc,f)=>{acc[f.name]=0;return acc;},{}),
+  scores: {},
   npProgressPct: 35,
 };
 
@@ -1369,11 +1316,9 @@ let btAnswerSearchDebounce = null;
 // ---- Blindtest SOLO sur vraies données (ajouté le 19/07/2026) ----
 // Contrairement au multijoueur ci-dessus, pas de salon/Supabase-realtime ici :
 // juste une file de vraies chansons (pool communautaire OU playlist perso)
-// piochée une fois au démarrage, rejouée localement dans screen-game (la même
-// coquille que l'ancien mode 100% démo — voir startBlindtestRound() plus bas).
-// btSoloQueue vide = on retombe sur l'ancien catalogue de démo (CATALOG),
-// utile uniquement en filet de sécurité si jamais aucune vraie donnée n'a pu
-// être chargée.
+// piochée une fois au démarrage, rejouée localement dans screen-game. Les deux
+// points d'entrée (startBtSoloFromPool()/startBtSoloFromPlaylist()) garantissent
+// déjà au moins BT_SOLO_MIN_TRACKS avant d'appeler beginBtSoloSession().
 let btSoloQueue = [];
 let btSoloPlayer = null;
 
@@ -1426,6 +1371,7 @@ function beginBtSoloSession(tracks){
   document.getElementById("gameOver").style.display = "none";
   document.getElementById("gameActive").style.display = "none";
   document.getElementById("gameIdle").style.display = "block";
+  state.scores = { [state.user]: 0 };
   showScreen("screen-game");
 }
 
@@ -1708,27 +1654,6 @@ function nextSerieRound(){
 
 let creationCategory = null; // catégorie en cours de création (avant d'avoir choisi le sous-mode)
 
-// Salons fictifs de démonstration (pour les modes pas encore connectés à Supabase).
-// "SOLO4U" (blindtest) retiré le 19/07/2026 : le Blindtest est maintenant un
-// vrai mode (multijoueur ou solo sur de vraies données, voir plus bas) — le
-// garder ici aurait pu resservir de vieilles données de démo par erreur.
-const MOCK_ROOMS = {
-  "COSMOS7": "distance",
-  "VELVET3": "owner",
-  "ORACLE9": "questions",
-};
-
-function modeForUnknownCode(code){
-  const modes = ["distance", "owner", "questions"];
-  let h = 0;
-  for(let i=0;i<code.length;i++){ h = (h * 31 + code.charCodeAt(i)) >>> 0; }
-  return modes[h % modes.length];
-}
-
-function categoryForMode(mode){
-  return (mode === "owner" || mode === "questions" || mode === "blindtest") ? "jeux" : "ecoute";
-}
-
 function generateRoomCode(){
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // sans 0/O ni 1/I pour éviter les confusions
   let code = "";
@@ -1873,7 +1798,14 @@ function showScreen(id){
 function goToCurrentScreen(){
   if(currentRoom && (currentRoom.mode === "questions" || currentRoom.mode === "owner")){ showScreen("screen-game-lobby"); return; }
   if(currentRoom && currentRoom.mode === "blindtest"){ showScreen("screen-blindtest-lobby"); return; }
-  showScreen(state.category === "jeux" ? "screen-game" : "screen-room");
+  // Blindtest solo (state.mode, pas de vrai salon) reste le seul cas légitime
+  // de "screen-game" sans currentRoom. Tout autre cas (état périmé après un
+  // rechargement, par exemple) renvoie à l'accueil plutôt que d'afficher un
+  // écran de salon/jeu vide (retiré le 22/07/2026, Round 50, avec l'ancien
+  // système de salons de démo qui servait jusque-là de repli).
+  if(state.category === "jeux" && state.mode === "blindtest"){ showScreen("screen-game"); return; }
+  if(currentRoom){ showScreen("screen-room"); return; }
+  showScreen("screen-lobby");
 }
 
 /* ---------- Création / choix de mode (le créateur du salon choisit) ---------- */
@@ -1981,26 +1913,22 @@ async function confirmCreateRoom(){
 // commentaire dans harmonize-schema.sql pour le détail de cette réutilisation.
 const REAL_MODES = ["soiree", "distance", "questions", "blindtest", "owner"];
 
-// Le créateur choisit un mode : Soirée et À distance créent un VRAI salon
-// en base, les autres restent en démo pour l'instant.
+// Le créateur choisit un mode : tous créent un VRAI salon en base.
 // N'est appelée QUE depuis confirmCreateRoom(), jamais directement au clic sur une carte de mode.
+// Tous les modes créables depuis l'accueil sont maintenant réels (le dernier,
+// "owner", l'est devenu le 22/07/2026, Round 46) — l'ancien système de salons
+// de démo (MOCK_ROOMS/enterMockRoom) a été retiré le 22/07/2026, Round 50 :
+// il ne servait plus qu'à masquer des bugs de navigation derrière du faux
+// contenu (voir idees.md).
 async function selectMode(mode){
-  if(REAL_MODES.includes(mode)){
-    if(!currentUser){ showToast("Connecte-toi d'abord."); showScreen("screen-login"); return; }
-    const code = generateRoomCode();
-    const { data, error } = await sb.from("rooms").insert({ code, mode, created_by: currentUser.id }).select().single();
-    if(error){ showToast("Erreur à la création du salon : " + error.message); return; }
-    await enterRealRoom(data, `Salon créé pour de vrai — code ${data.code}. Partage ce code à tes amis pour qu'ils te rejoignent !`);
-    return;
-  }
-  // Les autres modes restent en version démo tant qu'ils ne sont pas construits.
-  const code = "NEBULA42";
-  MOCK_ROOMS[code] = mode;
-  const d = MODE_DETAIL[mode];
-  enterMockRoom(mode, code, `Salon créé (version démo) — ${d.emoji} ${d.title} — code ${code}. Ce mode n'est pas encore relié à une vraie base de données.`);
+  if(!currentUser){ showToast("Connecte-toi d'abord."); showScreen("screen-login"); return; }
+  const code = generateRoomCode();
+  const { data, error } = await sb.from("rooms").insert({ code, mode, created_by: currentUser.id }).select().single();
+  if(error){ showToast("Erreur à la création du salon : " + error.message); return; }
+  await enterRealRoom(data, `Salon créé pour de vrai — code ${data.code}. Partage ce code à tes amis pour qu'ils te rejoignent !`);
 }
 
-// Rejoindre : on cherche d'abord un vrai salon, sinon on retombe sur les salons de démo.
+// Rejoindre un vrai salon par son code.
 async function joinRoom(){
   const code = (document.getElementById("joinCode").value.trim() || "").toUpperCase();
   if(!code){ showToast("Entre un code de salon."); return; }
@@ -2015,31 +1943,10 @@ async function joinRoom(){
     return;
   }
 
-  // Codes de démo connus (COSMOS7, VELVET3, ORACLE9, SOLO4U, ou un code de démo
-  // généré dans cette session) : toujours valides, on les garde tels quels.
-  if(MOCK_ROOMS[code]){
-    const mode = MOCK_ROOMS[code];
-    const d = MODE_DETAIL[mode];
-    enterMockRoom(mode, code, `Tu as rejoint le salon ${code} (version démo) — ${d.emoji} ${d.title}.`);
-    return;
-  }
-
-  // Sinon, si ce code a la forme d'un vrai code de salon (6 caractères, comme
-  // ceux générés par generateRoomCode()), c'est très probablement un salon réel
-  // introuvable — mauvaise frappe, ou droit de lecture (RLS) mal configuré côté
-  // Supabase — PAS un vrai salon de démo. On le signale clairement au lieu de
-  // basculer silencieusement dans un faux salon qui ressemble à s'y méprendre au
-  // vrai (mêmes 4 amis fictifs affichés, aucune sauvegarde entre les
-  // rechargements) : c'est justement ça qui a semé la confusion la dernière fois.
-  if(/^[A-Z0-9]{6}$/.test(code)){
-    console.warn("[Harmonize] Code à 6 caractères non trouvé parmi les vrais salons :", code, "— vérifie la policy RLS 'select' sur la table rooms dans Supabase.");
-    showToast(`⚠️ Salon "${code}" introuvable. Vérifie le code, ou dis-moi si ça persiste (peut venir d'un réglage Supabase).`);
-    return;
-  }
-
-  const mode = modeForUnknownCode(code);
-  const d = MODE_DETAIL[mode];
-  enterMockRoom(mode, code, `⚠️ "${code}" n'est pas un vrai salon — tu es dans un salon de DÉMO (pas relié à tes amis) — ${d.emoji} ${d.title}.`);
+  // Aucun salon de démo à proposer en repli (retiré le 22/07/2026, Round 50 —
+  // tous les modes sont réels) : un code introuvable est toujours signalé
+  // clairement, plutôt que de basculer silencieusement vers du faux contenu.
+  showToast(`⚠️ Salon "${code}" introuvable. Vérifie le code auprès de la personne qui a créé le salon.`);
 }
 
 /* ---------- Entrer dans un salon (réel ou démo) ---------- */
@@ -2051,7 +1958,6 @@ async function enterRealRoom(room, toastMsg){
   state.mode = room.mode === "distance" ? "distance" : (room.mode === "questions" || room.mode === "blindtest" || room.mode === "owner" ? room.mode : "soiree");
   state.category = (room.mode === "questions" || room.mode === "blindtest" || room.mode === "owner") ? "jeux" : "ecoute";
   document.getElementById("roomCode").textContent = room.code;
-  document.getElementById("roomRealBadge").textContent = "RÉEL";
   updateModeUI();
   document.getElementById("tabbar").style.display = "flex";
   showToast(toastMsg);
@@ -2116,29 +2022,6 @@ async function enterRealRoom(room, toastMsg){
   if(state.mode === "distance") autoJoinDistanceListening();
 }
 
-function enterMockRoom(mode, code, toastMsg){
-  if(realtimeChannel){ sb.removeChannel(realtimeChannel); realtimeChannel = null; }
-  stopQueuePolling();
-  stopAnyPlayback(); // le lecteur réel n'existe que dans les vrais salons
-  currentRoom = null;
-  state.mode = mode;
-  state.category = categoryForMode(mode);
-  document.getElementById("roomCode").textContent = code;
-  document.getElementById("roomRealBadge").textContent = "DÉMO";
-  document.getElementById("playerCard").style.display = "none";
-  // Le bouton "📌" du titre en cours (ajouté le 12/07/2026) ne concerne que
-  // les vrais salons (il propose de vraies playlists YouTube) — on le cache
-  // en repassant en démo, sinon il resterait affiché avec un titre périmé.
-  const npSaveBtnEl = document.getElementById("npSaveBtn");
-  if(npSaveBtnEl) npSaveBtnEl.style.display = "none";
-  updateModeUI();
-  renderRoomAvatars();
-  renderQueue();
-  document.getElementById("tabbar").style.display = "flex";
-  showToast(toastMsg);
-  showScreen(state.category === "jeux" ? "screen-game" : "screen-room");
-}
-
 function updateModeUI(){
   const d = MODE_DETAIL[state.mode] || MODE_DETAIL.soiree;
   const heroEl = document.getElementById("roomModeName");
@@ -2169,23 +2052,19 @@ function updateModeUI(){
 // maintenant l'id de la zone à remplir.
 function renderRoomAvatars(elId){
   const el = document.getElementById(elId || "roomAvatars");
-  if(!el) return;
-  if(currentRoom){
-    const people = realtimeChannel ? Object.values(realtimeChannel.presenceState()).flat() : [];
-    if(!people.length){
-      // Le temps que la présence se synchronise (juste après être entré dans le salon),
-      // on s'affiche soi-même au minimum plutôt que de laisser la zone vide.
-      const initial = (state.user || "?")[0].toUpperCase();
-      el.innerHTML = `<div class="avatar" style="background:var(--accent1);width:28px;height:28px;font-size:11px;">${escapeHtml(initial)}</div>`;
-      return;
-    }
-    el.innerHTML = people.map(p => {
-      const initial = (p.pseudo || "?")[0].toUpperCase();
-      return `<div class="avatar" style="background:var(--accent1);width:28px;height:28px;font-size:11px;" title="${escapeHtml(p.pseudo||"")}">${escapeHtml(initial)}</div>`;
-    }).join("");
-  } else {
-    el.innerHTML = FRIENDS.map(f => `<div class="avatar" style="background:${f.color};width:28px;height:28px;font-size:11px;">${f.name[0]}</div>`).join("");
+  if(!el || !currentRoom) return;
+  const people = realtimeChannel ? Object.values(realtimeChannel.presenceState()).flat() : [];
+  if(!people.length){
+    // Le temps que la présence se synchronise (juste après être entré dans le salon),
+    // on s'affiche soi-même au minimum plutôt que de laisser la zone vide.
+    const initial = (state.user || "?")[0].toUpperCase();
+    el.innerHTML = `<div class="avatar" style="background:var(--accent1);width:28px;height:28px;font-size:11px;">${escapeHtml(initial)}</div>`;
+    return;
   }
+  el.innerHTML = people.map(p => {
+    const initial = (p.pseudo || "?")[0].toUpperCase();
+    return `<div class="avatar" style="background:var(--accent1);width:28px;height:28px;font-size:11px;" title="${escapeHtml(p.pseudo||"")}">${escapeHtml(initial)}</div>`;
+  }).join("");
 }
 
 /* ---------- File d'attente : VRAIE (Supabase, mode Soirée) ----------
@@ -2859,36 +2738,8 @@ async function persistQueueOrder(orderedIds){
   await loadRealQueue(currentRoom.id);
 }
 
-/* ---------- File d'attente : DÉMO (données en mémoire, modes pas encore réels) ---------- */
-function renderMockQueueUI(){
-  const sorted = [...state.queue].sort((a,b)=>b.votes-a.votes);
-  const el = document.getElementById("queueList");
-  document.getElementById("queueCount").textContent = state.queue.length + " titre" + (state.queue.length>1?"s":"");
-  el.innerHTML = sorted.map((item) => `
-    <div class="queue-item">
-      <div class="art-sm">${item.emoji}</div>
-      <div class="qi-info">
-        <div class="qi-title">${escapeHtml(item.title)}</div>
-        <div class="qi-meta">${escapeHtml(item.artist)} · proposé par ${escapeHtml(item.proposedBy)} <span class="badge ${badgeClass[item.platform]}">${badgeLabel[item.platform]}</span></div>
-      </div>
-      <button class="vote-btn ${item.voted?'voted':''}" onclick="vote(${state.queue.indexOf(item)})">
-        <span>▲</span><span>${item.votes}</span>
-      </button>
-    </div>
-  `).join("") || `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">File vide — sois le premier à proposer un titre !</p>`;
-}
-
-function vote(idx){
-  const item = state.queue[idx];
-  if(item.voted){ item.votes--; item.voted=false; }
-  else { item.votes++; item.voted=true; }
-  renderQueue();
-}
-
-// Dispatcher : file réelle si on est dans un vrai salon (currentRoom défini), sinon file de démo.
 function renderQueue(){
-  if(currentRoom) renderRealQueueUI();
-  else renderMockQueueUI();
+  renderRealQueueUI();
 }
 
 /* ---------- Recherche / ajout de titre ----------
@@ -3000,41 +2851,34 @@ function addTrackToQueue(indexOrTrack){
 // d'affilée (résultats de recherche ou "Mes playlists") avant de fermer
 // soi-même avec le bouton "Fermer".
 async function addToQueue(track){
-  if(currentRoom){
-    if((state.realQueueItems||[]).some(q => q.title === track.title)){ showToast("Déjà dans la file !"); return; }
-    const { error } = await sb.from("queue_items").insert({
-      room_id: currentRoom.id,
-      title: track.title,
-      artist: track.artist,
-      platform: "youtube",
-      youtube_id: track.youtubeId,
-      proposed_by: currentUser.id,
-      votes: 1,
-    });
-    if(error){ showToast("Erreur d'ajout : " + error.message); return; }
-    showToast(`"${track.title}" ajouté à la vraie file d'attente`);
-    // Nourrit aussi le pool communautaire depuis les modes d'écoute (Soirée,
-    // À distance) — ajouté le 22/07/2026, demande de Rémi : jusque-là, seul
-    // le Blindtest multijoueur alimentait blindtest_pool.
-    if(track.youtubeId){
-      await populateBtPool([{ youtube_id: track.youtubeId, title: track.title, artist: track.artist || "", thumbnail: track.thumbnail || "" }]);
-    }
-    // On rafraîchit tout de suite en local : ne pas dépendre uniquement du temps
-    // réel pour voir sa propre musique apparaître (l'abonnement, lui, prévient les
-    // AUTRES participants du salon de la nouveauté).
-    await loadRealQueue(currentRoom.id);
-    // En mode À distance, si ce salon était vide, la première tentative de
-    // rejoindre l'écoute automatiquement (déclenchée à l'entrée dans le salon,
-    // voir autoJoinDistanceListening()) n'avait rien à jouer et a abandonné en
-    // silence. Ce titre est peut-être le premier de la file : on retente
-    // maintenant qu'il y a quelque chose à écouter (ajouté le 12/07/2026).
-    if(state.mode === "distance" && !distanceJoined) autoJoinDistanceListening();
-  } else {
-    if(state.queue.some(q => q.title === track.title)){ showToast("Déjà dans la file !"); return; }
-    state.queue.push({...track, proposedBy: state.user || "Toi", votes:1, voted:true});
-    renderQueue();
-    showToast(`"${track.title}" ajouté à la file d'attente (démo)`);
+  if((state.realQueueItems||[]).some(q => q.title === track.title)){ showToast("Déjà dans la file !"); return; }
+  const { error } = await sb.from("queue_items").insert({
+    room_id: currentRoom.id,
+    title: track.title,
+    artist: track.artist,
+    platform: "youtube",
+    youtube_id: track.youtubeId,
+    proposed_by: currentUser.id,
+    votes: 1,
+  });
+  if(error){ showToast("Erreur d'ajout : " + error.message); return; }
+  showToast(`"${track.title}" ajouté à la vraie file d'attente`);
+  // Nourrit aussi le pool communautaire depuis les modes d'écoute (Soirée,
+  // À distance) — ajouté le 22/07/2026, demande de Rémi : jusque-là, seul
+  // le Blindtest multijoueur alimentait blindtest_pool.
+  if(track.youtubeId){
+    await populateBtPool([{ youtube_id: track.youtubeId, title: track.title, artist: track.artist || "", thumbnail: track.thumbnail || "" }]);
   }
+  // On rafraîchit tout de suite en local : ne pas dépendre uniquement du temps
+  // réel pour voir sa propre musique apparaître (l'abonnement, lui, prévient les
+  // AUTRES participants du salon de la nouveauté).
+  await loadRealQueue(currentRoom.id);
+  // En mode À distance, si ce salon était vide, la première tentative de
+  // rejoindre l'écoute automatiquement (déclenchée à l'entrée dans le salon,
+  // voir autoJoinDistanceListening()) n'avait rien à jouer et a abandonné en
+  // silence. Ce titre est peut-être le premier de la file : on retente
+  // maintenant qu'il y a quelque chose à écouter (ajouté le 12/07/2026).
+  if(state.mode === "distance" && !distanceJoined) autoJoinDistanceListening();
 }
 
 /* ---------- Playlists importées : rattachées au COMPTE, pas à un salon ----------
@@ -6102,20 +5946,12 @@ function pickRounds(n){
   });
 }
 
+// "screen-game" ne sert plus qu'au Blindtest solo réel depuis que "Qui a mis
+// cette chanson ?" et "Le jeu des questions" ont chacun leur vrai salon
+// multijoueur (voir Round 46/19) — l'ancien repli vers des scores d'amis
+// fictifs a été retiré le 22/07/2026 (Round 50).
 function startGame(){
-  // Blindtest solo réel (ajouté le 19/07/2026) : pas d'amis fictifs à
-  // afficher, on joue seul contre de vraies chansons — voir aussi
-  // resetBtSoloVisuals()/gameScoresSection ci-dessous.
-  const realBtSolo = state.mode === "blindtest" && btSoloQueue.length >= BT_SOLO_MIN_TRACKS;
-  document.getElementById("gameScoresSection").style.display = realBtSolo ? "none" : "block";
-  if(realBtSolo){
-    state.scores = { [state.user]: 0 };
-  } else {
-    // on repart d'un tableau des scores à zéro pour cette nouvelle partie
-    state.scores = FRIENDS.reduce((acc,f)=>{acc[f.name]=0;return acc;},{});
-    state.scores[state.user] = 0;
-  }
-  renderScores();
+  state.scores = { [state.user]: 0 };
   roundState.currentRound = 0;
   document.getElementById("gameOver").style.display = "none";
   document.getElementById("gameIdle").style.display = "none";
@@ -6133,9 +5969,7 @@ function nextRound(){
   document.getElementById("roundNextPanel").style.display = "none";
   roundState.answered = false;
 
-  if(state.mode === "questions") startQuestionRound();
-  else if(state.mode === "blindtest") startBlindtestRound();
-  else startOwnerRound();
+  startBlindtestRound();
 
   startRoundTimer();
 }
@@ -6187,94 +6021,32 @@ function resetBtSoloVisuals(){
   stopBtSoloPlayer(); // arrête aussi le chrono et l'anti-pub (voir stopBtSoloPlayer)
 }
 
-/* ---- Contenu de chaque type de manche ---- */
-function startOwnerRound(){
-  resetBtSoloVisuals();
-  const track = CATALOG[Math.floor(Math.random()*CATALOG.length)];
-  const correctOwner = FRIENDS[Math.floor(Math.random()*FRIENDS.length)];
-  renderMysteryUI(track.title, track.artist + " " + track.emoji, buildFriendOptions(correctOwner.name));
-}
-
-function startQuestionRound(){
-  resetBtSoloVisuals();
-  const category = QUESTIONS[Math.floor(Math.random()*QUESTIONS.length)];
-  const answers = QUESTION_ANSWERS[category.id];
-  const names = Object.keys(answers);
-  const correctName = names[Math.floor(Math.random()*names.length)];
-  const track = answers[correctName];
-  document.getElementById("mysteryCategory").textContent = category.label;
-  renderMysteryUI(track.title, track.artist + " " + (track.emoji||""), buildFriendOptions(correctName));
-}
-
-// Blindtest solo : on ne révèle pas le titre (c'est justement la question) — on
-// devine directement le bon titre parmi 4 propositions. Ajouté le 19/07/2026 :
-// si btSoloQueue contient de vraies chansons (pool communautaire ou playlist
-// perso, voir beginBtSoloSession()), on joue du VRAI son via YouTube et les
-// pièges viennent de la même file plutôt que du catalogue de démo — sinon
-// (filet de sécurité) on retombe sur l'ancien comportement 100% démo.
+/* ---- Contenu de la manche (Blindtest solo) ---- */
+// On ne révèle pas le titre (c'est justement la question) — on devine
+// directement le bon titre parmi 4 propositions, à partir de la vraie file
+// btSoloQueue (pool communautaire ou playlist perso, voir beginBtSoloSession()).
 function startBlindtestRound(){
   document.getElementById("mysteryCategory").textContent = "🎧 Extrait mystère";
 
-  if(btSoloQueue.length >= BT_SOLO_MIN_TRACKS){
-    const correctTrack = btSoloQueue[(roundState.currentRound - 1) % btSoloQueue.length];
-    const pool = btSoloQueue.filter(t => t.youtube_id !== correctTrack.youtube_id);
-    const decoys = shuffleArray(pool).slice(0, Math.min(3, pool.length));
-    const options = shuffleArray([correctTrack, ...decoys]);
-    const optionsHtml = options.map(o => `
-      <button class="guess-option" data-key="${escapeHtml(o.youtube_id)}" onclick="guess('${escJs(o.youtube_id)}','${escJs(correctTrack.youtube_id)}')">
-        <div>${escapeHtml(o.title)}</div>
-        <div style="font-size:10.5px;color:var(--text-faint);">${escapeHtml(o.artist||"")}</div>
-      </button>
-    `).join("");
-    document.getElementById("gameArtEmoji").style.display = "none";
-    document.getElementById("btSoloAudioCover").style.display = "block";
-    document.getElementById("btSoloYtPlayer").style.display = "block";
-    ensureBtSoloPlayer(correctTrack.youtube_id);
-    renderMysteryUI("???", "Écoute et devine de quelle chanson il s'agit !", optionsHtml);
-    btSoloCurrentCorrectId = correctTrack.youtube_id;
-    document.getElementById("btSoloVoteRow").style.display = "flex";
-    resetBtSoloAdSkipUI();
-    startBtSoloVoteTimer();
-    return;
-  }
-
-  // Filet de sécurité : ancien catalogue de démo (aucune vraie donnée disponible)
-  // — pas de vrai lecteur YouTube ici, donc pas de chrono/anti-pub non plus.
-  document.getElementById("gameArtEmoji").style.display = "block";
-  document.getElementById("btSoloAudioCover").style.display = "none";
-  document.getElementById("btSoloYtPlayer").style.display = "none";
-  document.getElementById("btSoloVoteRow").style.display = "none";
-  stopBtSoloVoteTimer();
-  const correctTrack = CATALOG[Math.floor(Math.random()*CATALOG.length)];
-  let options = [correctTrack];
-  while(options.length < 4){
-    const candidate = CATALOG[Math.floor(Math.random()*CATALOG.length)];
-    if(!options.some(o => o.title === candidate.title)) options.push(candidate);
-  }
-  options.sort(()=>Math.random()-0.5);
+  const correctTrack = btSoloQueue[(roundState.currentRound - 1) % btSoloQueue.length];
+  const pool = btSoloQueue.filter(t => t.youtube_id !== correctTrack.youtube_id);
+  const decoys = shuffleArray(pool).slice(0, Math.min(3, pool.length));
+  const options = shuffleArray([correctTrack, ...decoys]);
   const optionsHtml = options.map(o => `
-    <button class="guess-option" data-key="${escapeHtml(o.title)}" onclick="guess('${escJs(o.title)}','${escJs(correctTrack.title)}')">
-      <div style="font-size:20px;">${o.emoji}</div>
+    <button class="guess-option" data-key="${escapeHtml(o.youtube_id)}" onclick="guess('${escJs(o.youtube_id)}','${escJs(correctTrack.youtube_id)}')">
       <div>${escapeHtml(o.title)}</div>
-      <div style="font-size:10.5px;color:var(--text-faint);">${escapeHtml(o.artist)}</div>
+      <div style="font-size:10.5px;color:var(--text-faint);">${escapeHtml(o.artist||"")}</div>
     </button>
   `).join("");
-  renderMysteryUI("???", "Écoute (bientôt en vrai son) et devine le titre !", optionsHtml);
-}
-
-function buildFriendOptions(correctName){
-  let options = [FRIENDS.find(f => f.name === correctName)];
-  while(options.length < 4){
-    const candidate = FRIENDS[Math.floor(Math.random()*FRIENDS.length)];
-    if(!options.includes(candidate)) options.push(candidate);
-  }
-  options.sort(()=>Math.random()-0.5);
-  return options.map(o => `
-    <button class="guess-option" data-key="${escapeHtml(o.name)}" onclick="guess('${escJs(o.name)}','${escJs(correctName)}')">
-      <div class="avatar" style="background:${o.color};width:30px;height:30px;">${o.name[0]}</div>
-      ${escapeHtml(o.name)}
-    </button>
-  `).join("");
+  document.getElementById("gameArtEmoji").style.display = "none";
+  document.getElementById("btSoloAudioCover").style.display = "block";
+  document.getElementById("btSoloYtPlayer").style.display = "block";
+  ensureBtSoloPlayer(correctTrack.youtube_id);
+  renderMysteryUI("???", "Écoute et devine de quelle chanson il s'agit !", optionsHtml);
+  btSoloCurrentCorrectId = correctTrack.youtube_id;
+  document.getElementById("btSoloVoteRow").style.display = "flex";
+  resetBtSoloAdSkipUI();
+  startBtSoloVoteTimer();
 }
 
 function renderMysteryUI(titleText, subText, optionsHtml){
@@ -6322,7 +6094,6 @@ function guess(picked, correct){
   } else {
     showToast(`Raté — c'était ${correct} !`);
   }
-  renderScores();
 
   // On ne passe JAMAIS à la manche suivante automatiquement : on propose
   // seulement, via le bouton, pour laisser le temps d'écouter le morceau.
@@ -6331,14 +6102,6 @@ function guess(picked, correct){
     ? "Bien joué ! Prenez le temps d'écouter la suite du morceau si vous voulez — passez quand vous êtes prêts."
     : `C'était "${correct}" — profitez du morceau, puis passez à la suite quand vous voulez.`;
   document.getElementById("roundNextPanel").style.display = "block";
-}
-
-function renderScores(){
-  const entries = Object.entries(state.scores).sort((a,b)=>b[1]-a[1]);
-  const el = document.getElementById("scoreBoard");
-  el.innerHTML = (entries.length ? entries : [[state.user||"Toi",0]]).map(([name,score]) => `
-    <div class="score-row"><span>${name}</span><strong>${score} pts</strong></div>
-  `).join("");
 }
 
 /* ---------- Utilitaires ---------- */
@@ -6357,7 +6120,6 @@ setInterval(()=>{
   if(bar) bar.style.width = state.npProgressPct + "%";
 }, 300);
 
-renderScores();
 pickRounds(5);
 
 // Enregistrement du service worker (PWA, ajouté le 19/07/2026) — voir sw.js.
