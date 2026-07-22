@@ -155,6 +155,12 @@
     border:1px solid var(--border);border-radius:10px;padding:6px 10px;color:var(--text-dim);font-size:12px;font-weight:700;flex-shrink:0;
   }
   .vote-btn.voted{color:var(--accent1);border-color:var(--accent1);}
+  /* Poignée de réordonnancement manuel (ajoutée le 22/07/2026, demande de
+     Rémi) — touch-action:none empêche le geste de faire défiler la page
+     pendant qu'on glisse, nécessaire pour que ça marche au doigt sur mobile
+     (le glisser-déposer HTML natif ne fonctionne pas sur téléphone). */
+  .queue-drag-handle{cursor:grab;touch-action:none;padding:4px 8px;color:var(--text-faint);font-size:18px;flex-shrink:0;user-select:none;}
+  .queue-item.dragging{opacity:.5;}
 
   .fab-row{display:flex;gap:10px;margin-top:14px;}
   .tabbar{
@@ -209,6 +215,7 @@
   }
   .guess-option.correct{border-color:var(--success);background:#22c55e18;}
   .guess-option.wrong{border-color:var(--accent2);background:#ec489918;opacity:.6;}
+  .guess-option.selected{border-color:var(--accent1);background:#8b5cf618;}
   .score-row{display:flex;justify-content:space-between;align-items:center;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:8px;font-size:13.5px;}
   .toast{
     position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--bg-elevated);
@@ -220,7 +227,7 @@
   /* mode selection */
   .mode-card{
     display:flex;align-items:flex-start;gap:14px;background:var(--bg-card);border:1px solid var(--border);
-    border-radius:var(--radius);padding:16px;margin-bottom:12px;text-align:left;width:100%;
+    border-radius:var(--radius);padding:16px;margin-bottom:12px;text-align:left;width:100%;color:var(--text);
   }
   .mode-card:active{transform:scale(0.98);}
   .mode-icon{
@@ -298,6 +305,14 @@
       <div class="card">
         <p id="importedSummary" style="margin:0 0 12px;color:var(--text-dim);font-size:13.5px;">Chargement...</p>
         <button class="btn-ghost" onclick="goToPlaylistsScreen()">📥 Gérer mes playlists</button>
+      </div>
+
+      <!-- Réservé en pratique aux comptes admin (voir profiles.is_admin,
+           harmonize-schema.sql) — la suppression est bloquée par une policy
+           RLS pour tout le monde d'autre, le bouton reste donc visible sans
+           risque pour un compte normal (juste inutile). -->
+      <div class="card" style="margin-top:16px;">
+        <button class="btn-ghost" onclick="goToPoolAdminScreen()">🛠 Gérer le pool communautaire</button>
       </div>
 
       <button class="btn-ghost" style="margin-top:20px;" onclick="handleSignOut()">Se déconnecter</button>
@@ -408,6 +423,21 @@
       <button class="btn-ghost" style="margin-top:16px;" onclick="showScreen('screen-lobby')">← Retour</button>
     </section>
 
+    <!-- SCREEN: GESTION DU POOL COMMUNAUTAIRE (ajouté le 22/07/2026, demande
+         de Rémi) — repasser à la main sur les chansons importées en masse
+         (voir seed-1000-chansons.sql) et en retirer certaines. La suppression
+         elle-même est bloquée côté base pour tout le monde sauf un compte
+         marqué admin (profiles.is_admin, voir harmonize-schema.sql) — sur un
+         compte normal, le bouton supprimer échoue simplement avec un message
+         d'erreur clair, rien de dangereux à laisser ce bouton visible. -->
+    <section class="screen" id="screen-pool-admin">
+      <h1>🛠 Pool communautaire</h1>
+      <p class="sub">Retire les chansons qui ne sont pas de vraies chansons identifiables. <span id="poolAdminCount"></span></p>
+      <input type="text" id="poolAdminSearch" placeholder="Filtrer par titre ou artiste..." oninput="renderPoolAdminList()" style="margin-bottom:14px;" />
+      <div id="poolAdminList"></div>
+      <button class="btn-ghost" style="margin-top:16px;" onclick="showScreen('screen-lobby')">← Retour</button>
+    </section>
+
     <!-- SCREEN: ROOM -->
     <section class="screen" id="screen-room">
       <div class="room-hero">
@@ -481,12 +511,27 @@
                ou playlist perso) — voir ensureBtSoloPlayer(). Cache visuel
                par-dessus pour ne rien révéler (même principe que gqAudioCover),
                puisque le but est justement de deviner sans voir le titre. -->
-          <div id="btSoloYtPlayer" style="display:none;"></div>
+          <div style="position:relative;display:inline-block;">
+            <div id="btSoloYtPlayer" style="display:none;"></div>
+            <!-- Bandeau anti-spoiler pour "Pub bloquée ?" (ajouté le 22/07/2026,
+                 même principe que serieAdSkipBanner) — le lecteur est en 1x1
+                 normalement, donc revealBtSoloAdSkip() l'agrandit ; ce bandeau ne
+                 couvre que le haut (le titre) sans bloquer le clic. -->
+            <div id="btSoloAdSkipBanner" style="display:none;position:absolute;top:0;left:0;right:0;height:55%;pointer-events:none;background:linear-gradient(160deg,var(--accent1),var(--accent2));border-radius:8px 8px 0 0;"></div>
+          </div>
           <div id="btSoloAudioCover" style="display:none;font-size:34px;padding:20px 0;">🎧</div>
           <div class="game-art" id="gameArtEmoji">🎵</div>
           <div style="font-size:11px;font-weight:700;color:var(--accent1);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;" id="mysteryCategory"></div>
           <div style="font-weight:700;font-size:16px;" id="mysteryTitle">???</div>
           <div style="color:var(--text-dim);font-size:13px;margin-top:2px;" id="mysteryArtist">???</div>
+          <!-- Chrono de réponse + bouton anti-pub (ajoutés le 22/07/2026,
+               demande de Rémi) : affichés uniquement en vrai Blindtest solo
+               (voir startBlindtestRound()), pas dans les autres jeux encore en
+               démo qui partagent cet écran. -->
+          <div id="btSoloVoteRow" style="display:none;align-items:center;justify-content:center;gap:10px;margin:8px 0;">
+            <span class="pill" id="btSoloCountdown">15</span>
+            <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="revealBtSoloAdSkip()">📺 Pub bloquée ?</button>
+          </div>
           <div class="guess-grid" id="guessGrid"></div>
         </div>
         <div id="roundNextPanel" style="display:none;margin-top:16px;text-align:center;">
@@ -656,11 +701,11 @@
                exclu par erreur). -->
           <div id="gqGuessBox" style="display:none;margin-bottom:16px;">
             <h2 style="margin-top:0;display:flex;align-items:center;justify-content:space-between;gap:8px;">
-              <span>Qui a répondu ça, d'après toi ?</span>
+              <span>Qui a répondu ça ?</span>
               <span class="pill" id="gqVoteCountdown" style="font-size:12px;"></span>
             </h2>
-            <p style="font-size:12px;color:var(--text-faint);margin-top:-6px;margin-bottom:10px;">Clique sur UN nom — ça s'enregistre tout de suite, pas besoin de valider, et ta réponse est ensuite définitive pour cette manche (si le titre a 2 propriétaires, choisir l'un des deux suffit). Plus tu réponds vite, plus tu marques de points. Tu as 20 secondes pour voter (la musique, elle, continue de jouer).</p>
-            <div id="gqGuessOptions" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+            <p style="font-size:12px;color:var(--text-faint);margin-top:-6px;margin-bottom:10px;">Un clic suffit à voter — c'est ensuite définitif pour cette manche.</p>
+            <div class="guess-grid" id="gqGuessOptions"></div>
             <p id="gqGuessTimeUpHint" style="display:none;font-size:12px;color:var(--text-faint);text-align:center;margin-top:12px;">⏰ Temps écoulé pour voter sur cette manche — révélation dans un instant.</p>
           </div>
 
@@ -1095,7 +1140,7 @@ const MODE_DETAIL = {
   },
   questions: {
     emoji:"❓", title:"Le jeu des questions",
-    desc:"Le créateur choisit des questions (\"ta chanson d'amour préférée\", \"ta chanson la plus triste\"...) parmi une liste de 30. Chacun répond avec un vrai titre AVANT que la partie commence. Ensuite on écoute les réponses une par une et on vote en direct pour deviner qui a choisi quoi.",
+    desc:"Le créateur choisit des questions (\"ta chanson d'amour préférée\", \"ta chanson la plus triste\"...) parmi une liste proposée. Chacun répond avec un vrai titre AVANT que la partie commence. Ensuite on écoute les réponses une par une et on vote en direct pour deviner qui a choisi quoi.",
     tag:"Connecté à une vraie base de données",
   },
   blindtest: {
@@ -1355,6 +1400,8 @@ function ensureBtSoloPlayer(youtubeId){
 }
 
 function stopBtSoloPlayer(){
+  stopBtSoloVoteTimer();
+  resetBtSoloAdSkipUI();
   if(btSoloPlayer){ try { btSoloPlayer.destroy(); } catch(e){} btSoloPlayer = null; }
 }
 
@@ -2116,6 +2163,7 @@ async function loadRealQueue(roomId){
     .select("*, profiles(pseudo)")
     .eq("room_id", roomId)
     .eq("played", false)
+    .order("position", { ascending:true, nullsFirst:false })
     .order("votes", { ascending:false })
     .order("created_at", { ascending:true });
   if(error){ showToast("Erreur de chargement de la file : " + error.message); return; }
@@ -2400,11 +2448,17 @@ function renderPlayerCard(){
                (celui qui, lui, prévient bien tout le monde). Cliquer
                n'importe où sur la vidéo revient donc à cliquer sur "⏸
                Pause"/"▶️ Lecture" ci-dessous. -->
-          <div onclick="toggleDistancePlayPause()" style="position:absolute;inset:0;cursor:pointer;" title="Cliquer pour mettre en pause / reprendre — pour tout le monde"></div>
+          <div id="distanceClickBlocker" onclick="toggleDistancePlayPause()" style="position:absolute;inset:0;cursor:pointer;display:${distanceAdSkipActive ? "none" : "block"};" title="Cliquer pour mettre en pause / reprendre — pour tout le monde"></div>
         </div>
-        <div style="display:flex;gap:8px;margin-top:10px;">
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
           <button class="btn-ghost" style="width:auto;padding:8px 14px;" onclick="toggleDistancePlayPause()" id="distancePlayPauseBtn">⏸ Pause</button>
           <button class="btn-ghost" style="width:auto;padding:8px 14px;" onclick="distanceSkipTrack()">⏭ Suivant (pour tout le monde)</button>
+          <!-- "Pub bloquée ?" (ajouté le 22/07/2026) : ici la vidéo est déjà
+               visible normalement (pas de spoiler à éviter), le seul souci
+               est que la couche invisible ci-dessus (distanceClickBlocker)
+               empêche d'atteindre le bouton natif "Ignorer" de YouTube — ce
+               bouton la désactive juste quelques secondes. -->
+          <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="revealDistanceAdSkip()">📺 Pub bloquée ?</button>
         </div>
         <p style="font-size:11px;color:var(--text-faint);margin-top:6px;">Pause, reprise et "suivant" sont partagés : ce que fait une personne se répercute aussitôt chez tout le monde. La barre de défilement de YouTube est volontairement désactivée : avancer/reculer dans le titre pour tout le monde n'est pas encore possible (à construire si tu en as besoin).</p>
       </div>
@@ -2612,6 +2666,33 @@ function applyDistancePlaybackState(){
 // sans attendre un aller-retour réseau — le temps réel (ou le filet de
 // sécurité toutes les 4s) se charge ensuite de répercuter exactement la même
 // chose chez tous les AUTRES participants.
+// "Pub bloquée ?" en mode À distance (ajouté le 22/07/2026, demande de Rémi) :
+// même principe que revealAdSkipButton() côté Blindtest, mais plus simple —
+// ici la vidéo est déjà visible normalement (rien à agrandir ni à cacher),
+// le seul obstacle est la couche invisible (distanceClickBlocker) qui capte
+// tous les clics pour rediriger vers pause/reprise synchronisés. On la
+// désactive juste quelques secondes pour atteindre le bouton natif
+// "Ignorer" de YouTube en dessous.
+// distanceAdSkipActive (même correctif que btAdSkipActive, Round 25) :
+// renderPlayerCard() régénère tout le bloc (innerHTML) à chaque mise à jour
+// temps réel de la lecture partagée — sans ce drapeau, un re-rendu pendant
+// les 10s de déblocage recréerait le bloqueur avec son style par défaut
+// (donc visible), annulant l'effet du bouton en plein milieu.
+let distanceAdSkipActive = false;
+let distanceAdSkipRestoreTimer = null;
+function revealDistanceAdSkip(){
+  distanceAdSkipActive = true;
+  const blocker = document.getElementById("distanceClickBlocker");
+  if(blocker) blocker.style.display = "none";
+  showToast("Tape directement sur le bouton \"Ignorer\" de la pub si tu le vois — ça revient à la normale dans 10 secondes.");
+  clearTimeout(distanceAdSkipRestoreTimer);
+  distanceAdSkipRestoreTimer = setTimeout(() => {
+    distanceAdSkipActive = false;
+    const b = document.getElementById("distanceClickBlocker");
+    if(b) b.style.display = "block";
+  }, 10000);
+}
+
 async function toggleDistancePlayPause(){
   if(!currentRoom) return;
   const playing = currentRoom.playback_state === "playing";
@@ -2665,7 +2746,8 @@ function renderRealQueueUI(){
   const el = document.getElementById("queueList");
   document.getElementById("queueCount").textContent = items.length + " titre" + (items.length>1?"s":"");
   el.innerHTML = items.map(item => `
-    <div class="queue-item">
+    <div class="queue-item" data-id="${item.id}">
+      <span class="queue-drag-handle" onpointerdown="startQueueDrag(event,'${item.id}')" title="Glisser pour réordonner">⠿</span>
       <div class="art-sm">🎵</div>
       <div class="qi-info">
         <div class="qi-title">${escapeHtml(item.title)}</div>
@@ -2676,6 +2758,66 @@ function renderRealQueueUI(){
       </button>
     </div>
   `).join("") || `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">File vide — sois le premier à proposer un titre !</p>`;
+}
+
+// Réordonnancement manuel (ajouté le 22/07/2026, demande de Rémi) : glisser
+// avec le doigt (Pointer Events, pas le drag-and-drop HTML natif qui ne
+// fonctionne pas sur mobile) pour réordonner la file à la main, en plus du
+// système de votes existant. Une fois qu'un réordonnancement a eu lieu, la
+// file entière prend une "position" explicite en base et n'est plus
+// retriée automatiquement par les votes — voter reste possible (affichage
+// du nombre de votes), mais ne change plus l'ordre après ce point. Tant que
+// personne n'a jamais glissé, l'ordre par votes continue de s'appliquer
+// normalement (aucune position enregistrée).
+let queueDragState = null;
+
+function startQueueDrag(e, itemId){
+  if(!currentRoom) return; // réordonnancement manuel seulement en vrai salon
+  e.preventDefault();
+  const list = document.getElementById("queueList");
+  const el = list.querySelector(`[data-id="${itemId}"]`);
+  if(!el) return;
+  queueDragState = { el };
+  el.classList.add("dragging");
+  try { el.setPointerCapture(e.pointerId); } catch(err){}
+  el.addEventListener("pointermove", onQueueDragMove);
+  el.addEventListener("pointerup", onQueueDragEnd);
+  el.addEventListener("pointercancel", onQueueDragEnd);
+}
+
+function onQueueDragMove(e){
+  if(!queueDragState) return;
+  const list = document.getElementById("queueList");
+  const draggedEl = queueDragState.el;
+  const y = e.clientY;
+  const siblings = [...list.querySelectorAll(".queue-item")].filter(node => node !== draggedEl);
+  for(const sibling of siblings){
+    const rect = sibling.getBoundingClientRect();
+    if(y < rect.top || y > rect.bottom) continue;
+    const middle = rect.top + rect.height / 2;
+    if(y < middle) list.insertBefore(draggedEl, sibling);
+    else list.insertBefore(draggedEl, sibling.nextElementSibling);
+    break;
+  }
+}
+
+async function onQueueDragEnd(e){
+  if(!queueDragState) return;
+  const el = queueDragState.el;
+  el.removeEventListener("pointermove", onQueueDragMove);
+  el.removeEventListener("pointerup", onQueueDragEnd);
+  el.removeEventListener("pointercancel", onQueueDragEnd);
+  el.classList.remove("dragging");
+  const list = document.getElementById("queueList");
+  const newOrderIds = [...list.querySelectorAll(".queue-item")].map(node => node.dataset.id);
+  queueDragState = null;
+  await persistQueueOrder(newOrderIds);
+}
+
+async function persistQueueOrder(orderedIds){
+  if(!currentRoom) return;
+  await Promise.all(orderedIds.map((id, index) => sb.from("queue_items").update({ position: index }).eq("id", id)));
+  await loadRealQueue(currentRoom.id);
 }
 
 /* ---------- File d'attente : DÉMO (données en mémoire, modes pas encore réels) ---------- */
@@ -2832,6 +2974,12 @@ async function addToQueue(track){
     });
     if(error){ showToast("Erreur d'ajout : " + error.message); return; }
     showToast(`"${track.title}" ajouté à la vraie file d'attente`);
+    // Nourrit aussi le pool communautaire depuis les modes d'écoute (Soirée,
+    // À distance) — ajouté le 22/07/2026, demande de Rémi : jusque-là, seul
+    // le Blindtest multijoueur alimentait blindtest_pool.
+    if(track.youtubeId){
+      await populateBtPool([{ youtube_id: track.youtubeId, title: track.title, artist: track.artist || "", thumbnail: track.thumbnail || "" }]);
+    }
     // On rafraîchit tout de suite en local : ne pas dépendre uniquement du temps
     // réel pour voir sa propre musique apparaître (l'abonnement, lui, prévient les
     // AUTRES participants du salon de la nouveauté).
@@ -3423,6 +3571,56 @@ function renderLobbyImportedSummary(){
     : "Aucune playlist importée pour l'instant.";
 }
 
+/* ---- Écran "🛠 Gérer le pool communautaire" (ajouté le 22/07/2026) ----
+   La suppression est bloquée côté base (policy RLS) pour tout compte qui
+   n'a pas profiles.is_admin = true — voir harmonize-schema.sql. Sur un
+   compte normal, le clic "Supprimer" échoue simplement avec un message
+   d'erreur clair (RLS), sans rien casser. */
+let poolAdminTracks = [];
+
+async function goToPoolAdminScreen(){
+  showScreen("screen-pool-admin");
+  document.getElementById("poolAdminList").innerHTML = `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Chargement...</p>`;
+  const { data, error } = await sb.from("blindtest_pool").select("*").order("title", { ascending: true }).limit(2000);
+  if(error){
+    document.getElementById("poolAdminList").innerHTML = `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Erreur de chargement : ${escapeHtml(error.message)}</p>`;
+    return;
+  }
+  poolAdminTracks = data || [];
+  document.getElementById("poolAdminCount").textContent = `(${poolAdminTracks.length} au total)`;
+  renderPoolAdminList();
+}
+
+function renderPoolAdminList(){
+  const query = (document.getElementById("poolAdminSearch")?.value || "").trim().toLowerCase();
+  const filtered = query
+    ? poolAdminTracks.filter(t => (t.title||"").toLowerCase().includes(query) || (t.artist||"").toLowerCase().includes(query))
+    : poolAdminTracks;
+  const el = document.getElementById("poolAdminList");
+  el.innerHTML = filtered.slice(0, 300).map(t => `
+    <div class="queue-item">
+      <div class="art-sm">🎵</div>
+      <div class="qi-info">
+        <div class="qi-title">${escapeHtml(t.title)}</div>
+        <div class="qi-meta">${escapeHtml(t.artist || "")}</div>
+      </div>
+      <button class="btn-ghost" style="width:auto;padding:8px 12px;font-size:12px;" onclick="deletePoolTrack('${escJs(t.id)}')">🗑</button>
+    </div>
+  `).join("") || `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Aucun résultat.</p>`;
+  if(filtered.length > 300){
+    el.innerHTML += `<p style="color:var(--text-faint);font-size:12px;text-align:center;padding:10px 0;">${filtered.length - 300} résultat(s) de plus — affine ta recherche pour les voir.</p>`;
+  }
+}
+
+async function deletePoolTrack(id){
+  const { error } = await sb.from("blindtest_pool").delete().eq("id", id);
+  if(error){ showToast("Suppression impossible : " + error.message); return; }
+  poolAdminTracks = poolAdminTracks.filter(t => t.id !== id);
+  document.getElementById("poolAdminCount").textContent = `(${poolAdminTracks.length} au total)`;
+  renderPoolAdminList();
+  showToast("Chanson retirée du pool.");
+}
+
 /* ---- Onglet "📂 Mes playlists" dans la fenêtre d'ajout de titre (dans un salon) ----
    Simple lecture en base (table imported_tracks) : aucune reconnexion à
    Google nécessaire ici, contrairement à l'écran d'import lui-même. */
@@ -3731,7 +3929,7 @@ function renderQuestionPicker(){
   document.getElementById("gqStepPlayback").style.display = "none";
   document.getElementById("gqStepMode").style.display = "none";
   document.getElementById("gqStepManual").style.display = "block";
-  document.getElementById("gqLobbyIntro").textContent = `Choisis exactement ${gameRoundsTarget} question(s) parmi les 30.`;
+  document.getElementById("gqLobbyIntro").textContent = `Choisis exactement ${gameRoundsTarget} question(s) parmi celles proposées.`;
   document.getElementById("gqQuestionPicker").innerHTML = GAME_QUESTIONS.map(q => {
     const checked = gameSelectedQuestionIds.includes(q.id);
     const disabled = !checked && gameSelectedQuestionIds.length >= gameRoundsTarget;
@@ -4321,9 +4519,10 @@ function renderGameGuessOptions(round){
     const active = gameMyGuessSelection.has(uid);
     return `
       <button
+        class="guess-option${active ? " selected" : ""}"
         onclick="toggleGuessSelection('${uid}')"
         ${locked ? "disabled" : ""}
-        style="width:auto;padding:10px 16px;border-radius:999px;border:2px solid ${active ? "var(--accent1)" : "var(--border)"};background:${active ? "var(--accent1)" : "transparent"};color:${active ? "#fff" : "var(--text-dim)"};font-weight:600;font-size:13.5px;cursor:${locked ? "default" : "pointer"};opacity:${locked && !active ? "0.5" : "1"};transition:all .15s;"
+        style="cursor:${locked ? "default" : "pointer"};opacity:${locked && !active ? "0.5" : "1"};"
       >${active ? "✓ " : ""}${escapeHtml(getPseudoForUserId(uid))}</button>
     `;
   }).join("");
@@ -4438,6 +4637,10 @@ async function nextGameRound(){
   gameAdSkipClickedAtRound = null;
   gameAdSkipClickedAtTime = null;
   if(currentRoom.game_phase === "playing") applyGamePlaybackState();
+  // Nourrit aussi le pool communautaire depuis "Le jeu des questions"
+  // (ajouté le 22/07/2026, demande de Rémi) — même fonction que Blindtest,
+  // les manches ont exactement la même forme (youtube_id/title/artist).
+  if(currentRoom.game_phase === "finished") await populateBtPool(rounds);
   renderGameLobby();
 }
 
@@ -5420,6 +5623,70 @@ async function rejouerBtMemeSalon(){
    bouton, jamais automatiquement, au cas où on veuille finir d'écouter le titre. */
 let roundState = { totalRounds: 5, currentRound: 0, timerInterval: null, elapsed: 0, answered: false };
 
+// Chrono de réponse + anti-pub pour le Blindtest solo réel (ajoutés le
+// 22/07/2026, demande de Rémi) — même principe que Série de blindtest :
+// 15s pour répondre (sinon la manche se termine comme une mauvaise réponse,
+// la musique elle-même ne s'arrête jamais), et un bouton "Pub bloquée ?" qui
+// agrandit temporairement le lecteur (normalement en 1x1, invisible) pour
+// atteindre le bouton natif "Ignorer" de YouTube.
+const BT_SOLO_VOTE_SECONDS = 15;
+let btSoloVoteTimer = null;
+let btSoloVoteDeadline = 0;
+let btSoloCurrentCorrectId = null;
+let btSoloAdSkipActive = false;
+let btSoloAdSkipRestoreTimer = null;
+
+function startBtSoloVoteTimer(){
+  stopBtSoloVoteTimer();
+  btSoloVoteDeadline = Date.now() + BT_SOLO_VOTE_SECONDS * 1000;
+  updateBtSoloVoteCountdown();
+  btSoloVoteTimer = setInterval(() => {
+    const secondsLeft = Math.ceil((btSoloVoteDeadline - Date.now()) / 1000);
+    if(secondsLeft <= 0){
+      stopBtSoloVoteTimer();
+      if(!roundState.answered) guess("__timeout__", btSoloCurrentCorrectId);
+      return;
+    }
+    updateBtSoloVoteCountdown(secondsLeft);
+  }, 250);
+}
+
+function updateBtSoloVoteCountdown(secondsLeft){
+  const el = document.getElementById("btSoloCountdown");
+  if(!el) return;
+  const left = secondsLeft ?? Math.max(0, Math.ceil((btSoloVoteDeadline - Date.now()) / 1000));
+  el.textContent = "⏱ " + left + "s";
+}
+
+function stopBtSoloVoteTimer(){
+  if(btSoloVoteTimer){ clearInterval(btSoloVoteTimer); btSoloVoteTimer = null; }
+}
+
+function revealBtSoloAdSkip(){
+  if(!btSoloPlayer || typeof btSoloPlayer.setSize !== "function") return;
+  btSoloAdSkipActive = true;
+  btSoloPlayer.setSize(280, 158);
+  const el = document.getElementById("btSoloYtPlayer");
+  if(el) el.style.display = "block";
+  const banner = document.getElementById("btSoloAdSkipBanner");
+  if(banner) banner.style.display = "block";
+  btSoloVoteDeadline += 10000;
+  updateBtSoloVoteCountdown();
+  showToast("Tape directement sur le bouton \"Ignorer\" de la pub si tu le vois — le lecteur revient à la normale dans 10 secondes, et ton chrono de réponse est repoussé d'autant.");
+  clearTimeout(btSoloAdSkipRestoreTimer);
+  btSoloAdSkipRestoreTimer = setTimeout(resetBtSoloAdSkipUI, 10000);
+}
+
+function resetBtSoloAdSkipUI(){
+  clearTimeout(btSoloAdSkipRestoreTimer);
+  btSoloAdSkipActive = false;
+  if(btSoloPlayer && typeof btSoloPlayer.setSize === "function") btSoloPlayer.setSize(1, 1);
+  const el = document.getElementById("btSoloYtPlayer");
+  if(el) el.style.display = "none";
+  const banner = document.getElementById("btSoloAdSkipBanner");
+  if(banner) banner.style.display = "none";
+}
+
 function pickRounds(n){
   roundState.totalRounds = n;
   document.getElementById("roundsChosenLabel").textContent = n;
@@ -5511,7 +5778,8 @@ function resetBtSoloVisuals(){
   document.getElementById("gameArtEmoji").style.display = "block";
   document.getElementById("btSoloAudioCover").style.display = "none";
   document.getElementById("btSoloYtPlayer").style.display = "none";
-  stopBtSoloPlayer();
+  document.getElementById("btSoloVoteRow").style.display = "none";
+  stopBtSoloPlayer(); // arrête aussi le chrono et l'anti-pub (voir stopBtSoloPlayer)
 }
 
 /* ---- Contenu de chaque type de manche ---- */
@@ -5558,13 +5826,20 @@ function startBlindtestRound(){
     document.getElementById("btSoloYtPlayer").style.display = "block";
     ensureBtSoloPlayer(correctTrack.youtube_id);
     renderMysteryUI("???", "Écoute et devine de quelle chanson il s'agit !", optionsHtml);
+    btSoloCurrentCorrectId = correctTrack.youtube_id;
+    document.getElementById("btSoloVoteRow").style.display = "flex";
+    resetBtSoloAdSkipUI();
+    startBtSoloVoteTimer();
     return;
   }
 
-  // Filet de sécurité : ancien catalogue de démo (aucune vraie donnée disponible).
+  // Filet de sécurité : ancien catalogue de démo (aucune vraie donnée disponible)
+  // — pas de vrai lecteur YouTube ici, donc pas de chrono/anti-pub non plus.
   document.getElementById("gameArtEmoji").style.display = "block";
   document.getElementById("btSoloAudioCover").style.display = "none";
   document.getElementById("btSoloYtPlayer").style.display = "none";
+  document.getElementById("btSoloVoteRow").style.display = "none";
+  stopBtSoloVoteTimer();
   const correctTrack = CATALOG[Math.floor(Math.random()*CATALOG.length)];
   let options = [correctTrack];
   while(options.length < 4){
@@ -5625,6 +5900,7 @@ function guess(picked, correct){
   if(roundState.answered) return;
   roundState.answered = true;
   clearRoundTimer();
+  stopBtSoloVoteTimer();
 
   document.querySelectorAll(".guess-option").forEach(btn=>{
     btn.onclick = null;
@@ -5636,6 +5912,8 @@ function guess(picked, correct){
     const { total, lightning } = computePoints(roundState.elapsed);
     state.scores[state.user] = (state.scores[state.user]||0) + total;
     showToast(lightning ? `⚡ Réponse éclair ! Bonus x2 — +${total} points` : `Bonne réponse ! +${total} points`);
+  } else if(picked === "__timeout__"){
+    showToast(`⏰ Temps écoulé — c'était ${correct} !`);
   } else {
     showToast(`Raté — c'était ${correct} !`);
   }
