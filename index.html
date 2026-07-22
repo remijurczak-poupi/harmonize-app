@@ -182,9 +182,16 @@
   .modal-backdrop.open{display:flex;}
   .modal{
     background:var(--bg-elevated);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:480px;
-    max-height:75vh;overflow-y:auto;border-top:1px solid var(--border);
+    max-height:75vh;border-top:1px solid var(--border);
+    display:flex;flex-direction:column;
   }
-  .modal-handle{width:36px;height:4px;background:var(--border);border-radius:3px;margin:0 auto 16px;}
+  .modal-handle{width:36px;height:4px;background:var(--border);border-radius:3px;margin:0 auto 16px;flex-shrink:0;}
+  /* Zone scrollable d'une modale (ajouté le 22/07/2026, retour de Rémi : le
+     bouton "Fermer" en bas d'une modale à onglets devenait inatteignable sans
+     scroller une fois la liste de résultats assez longue). Seul ce bloc
+     défile ; le titre/les onglets au-dessus et le bouton "Fermer" en dessous
+     restent toujours visibles. */
+  .modal-scroll{overflow-y:auto;flex:1;min-height:0;}
   /* Popup de fin de série (ajouté le 21/07/2026, demande de Rémi) : centré à
      l'écran plutôt qu'en tiroir du bas comme les autres modales — c'est un
      écran de résultat, pas une liste dans laquelle on choisit quelque chose. */
@@ -236,10 +243,6 @@
   }
   .mode-title{font-weight:700;font-size:15px;margin-bottom:3px;}
   .mode-desc{color:var(--text-dim);font-size:12.5px;line-height:1.4;}
-  .mode-tag{
-    display:inline-block;margin-top:6px;font-size:10.5px;color:var(--text-faint);
-    border:1px solid var(--border);padding:2px 7px;border-radius:6px;
-  }
 </style>
 </head>
 <body>
@@ -255,7 +258,7 @@
     <!-- SCREEN: LOGIN / SIGNUP (vrais comptes Supabase) -->
     <section class="screen active" id="screen-login">
       <h1>Bienvenue 👋</h1>
-      <p class="sub">Connecte-toi, ou crée un compte si c'est ta première visite. Le mode Soirée est maintenant connecté à une vraie base de données.</p>
+      <p class="sub">Connecte-toi, ou crée un compte si c'est ta première visite.</p>
       <div class="card stack">
         <button class="btn-ghost" onclick="handleGoogleLogin()">🔐 Continuer avec Google</button>
         <div class="divider-or">ou</div>
@@ -274,6 +277,7 @@
       <h1>Salut <span id="hiName">!</span></h1>
       <p class="sub">Qu'est-ce qu'on fait aujourd'hui ?</p>
 
+      <h2 style="margin-top:8px;">Créer un salon</h2>
       <button class="mode-card" onclick="chooseCategory('ecoute')">
         <div class="mode-icon">🎧</div>
         <div>
@@ -291,8 +295,7 @@
 
       <div class="card stack" style="margin-top:16px;">
         <input type="text" id="joinCode" placeholder="Code du salon (ex: NEBULA42)" oninput="uppercaseInputLive(this)" />
-        <button class="btn-ghost" onclick="joinRoom()">Rejoindre avec un code</button>
-        <p style="margin:0;font-size:11.5px;color:var(--text-faint);line-height:1.4;">Pas besoin de choisir Écoute ou Jeux pour rejoindre : le code t'emmène directement là où le salon a été créé.</p>
+        <button class="btn-ghost" onclick="joinRoom()">Rejoindre un salon avec un code</button>
       </div>
 
       <h2 style="margin-top:28px;">Tes playlists importées</h2>
@@ -369,8 +372,15 @@
     <section class="screen" id="screen-serie">
       <h1>🔥 Série de blindtest</h1>
       <p class="sub" id="serieSourceHint">Enchaîne un maximum de bonnes réponses sans te tromper !</p>
+      <!-- Série en cours mise en avant (agrandie le 22/07/2026, retour de
+           Rémi : le score en cours devait être plus visible qu'une simple
+           pastille de la même taille que les 2 records) — le nombre est ce
+           qu'on veut voir grossir d'un coup d'œil après chaque bonne réponse. -->
+      <div class="card" style="text-align:center;padding:14px 20px;margin-bottom:10px;background:var(--accent-gradient);">
+        <div style="font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.85);">🔥 Série en cours</div>
+        <div style="font-size:40px;font-weight:800;color:#fff;line-height:1.15;" id="serieStreak">0</div>
+      </div>
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
-        <span class="pill">🔥 Série : <span id="serieStreak">0</span></span>
         <span class="pill">📅 Record du jour : <span id="serieRecordToday">0</span></span>
         <span class="pill">🏆 Record total : <span id="serieRecordAllTime">0</span></span>
       </div>
@@ -683,7 +693,7 @@
           </div>
           <div class="card" style="margin-bottom:16px;">
             <div style="font-size:11px;font-weight:700;color:var(--accent1);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;" id="gqRoundQuestion"></div>
-            <div style="position:relative;">
+            <div style="position:relative;min-height:180px;">
               <div id="gameYtPlayer"></div>
               <!-- Mode "audio seulement" (ajouté le 13/07/2026, à la demande de
                    Rémi, anti-spoiler) : la vidéo continue de jouer (donc le son
@@ -849,7 +859,7 @@
             <span class="pill" id="btRoundCounter">Manche 1/5</span>
           </div>
           <div class="card" style="margin-bottom:16px;">
-            <div style="position:relative;">
+            <div style="position:relative;min-height:180px;">
               <div id="btYtPlayer"></div>
               <div id="btAudioCover" onclick="toggleBtPlayPause()" style="display:none;position:absolute;inset:0;cursor:pointer;background:linear-gradient(160deg,var(--accent1),var(--accent2));align-items:center;justify-content:center;flex-direction:column;gap:6px;border-radius:12px;color:#fff;text-align:center;padding:12px;">
                 <div style="font-size:28px;">🎧</div>
@@ -937,16 +947,18 @@
         <button class="btn-ghost" id="tabSearchBtn" style="width:auto;flex:1;padding:10px;" onclick="switchAddTab('search')">🔎 Recherche</button>
         <button class="btn-ghost" id="tabMineBtn" style="width:auto;flex:1;padding:10px;" onclick="switchAddTab('mine')">📂 Mes playlists</button>
       </div>
-      <div id="tabSearchPane">
-        <input type="text" id="searchInput" placeholder="Rechercher un titre ou un artiste..." oninput="onSearchInput()" />
-        <div id="searchResults" style="margin-top:14px;"></div>
-        <p style="font-size:11px;color:var(--text-faint);margin-top:10px;">Recherche dans YouTube — les titres ajoutés sont immédiatement prêts à être joués.</p>
+      <div class="modal-scroll">
+        <div id="tabSearchPane">
+          <input type="text" id="searchInput" placeholder="Rechercher un titre ou un artiste..." oninput="onSearchInput()" />
+          <div id="searchResults" style="margin-top:14px;"></div>
+          <p style="font-size:11px;color:var(--text-faint);margin-top:10px;">Recherche dans YouTube — les titres ajoutés sont immédiatement prêts à être joués.</p>
+        </div>
+        <div id="tabMinePane" style="display:none;">
+          <input type="text" id="mineSearchInput" placeholder="🔎 Chercher un titre ou un artiste..." oninput="onMineSearchInput()" style="margin-bottom:12px;" />
+          <div id="myImportedResults"></div>
+        </div>
       </div>
-      <div id="tabMinePane" style="display:none;">
-        <input type="text" id="mineSearchInput" placeholder="🔎 Chercher un titre ou un artiste..." oninput="onMineSearchInput()" style="margin-bottom:12px;" />
-        <div id="myImportedResults"></div>
-      </div>
-      <button class="btn-ghost" style="margin-top:10px;" onclick="closeSearch()">Fermer</button>
+      <button class="btn-ghost" style="margin-top:10px;flex-shrink:0;" onclick="closeSearch()">Fermer</button>
     </div>
   </div>
 
@@ -957,8 +969,8 @@
       <div class="modal-handle"></div>
       <h2>📌 Ajouter à une playlist YouTube</h2>
       <p id="ytSaveTrackLabel" style="font-size:13px;color:var(--text-dim);margin:-4px 0 14px;"></p>
-      <div id="ytSaveContent"></div>
-      <button class="btn-ghost" style="margin-top:10px;" onclick="closeYtSaveModal()">Fermer</button>
+      <div class="modal-scroll"><div id="ytSaveContent"></div></div>
+      <button class="btn-ghost" style="margin-top:10px;flex-shrink:0;" onclick="closeYtSaveModal()">Fermer</button>
     </div>
   </div>
 
@@ -977,16 +989,18 @@
         <button class="btn-ghost" id="gameAnswerTabSearchBtn" style="width:auto;flex:1;padding:10px;" onclick="switchGameAnswerTab('search')">🔎 Recherche</button>
         <button class="btn-ghost" id="gameAnswerTabMineBtn" style="width:auto;flex:1;padding:10px;" onclick="switchGameAnswerTab('mine')">📂 Mes playlists</button>
       </div>
-      <div id="gameAnswerTabSearchPane">
-        <input type="text" id="gameAnswerSearchInput" placeholder="Rechercher un titre ou un artiste..." oninput="onGameAnswerSearchInput()" />
-        <div id="gameAnswerResults" style="margin-top:14px;"></div>
+      <div class="modal-scroll">
+        <div id="gameAnswerTabSearchPane">
+          <input type="text" id="gameAnswerSearchInput" placeholder="Rechercher un titre ou un artiste..." oninput="onGameAnswerSearchInput()" />
+          <div id="gameAnswerResults" style="margin-top:14px;"></div>
+        </div>
+        <div id="gameAnswerTabMinePane" style="display:none;">
+          <input type="text" id="gameAnswerMineSearchInput" placeholder="🔎 Chercher un titre ou un artiste..." oninput="onGameAnswerMineSearchInput()" style="margin-bottom:12px;" />
+          <div id="gameAnswerMineResults"></div>
+        </div>
       </div>
-      <div id="gameAnswerTabMinePane" style="display:none;">
-        <input type="text" id="gameAnswerMineSearchInput" placeholder="🔎 Chercher un titre ou un artiste..." oninput="onGameAnswerMineSearchInput()" style="margin-bottom:12px;" />
-        <div id="gameAnswerMineResults"></div>
-      </div>
-      <p style="font-size:11px;color:var(--text-faint);margin-top:10px;">Ta réponse reste secrète pour les autres jusqu'au lancement de la partie. Tu peux la changer tant que la partie n'a pas commencé.</p>
-      <button class="btn-ghost" style="margin-top:10px;" onclick="closeGameAnswerModal()">Fermer</button>
+      <p style="font-size:11px;color:var(--text-faint);margin-top:10px;flex-shrink:0;">Ta réponse reste secrète pour les autres jusqu'au lancement de la partie. Tu peux la changer tant que la partie n'a pas commencé.</p>
+      <button class="btn-ghost" style="margin-top:10px;flex-shrink:0;" onclick="closeGameAnswerModal()">Fermer</button>
     </div>
   </div>
 
@@ -1157,27 +1171,22 @@ const MODE_DETAIL = {
   soiree: {
     emoji:"🪩", title:"Soirée",
     desc:"Vous êtes tous réunis au même endroit. Chacun ajoute ses titres à la file d'attente commune, et la musique joue sur une seule enceinte pour tout le monde — comme un juke-box partagé où chacun a la main.",
-    tag:"Connecté à une vraie base de données",
   },
   distance: {
     emoji:"🌐", title:"À distance",
     desc:"Chacun est chez soi, avec son casque ou ses enceintes. L'appli synchronise la lecture pour que tout le monde entende exactement le même morceau au même instant, chacun depuis son propre appareil.",
-    tag:"Connecté à une vraie base de données",
   },
   owner: {
     emoji:"🎲", title:"Qui a mis cette chanson ?",
-    desc:"Chacun propose quelques chansons de son choix. Un morceau surprise est ensuite tiré parmi elles, tout le monde l'entend en même temps, et chacun vote pour deviner qui l'a proposé.",
-    tag:"Connecté à une vraie base de données",
+    desc:"Chacun propose quelques chansons de son choix. Le jeu est ensuite de deviner qui a mis les musiques jouées aléatoirement.",
   },
   questions: {
     emoji:"❓", title:"Le jeu des questions",
     desc:"Le créateur choisit des questions (\"ta chanson d'amour préférée\", \"ta chanson la plus triste\"...) parmi une liste proposée. Chacun répond avec un vrai titre AVANT que la partie commence. Ensuite on écoute les réponses une par une et on vote en direct pour deviner qui a choisi quoi.",
-    tag:"Connecté à une vraie base de données",
   },
   blindtest: {
     emoji:"🎧", title:"Blindtest",
     desc:"En groupe : chacun propose quelques chansons, puis on les écoute une par une et on devine de quel titre il s'agit parmi plusieurs choix. En solo : pioche dans le pool communautaire de chansons déjà proposées par d'autres, ou dans ta propre playlist importée.",
-    tag:"Connecté à une vraie base de données",
   },
   // Ajouté le 21/07/2026, idée notée le 19/07/2026 : toujours solo (pas de
   // salon à créer), enchaîne les manches de blindtest sans limite tant
@@ -1185,7 +1194,6 @@ const MODE_DETAIL = {
   serie: {
     emoji:"🔥", title:"Série de blindtest",
     desc:"Enchaîne un maximum de bonnes réponses d'affilée, en solo — une erreur remet le compteur à zéro. Pioche dans le pool communautaire de chansons déjà proposées par d'autres joueurs.",
-    tag:"Solo · vraies données",
   },
 };
 
@@ -1828,7 +1836,6 @@ function renderModeCards(){
         <div>
           <div class="mode-title">${d.title}</div>
           <div class="mode-desc">${d.desc}</div>
-          <span class="mode-tag">${d.tag}</span>
         </div>
       </button>
     `;
@@ -1856,7 +1863,6 @@ function previewMode(mode){
     <div>
       <div class="mode-title">${d.title}</div>
       <div class="mode-desc">${d.desc}</div>
-      <span class="mode-tag">${d.tag}</span>
     </div>
   `;
   // Le Blindtest solo (ajouté le 19/07/2026) ne nécessite pas de vrai salon —
@@ -2257,7 +2263,7 @@ function stopBroadcast(){
   isBroadcasting = false;
   currentPlayingItem = null;
   const btn = document.getElementById("broadcastToggleBtn");
-  if(btn) btn.textContent = "🔊 Diffuser ici";
+  if(btn) btn.textContent = "🔊 Je diffuse";
   const wrap = document.getElementById("ytPlayerWrap");
   if(wrap) wrap.style.display = "none";
   if(ytPlayer){ try { ytPlayer.destroy(); } catch(e) {} ytPlayer = null; }
@@ -2352,7 +2358,7 @@ function renderPlayerCard(){
         <button class="btn-ghost" style="width:auto;padding:8px 14px;" id="distanceJoinBtn" onclick="toggleDistanceListening()">🎧 Rejoindre l'écoute</button>
       </div>
       <div id="distancePlayerWrap" style="display:none;margin-top:12px;">
-        <div style="position:relative;">
+        <div style="position:relative;min-height:180px;">
           <div id="ytPlayer"></div>
           <!-- Recouvre entièrement la vidéo (ajouté le 12/07/2026) : les
                paramètres demandés à YouTube pour cacher ses propres boutons
@@ -2385,9 +2391,9 @@ function renderPlayerCard(){
     el.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
         <p style="font-size:11.5px;color:var(--text-faint);flex:1;min-width:180px;margin:0;">
-          🔊 Une seule personne (celle près de l'enceinte) doit activer ça — pas tout le monde en même temps.
+          🔊 Une seule personne (celle connectée à l'enceinte) doit activer ça — pas tout le monde en même temps.
         </p>
-        <button class="btn-ghost" style="width:auto;padding:8px 14px;" id="broadcastToggleBtn" onclick="toggleBroadcast()">🔊 Diffuser ici</button>
+        <button class="btn-ghost" style="width:auto;padding:8px 14px;" id="broadcastToggleBtn" onclick="toggleBroadcast()">🔊 Je diffuse</button>
       </div>
       <div id="ytPlayerWrap" style="display:none;margin-top:12px;">
         <div id="ytPlayer"></div>
@@ -3829,6 +3835,11 @@ function renderQuestionPicker(){
   const creator = isGameCreator();
   document.getElementById("gqLobbyCreatorFlow").style.display = creator ? "block" : "none";
   document.getElementById("gqLobbyWaitMsg").style.display = creator ? "none" : "block";
+  // "Le jeu des questions" n'utilise jamais l'étape "combien de chansons
+  // chacun propose" (propre à "Qui a mis cette chanson ?", voir
+  // renderOwnerLobbySetup()) — s'assurer qu'elle reste cachée même si ce
+  // salon a affiché l'autre mode plus tôt dans la session.
+  document.getElementById("ownerStepSongs").style.display = "none";
   if(!creator) return;
 
   if(!document.getElementById("gqRoundsPicker").children.length){
@@ -6090,17 +6101,20 @@ function guess(picked, correct){
     state.scores[state.user] = (state.scores[state.user]||0) + total;
     showToast(lightning ? `⚡ Réponse éclair ! Bonus x2 — +${total} points` : `Bonne réponse ! +${total} points`);
   } else if(picked === "__timeout__"){
-    showToast(`⏰ Temps écoulé — c'était ${correct} !`);
+    showToast(`⏰ Temps écoulé !`);
   } else {
-    showToast(`Raté — c'était ${correct} !`);
+    showToast(`Raté !`);
   }
 
   // On ne passe JAMAIS à la manche suivante automatiquement : on propose
   // seulement, via le bouton, pour laisser le temps d'écouter le morceau.
+  // Texte fixe (ajouté le 22/07/2026, retour de Rémi) : affichait avant
+  // l'identifiant YouTube brut de la bonne réponse ("C'était hxgz8E98ogo"),
+  // pas un vrai titre lisible.
   const hint = document.getElementById("roundNextHint");
   if(hint) hint.textContent = picked === correct
-    ? "Bien joué ! Prenez le temps d'écouter la suite du morceau si vous voulez — passez quand vous êtes prêts."
-    : `C'était "${correct}" — profitez du morceau, puis passez à la suite quand vous voulez.`;
+    ? "Bravo ! Profitez du morceau, puis passez à la suite quand vous voulez."
+    : "Dommage ! Profitez du morceau, puis passez à la suite quand vous voulez.";
   document.getElementById("roundNextPanel").style.display = "block";
 }
 
