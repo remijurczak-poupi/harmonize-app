@@ -583,7 +583,9 @@
     <section class="screen" id="screen-game-lobby">
       <div class="room-hero">
         <div class="code">Salon · <span id="gqRoomCode">------</span> <span class="real-badge">RÉEL</span></div>
-        <div class="name">❓ Le jeu des questions</div>
+        <!-- Dynamique depuis le 22/07/2026 : cet écran est maintenant partagé
+             avec "Qui a mis cette chanson ?" (voir enterRealRoom()). -->
+        <div class="name" id="gqRoomModeName">❓ Le jeu des questions</div>
         <div class="avatars-inline" id="gqRoomAvatars"></div>
       </div>
 
@@ -592,6 +594,19 @@
            12/07/2026 à la demande de Rémi. -->
       <div id="gqPhaseLobby" style="display:none;">
         <div id="gqLobbyCreatorFlow">
+          <!-- "Qui a mis cette chanson ?" (ajouté le 22/07/2026) : contribution
+               libre façon Blindtest (curseur du nombre de chansons, pas de
+               catégories fixes) — seule cette première étape diffère du "jeu
+               des questions" ; les réglages d'écoute (gqStepPlayback) et toute
+               la partie (manches/vote/podium) sont entièrement réutilisés. -->
+          <div id="ownerStepSongs" class="card" style="display:none;margin-bottom:16px;">
+            <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">Combien de chansons chacun propose-t-il ?</p>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+              <input type="range" id="ownerSongsSlider" min="1" max="20" value="3" oninput="onOwnerSongsSliderInput(this.value)" style="flex:1;accent-color:var(--accent1);" />
+              <span class="pill" id="ownerSongsSliderValue" style="min-width:32px;text-align:center;">3</span>
+            </div>
+            <button class="btn-primary" onclick="confirmOwnerSongsCount()">Valider</button>
+          </div>
           <div id="gqStepRounds" class="card" style="margin-bottom:16px;">
             <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">Combien de manches (une manche = une question) pour cette partie ?</p>
             <div style="display:flex;gap:8px;flex-wrap:wrap;" id="gqRoundsPicker"></div>
@@ -600,7 +615,10 @@
                Rémi) : anti-spoiler — cacher vignette/titre/artiste pendant la
                manche (mode "audio seulement") et/ou démarrer chaque morceau
                vers ~45 secondes plutôt que dès le début (souvent trop
-               reconnaissable). -->
+               reconnaissable). Réutilisée telle quelle par "Qui a mis cette
+               chanson ?" (ajouté le 22/07/2026) — voir pickGameDisplayMode()/
+               pickGamePlaybackStart(), qui redirigent vers le bon écran selon
+               currentRoom.mode. -->
           <div id="gqStepPlayback" class="card" style="display:none;margin-bottom:16px;">
             <p style="font-size:13px;color:var(--text-dim);margin-bottom:10px;">Comment veux-tu afficher les manches ?</p>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;" id="gqDisplayModePicker">
@@ -613,7 +631,7 @@
               <button class="btn-ghost" style="width:auto;flex:1;padding:10px 8px;" data-start="middle" onclick="pickGamePlaybackStart('middle')">⏭ Vers ~45 secondes</button>
             </div>
             <p style="font-size:11px;color:var(--text-faint);margin:0 0 14px;">Choisis les deux réglages ci-dessus pour continuer automatiquement.</p>
-            <button class="btn-ghost" onclick="backToRoundsStep()">← Changer le nombre de manches</button>
+            <button class="btn-ghost" onclick="currentRoom && currentRoom.mode === 'owner' ? backToOwnerSongsStep() : backToRoundsStep()">← Changer le nombre de manches</button>
           </div>
           <div id="gqStepMode" class="card" style="display:none;margin-bottom:16px;">
             <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;" id="gqStepModeIntro"></p>
@@ -637,11 +655,11 @@
 
       <!-- Phase 2 : chacun répond aux questions choisies -->
       <div id="gqPhaseAnswering" style="display:none;">
-        <h2 style="margin-top:0;">Tes réponses</h2>
+        <h2 style="margin-top:0;" id="gqMyAnswersTitle">Tes réponses</h2>
         <div id="gqMyAnswers" class="stack" style="margin-bottom:24px;"></div>
 
-        <h2>Qui a répondu ?</h2>
-        <p style="font-size:12px;color:var(--text-faint);margin-top:-6px;margin-bottom:12px;">Le contenu des réponses reste secret jusqu'au lancement de la partie — seule la progression est visible.</p>
+        <h2 id="gqProgressTitle">Qui a répondu ?</h2>
+        <p style="font-size:12px;color:var(--text-faint);margin-top:-6px;margin-bottom:12px;" id="gqProgressHint">Le contenu des réponses reste secret jusqu'au lancement de la partie — seule la progression est visible.</p>
         <div id="gqProgress" class="stack" style="margin-bottom:20px;"></div>
 
         <div id="gqCreatorControls" style="display:none;text-align:center;">
@@ -704,7 +722,7 @@
           </div>
 
           <div id="gqOwnerNote" class="card" style="display:none;text-align:center;margin-bottom:16px;">
-            <p style="font-size:13px;color:var(--text-dim);margin:0;">🎵 C'est l'une de tes réponses ! Profite du morceau — les autres devinent qui l'a choisi.</p>
+            <p style="font-size:13px;color:var(--text-dim);margin:0;" id="gqOwnerNoteText">🎵 C'est l'une de tes réponses ! Profite du morceau — les autres devinent qui l'a choisi.</p>
           </div>
 
           <!-- Redessiné le 13/07/2026, à la demande de Rémi : les options
@@ -716,7 +734,7 @@
                exclu par erreur). -->
           <div id="gqGuessBox" style="display:none;margin-bottom:16px;">
             <h2 style="margin-top:0;display:flex;align-items:center;justify-content:space-between;gap:8px;">
-              <span>Qui a répondu ça ?</span>
+              <span id="gqGuessBoxTitle">Qui a répondu ça ?</span>
               <span class="pill" id="gqVoteCountdown" style="font-size:12px;"></span>
             </h2>
             <p style="font-size:12px;color:var(--text-faint);margin-top:-6px;margin-bottom:10px;">Un clic suffit à voter — c'est ensuite définitif pour cette manche.</p>
@@ -1150,8 +1168,8 @@ const MODE_DETAIL = {
   },
   owner: {
     emoji:"🎲", title:"Qui a mis cette chanson ?",
-    desc:"Un morceau surprise est tiré des playlists du groupe, tout le monde l'entend en même temps, et chacun vote pour deviner qui l'a mis dans sa playlist.",
-    tag:"Version démo pour l'instant (Phase 3)",
+    desc:"Chacun propose quelques chansons de son choix. Un morceau surprise est ensuite tiré parmi elles, tout le monde l'entend en même temps, et chacun vote pour deviner qui l'a proposé.",
+    tag:"Connecté à une vraie base de données",
   },
   questions: {
     emoji:"❓", title:"Le jeu des questions",
@@ -1840,7 +1858,7 @@ function showScreen(id){
 // le 12/07/2026), un vrai salon "blindtest" (le sien, ajouté le 19/07/2026),
 // un autre jeu encore en démo (screen-game), ou un mode d'écoute (screen-room).
 function goToCurrentScreen(){
-  if(currentRoom && currentRoom.mode === "questions"){ showScreen("screen-game-lobby"); return; }
+  if(currentRoom && (currentRoom.mode === "questions" || currentRoom.mode === "owner")){ showScreen("screen-game-lobby"); return; }
   if(currentRoom && currentRoom.mode === "blindtest"){ showScreen("screen-blindtest-lobby"); return; }
   showScreen(state.category === "jeux" ? "screen-game" : "screen-room");
 }
@@ -1962,7 +1980,7 @@ async function confirmCreateRoom(){
 // section "Blindtest (VRAI salon)" plus bas. Réutilise tout le mécanisme du
 // "jeu des questions" (colonnes game_*, table game_answers), voir le
 // commentaire dans harmonize-schema.sql pour le détail de cette réutilisation.
-const REAL_MODES = ["soiree", "distance", "questions", "blindtest"];
+const REAL_MODES = ["soiree", "distance", "questions", "blindtest", "owner"];
 
 // Le créateur choisit un mode : Soirée et À distance créent un VRAI salon
 // en base, les autres restent en démo pour l'instant.
@@ -2031,8 +2049,8 @@ async function enterRealRoom(room, toastMsg){
   stopQueuePolling();
   stopAnyPlayback(); // on repart d'un lecteur arrêté (Soirée ou À distance) si on venait d'un autre salon
   currentRoom = room;
-  state.mode = room.mode === "distance" ? "distance" : (room.mode === "questions" || room.mode === "blindtest" ? room.mode : "soiree");
-  state.category = (room.mode === "questions" || room.mode === "blindtest") ? "jeux" : "ecoute";
+  state.mode = room.mode === "distance" ? "distance" : (room.mode === "questions" || room.mode === "blindtest" || room.mode === "owner" ? room.mode : "soiree");
+  state.category = (room.mode === "questions" || room.mode === "blindtest" || room.mode === "owner") ? "jeux" : "ecoute";
   document.getElementById("roomCode").textContent = room.code;
   document.getElementById("roomRealBadge").textContent = "RÉEL";
   updateModeUI();
@@ -2041,18 +2059,21 @@ async function enterRealRoom(room, toastMsg){
   saveLastRoom(room.id, room.code); // pour revenir ici tout seul après un rechargement de page
   subscribeQueue(room.id);
 
-  // Le VRAI "jeu des questions" a son propre écran (lobby + réponses), pas de
-  // file d'attente ni de lecteur classique (voir la section "Jeu des
+  // Le VRAI "jeu des questions" ET "Qui a mis cette chanson ?" (ajouté le
+  // 22/07/2026) partagent le même écran (lobby + réponses/propositions), pas
+  // de file d'attente ni de lecteur classique (voir la section "Jeu des
   // questions (VRAI salon)" plus bas) — ajouté le 12/07/2026.
-  if(room.mode === "questions"){
+  if(room.mode === "questions" || room.mode === "owner"){
     document.getElementById("playerCard").style.display = "none";
     document.getElementById("gqRoomCode").textContent = room.code;
+    document.getElementById("gqRoomModeName").textContent = room.mode === "owner" ? "🎲 Qui a mis cette chanson ?" : "❓ Le jeu des questions";
     // Repart d'une sélection vierge à chaque entrée dans le salon.
     gameSelectedQuestionIds = [];
     gameRoundsTarget = null;
     gameDisplayMode = null;
     gamePlaybackStart = null;
     gameSelectionMode = null;
+    ownerSongsPerPersonTarget = null;
     gameGuessSelectionRoundIdx = -1;
     gameMyGuessSelection = new Set();
     gameAutoRevealRoundIdx = -1;
@@ -2200,21 +2221,24 @@ function subscribeQueue(roomId){
     .on("postgres_changes", { event:"UPDATE", schema:"public", table:"rooms", filter:"id=eq." + roomId }, (payload) => {
       currentRoom = payload.new;
       if(state.mode === "distance") applyDistancePlaybackState();
-      if(state.mode === "questions") renderGameLobby();
+      if(state.mode === "questions" || state.mode === "owner") renderGameLobby();
       if(state.mode === "blindtest") renderBlindtestLobby();
     })
     // Réponses/propositions (ajouté le 12/07/2026, étendu au Blindtest le
-    // 19/07/2026) : dès qu'un participant choisit ou change un titre, tout le
-    // monde revoit la progression se mettre à jour sans recharger la page.
-    // Table partagée par les deux jeux (voir harmonize-schema.sql).
+    // 19/07/2026 et à "Qui a mis cette chanson ?" le 22/07/2026) : dès qu'un
+    // participant choisit ou change un titre, tout le monde revoit la
+    // progression se mettre à jour sans recharger la page. Table partagée
+    // par les trois jeux (voir harmonize-schema.sql).
     .on("postgres_changes", { event:"*", schema:"public", table:"game_answers", filter:"room_id=eq." + roomId }, () => {
-      if(state.mode === "questions") loadGameAnswers(roomId).then(renderGameLobby);
+      if(state.mode === "questions" || state.mode === "owner") loadGameAnswers(roomId).then(renderGameLobby);
       if(state.mode === "blindtest") loadGameAnswers(roomId).then(renderBlindtestLobby);
     })
     // Votes de la partie (ajouté le 12/07/2026) : dès que quelqu'un devine qui
     // a répondu quoi, le classement se met à jour en direct chez tout le monde.
+    // Réutilisée telle quelle par "Qui a mis cette chanson ?" (même mécanique
+    // "deviner quel user_id", table game_guesses partagée).
     .on("postgres_changes", { event:"*", schema:"public", table:"game_guesses", filter:"room_id=eq." + roomId }, () => {
-      if(state.mode === "questions") loadGameGuesses(roomId).then(renderGameLobby);
+      if(state.mode === "questions" || state.mode === "owner") loadGameGuesses(roomId).then(renderGameLobby);
     })
     // Votes du Blindtest (ajouté le 19/07/2026, table distincte de
     // game_guesses — voir harmonize-schema.sql).
@@ -2223,7 +2247,7 @@ function subscribeQueue(roomId){
     })
     .on("presence", { event: "sync" }, () => {
       renderRoomAvatars();
-      if(state.mode === "questions") renderGameLobby();
+      if(state.mode === "questions" || state.mode === "owner") renderGameLobby();
       if(state.mode === "blindtest") renderBlindtestLobby();
     })
     .subscribe(async (status) => {
@@ -2256,10 +2280,11 @@ function startQueuePolling(roomId){
   stopQueuePolling();
   queuePollInterval = setInterval(async () => {
     if(!currentRoom || currentRoom.id !== roomId) return;
-    if(state.mode === "questions"){
-      // Pas de file d'attente en mode "jeu des questions" — filet de sécurité
-      // équivalent à celui du mode À distance, mais pour le salon (phase,
-      // questions choisies, exclusions) et les réponses déjà données.
+    if(state.mode === "questions" || state.mode === "owner"){
+      // Pas de file d'attente en mode "jeu des questions"/"Qui a mis cette
+      // chanson ?" — filet de sécurité équivalent à celui du mode À distance,
+      // mais pour le salon (phase, questions/chansons choisies, exclusions)
+      // et les réponses/propositions déjà données.
       const { data } = await sb.from("rooms").select("*").eq("id", roomId).maybeSingle();
       if(data) currentRoom = data;
       await loadGameAnswers(roomId);
@@ -3943,8 +3968,9 @@ function renderGameLobby(){
   document.getElementById("gqPlayingActive").style.display = phase === "playing" ? "block" : "none";
   document.getElementById("gqPhaseFinished").style.display = phase === "finished" ? "block" : "none";
 
-  if(phase === "lobby") renderQuestionPicker();
-  else if(phase === "answering") renderAnsweringPhase();
+  const isOwnerMode = currentRoom.mode === "owner";
+  if(phase === "lobby") { isOwnerMode ? renderOwnerLobbySetup() : renderQuestionPicker(); }
+  else if(phase === "answering") { isOwnerMode ? renderOwnerAnsweringPhase() : renderAnsweringPhase(); }
   else if(phase === "playing") renderGamePlaying();
   else renderGameFinished();
 }
@@ -4049,13 +4075,21 @@ function backToRoundsStep(){
 
 // Réglages d'écoute (ajoutés le 13/07/2026) : entre l'étape "manches" et
 // l'étape "mode de sélection" — voir gqStepPlayback dans le HTML.
+// Réutilisées par "Qui a mis cette chanson ?" (ajouté le 22/07/2026) : ces
+// deux réglages d'écoute sont génériques (colonnes game_display_mode/
+// game_playback_start de "rooms") — seul le redessin cible le bon écran.
+// Contrairement au "jeu des questions" (qui enchaîne vers l'étape "mode de
+// sélection"), "Qui a mis cette chanson ?" valide directement les réglages
+// dès que les deux sont choisis (même principe que confirmBtSettings()).
 function pickGameDisplayMode(mode){
   gameDisplayMode = mode;
+  if(currentRoom?.mode === "owner"){ renderOwnerLobbySetup(); return; }
   renderQuestionPicker();
 }
 
 function pickGamePlaybackStart(mode){
   gamePlaybackStart = mode;
+  if(currentRoom?.mode === "owner"){ renderOwnerLobbySetup(); confirmOwnerSettings(); return; }
   renderQuestionPicker();
 }
 
@@ -4110,6 +4144,9 @@ async function confirmQuestionSelection(){
 
 /* ---- Phase 2 : chacun répond, le créateur suit la progression ---- */
 function renderAnsweringPhase(){
+  document.getElementById("gqMyAnswersTitle").textContent = "Tes réponses";
+  document.getElementById("gqProgressTitle").textContent = "Qui a répondu ?";
+  document.getElementById("gqProgressHint").textContent = "Le contenu des réponses reste secret jusqu'au lancement de la partie — seule la progression est visible.";
   const questionIds = currentRoom.game_question_ids || [];
   const myAnswers = gameAnswers.filter(a => a.user_id === currentUser?.id);
 
@@ -4322,8 +4359,11 @@ function renderGamePlaying(){
 
   document.getElementById("gqRoundCounter").textContent = `Manche ${Math.min(idx + 1, total)}/${total}`;
   const q = GAME_QUESTIONS.find(x => x.id === round.question_id);
-  document.getElementById("gqRoundQuestion").textContent = q ? q.label : "";
-  showGameQuestionIntro(idx, total, q ? q.label : "");
+  // "Qui a mis cette chanson ?" (round.question_id vaut "ow1".."owN", ne
+  // correspond à aucune vraie question) : libellé générique à la place.
+  const roundLabel = q ? q.label : (currentRoom.mode === "owner" ? "🎲 Devine qui a proposé cette chanson !" : "");
+  document.getElementById("gqRoundQuestion").textContent = roundLabel;
+  showGameQuestionIntro(idx, total, roundLabel);
 
   const revealed = !!currentRoom.game_round_revealed;
 
@@ -4349,6 +4389,11 @@ function renderGamePlaying(){
   ensureGamePlayer(round);
 
   const iAmOwner = (round.owner_user_ids || []).includes(currentUser?.id);
+  const isOwnerGame = currentRoom.mode === "owner";
+  document.getElementById("gqOwnerNoteText").textContent = isOwnerGame
+    ? "🎵 C'est l'une de tes propositions ! Profite du morceau — les autres devinent qui l'a proposé."
+    : "🎵 C'est l'une de tes réponses ! Profite du morceau — les autres devinent qui l'a choisi.";
+  document.getElementById("gqGuessBoxTitle").textContent = isOwnerGame ? "Qui a proposé ça ?" : "Qui a répondu ça ?";
 
   document.getElementById("gqOwnerNote").style.display = (!revealed && iAmOwner) ? "block" : "none";
   document.getElementById("gqGuessBox").style.display = (!revealed && !iAmOwner) ? "block" : "none";
@@ -4680,10 +4725,13 @@ function renderGameReveal(round){
     }
   });
   const iAmOwner = owners.includes(currentUser?.id);
+  const isOwnerGame = currentRoom.mode === "owner";
+  const chosenLabel = isOwnerGame ? "Proposé par : " : "Choisi par : ";
+  const noneLabel = isOwnerGame ? "Personne n'a proposé ça" : "Personne n'a répondu ça";
   document.getElementById("gqRevealBox").innerHTML = `
     <div class="card" style="text-align:center;">
       <div style="font-size:13px;color:var(--text-dim);margin-bottom:6px;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
-      <div style="font-size:15px;font-weight:700;">${owners.length ? "Choisi par : " + escapeHtml(ownerNames) : "Personne n'a répondu ça"}</div>
+      <div style="font-size:15px;font-weight:700;">${owners.length ? chosenLabel + escapeHtml(ownerNames) : noneLabel}</div>
       ${myPoints > 0
         ? `<div style="margin-top:8px;color:var(--accent1);font-weight:700;">${lightning ? "⚡ " : ""}+${myPoints} point(s) pour toi !</div>`
         : (iAmOwner ? "" : `<div style="margin-top:8px;color:var(--text-faint);">0 point cette manche.</div>`)}
@@ -4835,11 +4883,12 @@ async function rejouerMemeSalon(){
   gameDisplayMode = null;
   gamePlaybackStart = null;
   gameSelectionMode = null;
+  ownerSongsPerPersonTarget = null;
   gameGuessSelectionRoundIdx = -1;
   gameMyGuessSelection = new Set();
   gameAutoRevealRoundIdx = -1;
   gameQuestionIntroRoundIdx = -1;
-  showToast("🔄 Nouvelle partie ! Choisissez de nouvelles questions.");
+  showToast(currentRoom.mode === "owner" ? "🔄 Nouvelle partie ! Proposez de nouvelles chansons." : "🔄 Nouvelle partie ! Choisissez de nouvelles questions.");
   renderGameLobby();
 }
 
@@ -4854,7 +4903,8 @@ let gameAnswerSearchDebounce = null;
 function openGameAnswerModal(questionId){
   gamePickingQuestionId = questionId;
   const q = GAME_QUESTIONS.find(x => x.id === questionId);
-  const label = q ? q.label : (String(questionId).startsWith("bt") ? `🎵 Chanson n°${String(questionId).slice(2)}` : "Réponds à la question");
+  const isSongSlot = /^(bt|ow)\d+$/.test(String(questionId));
+  const label = q ? q.label : (isSongSlot ? `🎵 Chanson n°${String(questionId).slice(2)}` : "Réponds à la question");
   document.getElementById("gameAnswerModalTitle").textContent = label;
   document.getElementById("gameAnswerSearchInput").value = "";
   document.getElementById("gameAnswerResults").innerHTML = `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Tape le nom d'un titre ou d'un artiste...</p>`;
@@ -4929,6 +4979,123 @@ async function pickGameAnswer(index){
   closeGameAnswerModal();
   await loadGameAnswers(currentRoom.id);
   if(currentRoom.mode === "blindtest") renderBlindtestLobby(); else renderGameLobby();
+}
+
+/* ============================================================
+   "Qui a mis cette chanson ?" (VRAI salon multijoueur, ajouté le 22/07/2026)
+   ============================================================
+   Principe : contribution libre façon Blindtest (chacun propose quelques
+   chansons de son choix, pas de catégories fixes) + mécanique de vote façon
+   "Le jeu des questions" (deviner QUI a proposé la chanson qui joue, pas
+   QUELLE chanson c'est). Aucune nouvelle table n'était nécessaire : les
+   propositions réutilisent game_answers avec des slots synthétiques
+   ("ow1".."owN", même principe que "bt1".."btN" pour Blindtest), et les
+   votes réutilisent game_guesses tel quel (déjà "deviner quel user_id"). La
+   partie elle-même (calcul des manches, écoute, révélation, points, podium,
+   rejouer, alimentation du pool communautaire) est ENTIÈREMENT partagée avec
+   "Le jeu des questions" (computeGameRounds(), launchGame(), nextGameRound(),
+   renderGamePlaying(), renderGameGuessOptions(), renderGameReveal(),
+   renderGameFinished()...) — seule la phase 1 (combien de chansons chacun
+   propose, au lieu de choisir des questions) diffère vraiment. */
+
+let ownerSongsPerPersonTarget = null;
+
+function renderOwnerLobbySetup(){
+  const creator = isGameCreator();
+  document.getElementById("gqLobbyCreatorFlow").style.display = creator ? "block" : "none";
+  document.getElementById("gqLobbyWaitMsg").style.display = creator ? "none" : "block";
+  document.getElementById("gqStepRounds").style.display = "none";
+  document.getElementById("gqStepMode").style.display = "none";
+  document.getElementById("gqStepManual").style.display = "none";
+  if(!creator) return;
+
+  if(!ownerSongsPerPersonTarget){
+    document.getElementById("ownerStepSongs").style.display = "block";
+    document.getElementById("gqStepPlayback").style.display = "none";
+    return;
+  }
+  document.getElementById("ownerStepSongs").style.display = "none";
+  document.getElementById("gqStepPlayback").style.display = "block";
+  document.querySelectorAll("#gqDisplayModePicker button").forEach(btn => {
+    const active = btn.dataset.display === gameDisplayMode;
+    btn.style.borderColor = active ? "var(--accent1)" : "var(--border)";
+    btn.style.color = active ? "var(--text)" : "var(--text-dim)";
+  });
+  document.querySelectorAll("#gqPlaybackStartPicker button").forEach(btn => {
+    const active = btn.dataset.start === gamePlaybackStart;
+    btn.style.borderColor = active ? "var(--accent1)" : "var(--border)";
+    btn.style.color = active ? "var(--text)" : "var(--text-dim)";
+  });
+}
+
+function onOwnerSongsSliderInput(value){
+  document.getElementById("ownerSongsSliderValue").textContent = value;
+}
+
+function confirmOwnerSongsCount(){
+  ownerSongsPerPersonTarget = Number(document.getElementById("ownerSongsSlider").value);
+  gameDisplayMode = null;
+  gamePlaybackStart = null;
+  renderOwnerLobbySetup();
+}
+
+function backToOwnerSongsStep(){
+  ownerSongsPerPersonTarget = null;
+  gameDisplayMode = null;
+  gamePlaybackStart = null;
+  renderOwnerLobbySetup();
+}
+
+// Les slots ("ow1", "ow2"...) jouent le même rôle que "bt1".."btN" pour
+// Blindtest : savoir combien de propositions chacun doit encore faire, sans
+// avoir besoin d'une vraie liste de questions.
+async function confirmOwnerSettings(){
+  if(!isGameCreator()) return;
+  const slots = Array.from({ length: ownerSongsPerPersonTarget }, (_, i) => `ow${i + 1}`);
+  const { data, error } = await sb.from("rooms").update({
+    game_question_ids: slots,
+    game_phase: "answering",
+    game_display_mode: gameDisplayMode,
+    game_playback_start: gamePlaybackStart,
+  }).eq("id", currentRoom.id).select().single();
+  if(error){ showToast("Erreur à la validation des réglages : " + error.message); return; }
+  currentRoom = data;
+  showToast(`${ownerSongsPerPersonTarget} chanson(s) chacun — à vos propositions !`);
+  renderGameLobby();
+}
+
+// Phase 2 : chacun propose ses chansons. Ne diffère de renderAnsweringPhase()
+// (jeu des questions) que par le libellé des slots ("🎵 Chanson n°X" au lieu
+// du texte de la question) — renderGameProgress()/updateLaunchButton() sont
+// déjà génériques et réutilisés tels quels.
+function renderOwnerAnsweringPhase(){
+  document.getElementById("gqMyAnswersTitle").textContent = "Tes chansons";
+  document.getElementById("gqProgressTitle").textContent = "Qui a proposé ses chansons ?";
+  document.getElementById("gqProgressHint").textContent = "Le contenu des propositions reste secret jusqu'au lancement de la partie — seule la progression est visible.";
+  const slots = currentRoom.game_question_ids || [];
+  const myAnswers = gameAnswers.filter(a => a.user_id === currentUser?.id);
+
+  document.getElementById("gqMyAnswers").innerHTML = slots.map(slot => {
+    const label = `🎵 Chanson n°${slot.slice(2)}`;
+    const mine = myAnswers.find(a => a.question_id === slot);
+    return `
+      <div class="search-result" style="align-items:flex-start;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:600;">${escapeHtml(label)}</div>
+          ${mine
+            ? `<div style="font-size:12.5px;color:var(--text-dim);margin-top:2px;">✅ ${escapeHtml(mine.title)} — ${escapeHtml(mine.artist||"")}</div>`
+            : `<div style="font-size:12.5px;color:var(--text-faint);margin-top:2px;">Pas encore proposée</div>`}
+        </div>
+        <button class="add-btn" onclick="openGameAnswerModal('${slot}')" title="${mine ? "Changer ta proposition" : "Proposer"}" style="width:auto;padding:0 12px;">${mine ? "✏️ Modifier" : "➕ Proposer"}</button>
+      </div>
+    `;
+  }).join("");
+
+  renderGameProgress(slots);
+
+  const creator = isGameCreator();
+  document.getElementById("gqCreatorControls").style.display = creator ? "block" : "none";
+  if(creator) updateLaunchButton(slots);
 }
 
 /* ============================================================
