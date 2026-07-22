@@ -295,12 +295,6 @@
         <p style="margin:0;font-size:11.5px;color:var(--text-faint);line-height:1.4;">Pas besoin de choisir Écoute ou Jeux pour rejoindre : le code t'emmène directement là où le salon a été créé.</p>
       </div>
 
-      <h2 style="margin-top:28px;">Tes amis</h2>
-      <div class="card">
-        <div id="friendsList"></div>
-        <p style="margin:10px 0 0;font-size:11px;color:var(--text-faint);">Liste de démonstration — le vrai système d'amis arrive dans une prochaine étape.</p>
-      </div>
-
       <h2 style="margin-top:28px;">Tes playlists importées</h2>
       <div class="card">
         <p id="importedSummary" style="margin:0 0 12px;color:var(--text-dim);font-size:13.5px;">Chargement...</p>
@@ -979,13 +973,26 @@
   <!-- Fenêtre : choisir un titre pour répondre à une question du "jeu des
        questions" (ajoutée le 12/07/2026). Séparée de searchModal car ici on
        n'ajoute pas à une file d'attente : on enregistre une réponse liée à
-       UNE question précise (table game_answers, voir pickGameAnswer()). -->
+       UNE question précise (table game_answers, voir pickGameAnswer()).
+       Onglet "📂 Mes playlists" ajouté le 22/07/2026 (demande de Rémi) —
+       même principe que searchModal, pour pouvoir répondre/proposer avec un
+       titre déjà importé plutôt que de toujours rechercher sur YouTube. -->
   <div class="modal-backdrop" id="gameAnswerModal">
     <div class="modal">
       <div class="modal-handle"></div>
       <h2 id="gameAnswerModalTitle">Réponds à la question</h2>
-      <input type="text" id="gameAnswerSearchInput" placeholder="Rechercher un titre ou un artiste..." oninput="onGameAnswerSearchInput()" />
-      <div id="gameAnswerResults" style="margin-top:14px;"></div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <button class="btn-ghost" id="gameAnswerTabSearchBtn" style="width:auto;flex:1;padding:10px;" onclick="switchGameAnswerTab('search')">🔎 Recherche</button>
+        <button class="btn-ghost" id="gameAnswerTabMineBtn" style="width:auto;flex:1;padding:10px;" onclick="switchGameAnswerTab('mine')">📂 Mes playlists</button>
+      </div>
+      <div id="gameAnswerTabSearchPane">
+        <input type="text" id="gameAnswerSearchInput" placeholder="Rechercher un titre ou un artiste..." oninput="onGameAnswerSearchInput()" />
+        <div id="gameAnswerResults" style="margin-top:14px;"></div>
+      </div>
+      <div id="gameAnswerTabMinePane" style="display:none;">
+        <input type="text" id="gameAnswerMineSearchInput" placeholder="🔎 Chercher un titre ou un artiste..." oninput="onGameAnswerMineSearchInput()" style="margin-bottom:12px;" />
+        <div id="gameAnswerMineResults"></div>
+      </div>
       <p style="font-size:11px;color:var(--text-faint);margin-top:10px;">Ta réponse reste secrète pour les autres jusqu'au lancement de la partie. Tu peux la changer tant que la partie n'a pas commencé.</p>
       <button class="btn-ghost" style="margin-top:10px;" onclick="closeGameAnswerModal()">Fermer</button>
     </div>
@@ -1814,7 +1821,6 @@ async function afterLogin(pseudo){
   state.user = pseudo;
   document.getElementById("userPill").textContent = "@" + pseudo.toLowerCase().replace(/\s+/g,"");
   document.getElementById("hiName").textContent = pseudo;
-  renderFriends();
   loadMyImportedTracks(); // en tâche de fond, pour que le résumé de l'accueil soit prêt sans bloquer la connexion
 
   // Si on avait laissé un salon réel ouvert avant de recharger la page (ou de
@@ -1868,20 +1874,6 @@ function goToCurrentScreen(){
   if(currentRoom && (currentRoom.mode === "questions" || currentRoom.mode === "owner")){ showScreen("screen-game-lobby"); return; }
   if(currentRoom && currentRoom.mode === "blindtest"){ showScreen("screen-blindtest-lobby"); return; }
   showScreen(state.category === "jeux" ? "screen-game" : "screen-room");
-}
-
-function renderFriends(){
-  const el = document.getElementById("friendsList");
-  el.innerHTML = FRIENDS.map(f => `
-    <div class="friend-row">
-      <div class="avatar" style="background:${f.color}">${f.name[0]}</div>
-      <div style="flex:1;">
-        <div style="font-weight:600;font-size:14px;">${f.name}</div>
-        <div style="font-size:12px;color:var(--text-faint);">connecté via</div>
-      </div>
-      <span class="badge ${badgeClass[f.platform]}">${badgeLabel[f.platform]}</span>
-    </div>
-  `).join("");
 }
 
 /* ---------- Création / choix de mode (le créateur du salon choisit) ---------- */
@@ -4928,7 +4920,133 @@ function openGameAnswerModal(questionId){
   document.getElementById("gameAnswerModalTitle").textContent = label;
   document.getElementById("gameAnswerSearchInput").value = "";
   document.getElementById("gameAnswerResults").innerHTML = `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Tape le nom d'un titre ou d'un artiste...</p>`;
+  switchGameAnswerTab("search"); // repart toujours sur l'onglet recherche à l'ouverture
   document.getElementById("gameAnswerModal").classList.add("open");
+}
+
+// Onglet "📂 Mes playlists" pour cette fenêtre (ajouté le 22/07/2026, demande
+// de Rémi) — même principe que l'onglet "Mes playlists" de searchModal (mode
+// Soirée), mais séparé (ids/état distincts) pour ne rien risquer sur ce flux
+// déjà en place : ici on enregistre une réponse dans game_answers (voir
+// saveGameAnswerTrack()) plutôt que d'ajouter à une file d'attente.
+const GAME_ANSWER_ALL_IMPORTED_LABEL = "Toutes mes chansons importées";
+let gameAnswerMinePlaylistFilter = null;
+let gameAnswerMineGroupNames = [];
+
+function switchGameAnswerTab(tab){
+  const searchBtn = document.getElementById("gameAnswerTabSearchBtn");
+  const mineBtn = document.getElementById("gameAnswerTabMineBtn");
+  const searchPane = document.getElementById("gameAnswerTabSearchPane");
+  const minePane = document.getElementById("gameAnswerTabMinePane");
+  const active = tab === "mine";
+  searchPane.style.display = active ? "none" : "block";
+  minePane.style.display = active ? "block" : "none";
+  searchBtn.style.borderColor = active ? "var(--border)" : "var(--accent1)";
+  searchBtn.style.color = active ? "var(--text-dim)" : "var(--text)";
+  mineBtn.style.borderColor = active ? "var(--accent1)" : "var(--border)";
+  mineBtn.style.color = active ? "var(--text)" : "var(--text-dim)";
+  if(active){
+    gameAnswerMinePlaylistFilter = null;
+    const mineInput = document.getElementById("gameAnswerMineSearchInput");
+    if(mineInput) mineInput.value = "";
+    renderGameAnswerMineTab();
+  }
+}
+
+async function renderGameAnswerMineTab(){
+  const el = document.getElementById("gameAnswerMineResults");
+  el.innerHTML = `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Chargement...</p>`;
+  await loadMyImportedTracks();
+  renderGameAnswerMineResults();
+}
+
+function onGameAnswerMineSearchInput(){
+  renderGameAnswerMineResults();
+}
+
+function renderGameAnswerMineResults(){
+  const el = document.getElementById("gameAnswerMineResults");
+  if(!el) return;
+  if(!myImportedTracks.length){
+    el.innerHTML = `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Tu n'as encore importé aucune playlist.</p>
+      <button class="btn-ghost" style="margin-top:8px;" onclick="closeGameAnswerModal();goToPlaylistsScreen();">🔗 Importer une playlist</button>`;
+    return;
+  }
+  const query = (document.getElementById("gameAnswerMineSearchInput")?.value || "").trim().toLowerCase();
+  if(query){
+    const filtered = myImportedTracks.filter(t =>
+      t.title.toLowerCase().includes(query) || (t.artist||"").toLowerCase().includes(query)
+    );
+    renderGameAnswerMineFlatList(filtered, false, `Aucun titre ne correspond à "${escapeHtml(query)}".`);
+    return;
+  }
+  if(gameAnswerMinePlaylistFilter){
+    const tracks = gameAnswerMinePlaylistFilter === GAME_ANSWER_ALL_IMPORTED_LABEL
+      ? myImportedTracks
+      : myImportedTracks.filter(t => (t.playlist_title || "Sans playlist") === gameAnswerMinePlaylistFilter);
+    renderGameAnswerMineFlatList(tracks, true, "Aucun titre dans cette playlist.");
+    return;
+  }
+  renderGameAnswerMinePlaylistsList();
+}
+
+function renderGameAnswerMinePlaylistsList(){
+  const el = document.getElementById("gameAnswerMineResults");
+  const groups = {};
+  myImportedTracks.forEach(t => {
+    const name = t.playlist_title || "Sans playlist";
+    groups[name] = (groups[name] || 0) + 1;
+  });
+  const otherNames = Object.keys(groups).sort((a,b) => a.localeCompare(b));
+  gameAnswerMineGroupNames = [GAME_ANSWER_ALL_IMPORTED_LABEL, ...otherNames];
+  el.innerHTML = gameAnswerMineGroupNames.map((name, i) => {
+    const count = name === GAME_ANSWER_ALL_IMPORTED_LABEL ? myImportedTracks.length : groups[name];
+    const icon = name === GAME_ANSWER_ALL_IMPORTED_LABEL ? "🎶" : "📂";
+    return `
+    <div class="search-result" style="cursor:pointer;" onclick="openGameAnswerMinePlaylist(${i})">
+      <div style="font-size:20px;flex-shrink:0;">${icon}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(name)}</div>
+        <div style="font-size:12px;color:var(--text-faint);">${count} titre(s)</div>
+      </div>
+      <span style="color:var(--text-faint);">›</span>
+    </div>`;
+  }).join("");
+}
+
+function openGameAnswerMinePlaylist(index){
+  const name = gameAnswerMineGroupNames[index];
+  if(name === undefined) return;
+  gameAnswerMinePlaylistFilter = name;
+  renderGameAnswerMineResults();
+}
+
+function backToGameAnswerMinePlaylists(){
+  gameAnswerMinePlaylistFilter = null;
+  renderGameAnswerMineResults();
+}
+
+function renderGameAnswerMineFlatList(tracks, showBackButton, emptyMessage){
+  const el = document.getElementById("gameAnswerMineResults");
+  const backBtn = showBackButton
+    ? `<button class="btn-ghost" style="width:auto;padding:6px 12px;font-size:12.5px;margin-bottom:10px;" onclick="backToGameAnswerMinePlaylists()">← Toutes les playlists</button>`
+    : "";
+  if(!tracks.length){
+    el.innerHTML = backBtn + `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">${emptyMessage}</p>`;
+    return;
+  }
+  el.innerHTML = backBtn + tracks.map(t => {
+    const i = myImportedTracks.indexOf(t);
+    return `
+    <div class="search-result">
+      <img src="${t.thumbnail||''}" alt="" style="width:34px;height:34px;border-radius:8px;object-fit:cover;flex-shrink:0;" />
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(t.title)}</div>
+        <div style="font-size:12px;color:var(--text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(t.artist||"")}</div>
+      </div>
+      <button class="add-btn" onclick="pickGameAnswerFromMine(${i})" title="Choisir ce titre comme réponse" style="width:auto;padding:0 12px;">✓ Choisir</button>
+    </div>`;
+  }).join("");
 }
 
 function closeGameAnswerModal(){
@@ -4982,23 +5100,38 @@ async function renderGameAnswerResults(q){
   `).join("");
 }
 
-async function pickGameAnswer(index){
-  const track = gameAnswerSearchResults[index];
-  if(!track || !gamePickingQuestionId || !currentRoom) return;
+// Facteur commun (ajouté le 22/07/2026) entre un résultat de recherche
+// ({youtubeId} en camelCase) et un titre déjà importé ({youtube_id} en
+// snake_case, comme en base) — voir pickGameAnswer()/pickGameAnswerFromMine().
+async function saveGameAnswerTrack(title, artist, youtubeId, thumbnail){
+  if(!gamePickingQuestionId || !currentRoom) return;
   const { error } = await sb.from("game_answers").upsert({
     room_id: currentRoom.id,
     question_id: gamePickingQuestionId,
     user_id: currentUser.id,
-    title: track.title,
-    artist: track.artist,
-    youtube_id: track.youtubeId,
-    thumbnail: track.thumbnail || "",
+    title, artist,
+    youtube_id: youtubeId,
+    thumbnail: thumbnail || "",
   }, { onConflict: "room_id,question_id,user_id" });
   if(error){ showToast("Erreur d'enregistrement de ta réponse : " + error.message); return; }
-  showToast(`Réponse enregistrée : "${track.title}"`);
+  showToast(`Réponse enregistrée : "${title}"`);
   closeGameAnswerModal();
   await loadGameAnswers(currentRoom.id);
   if(currentRoom.mode === "blindtest") renderBlindtestLobby(); else renderGameLobby();
+}
+
+async function pickGameAnswer(index){
+  const track = gameAnswerSearchResults[index];
+  if(!track) return;
+  await saveGameAnswerTrack(track.title, track.artist, track.youtubeId, track.thumbnail);
+}
+
+// "Mes playlists" (ajouté le 22/07/2026, demande de Rémi) — répondre/proposer
+// avec un titre déjà importé plutôt que de toujours rechercher sur YouTube.
+async function pickGameAnswerFromMine(index){
+  const track = myImportedTracks[index];
+  if(!track) return;
+  await saveGameAnswerTrack(track.title, track.artist, track.youtube_id, track.thumbnail);
 }
 
 /* ============================================================
