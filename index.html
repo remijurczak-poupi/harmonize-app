@@ -720,7 +720,7 @@
               <!-- Ajouté le 19/07/2026, même correctif que le Blindtest
                    (revealAdSkipButton()) : les 2 couches ci-dessus bloquent
                    aussi le bouton natif "Passer" d'une éventuelle pub. -->
-              <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="revealGameAdSkipButton()">📺 Pub bloquée ?</button>
+              <button class="btn-ghost" id="gameAdSkipBtn" style="width:auto;padding:8px 14px;font-size:12px;" onclick="revealGameAdSkipButton()">📺 Pub bloquée ?</button>
             </div>
           </div>
 
@@ -882,7 +882,7 @@
                    atteindre. Ce bouton les désactive quelques secondes pour
                    pouvoir taper directement sur "Passer" en dessous — voir
                    revealAdSkipButton(). -->
-              <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="revealAdSkipButton()">📺 Pub bloquée ?</button>
+              <button class="btn-ghost" id="btAdSkipBtn" style="width:auto;padding:8px 14px;font-size:12px;" onclick="revealAdSkipButton()">📺 Pub bloquée ?</button>
             </div>
           </div>
 
@@ -4245,13 +4245,26 @@ function renderGamePlaying(){
   const audioOnly = currentRoom.game_display_mode === "audio";
   const cover = document.getElementById("gqAudioCover");
   if(cover) cover.style.display = (audioOnly && !revealed && !gameAdSkipActive) ? "flex" : "none";
+  // Couche de clic invisible : plus nécessaire en mode "vidéo visible" —
+  // retirée le 22/07/2026 (retour de Rémi : voir le vrai bouton "Ignorer" de
+  // YouTube sans pouvoir cliquer dessus ne s'expliquait à personne). Reste
+  // active en mode audio (nécessaire pour rediriger les clics vers le vrai
+  // bouton pause d'Harmonize, la vidéo étant cachée). Compromis accepté avec
+  // Rémi : en mode vidéo, un clic sur le bouton pause natif de YouTube ne
+  // préviendra donc plus le reste du salon (seul le bouton Pause d'Harmonize
+  // reste garanti synchronisé) — jugé acceptable pour un vrai bouton "Ignorer"
+  // de pub qui refonctionne normalement.
   const blocker = document.getElementById("gqClickBlocker");
-  if(blocker) blocker.style.display = gameAdSkipActive ? "none" : "block";
+  if(blocker) blocker.style.display = (audioOnly && !gameAdSkipActive) ? "block" : "none";
   // Bandeau partiel (voir revealGameAdSkipButton()) : remplace le cache
   // complet pendant la fenêtre de déblocage, pour ne pas dévoiler le titre
   // une fois la pub passée (la vraie vidéo redevient visible en dessous).
   const banner = document.getElementById("gqAdSkipBanner");
   if(banner) banner.style.display = (gameAdSkipActive && audioOnly && !revealed) ? "block" : "none";
+  // "Pub bloquée ?" n'a plus de raison d'être en mode vidéo, puisque plus rien
+  // ne bloque le bouton natif "Ignorer" de YouTube dans ce mode.
+  const adSkipBtn = document.getElementById("gameAdSkipBtn");
+  if(adSkipBtn) adSkipBtn.style.display = audioOnly ? "" : "none";
 
   ensureGamePlayer(round);
 
@@ -5424,13 +5437,18 @@ function renderBtPlaying(){
   const audioOnly = currentRoom.game_display_mode === "audio";
   const cover = document.getElementById("btAudioCover");
   if(cover) cover.style.display = (audioOnly && !revealed && !btAdSkipActive) ? "flex" : "none";
+  // Couche de clic invisible : plus nécessaire en mode "vidéo visible" (même
+  // correctif que renderGamePlaying(), voir son commentaire pour le détail du
+  // compromis accepté avec Rémi) — seul le mode audio en a besoin.
   const blocker = document.getElementById("btClickBlocker");
-  if(blocker) blocker.style.display = btAdSkipActive ? "none" : "block";
+  if(blocker) blocker.style.display = (audioOnly && !btAdSkipActive) ? "block" : "none";
   // Bandeau partiel (voir revealAdSkipButton()) : remplace le cache complet
   // pendant la fenêtre de déblocage, pour ne pas dévoiler le titre une fois
   // la pub passée (la vraie vidéo redevient visible en dessous).
   const banner = document.getElementById("btAdSkipBanner");
   if(banner) banner.style.display = (btAdSkipActive && audioOnly && !revealed) ? "block" : "none";
+  const adSkipBtn = document.getElementById("btAdSkipBtn");
+  if(adSkipBtn) adSkipBtn.style.display = audioOnly ? "" : "none";
 
   ensureBtPlayer(round);
 
