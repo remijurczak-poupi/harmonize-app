@@ -423,18 +423,33 @@
       <button class="btn-ghost" style="margin-top:16px;" onclick="showScreen('screen-lobby')">← Retour</button>
     </section>
 
-    <!-- SCREEN: GESTION DU POOL COMMUNAUTAIRE (ajouté le 22/07/2026, demande
-         de Rémi) — repasser à la main sur les chansons importées en masse
-         (voir seed-1000-chansons.sql) et en retirer certaines. La suppression
-         elle-même est bloquée côté base pour tout le monde sauf un compte
-         marqué admin (profiles.is_admin, voir harmonize-schema.sql) — sur un
-         compte normal, le bouton supprimer échoue simplement avec un message
-         d'erreur clair, rien de dangereux à laisser ce bouton visible. -->
+    <!-- SCREEN: GESTION DU POOL COMMUNAUTAIRE (ajouté le 22/07/2026, revu le
+         même jour, Round 45 — demande de Rémi) — deux onglets :
+         - "En attente" (par défaut) : les chansons proposées par les joueurs
+           en jouant (blindtest_pool.status = 'pending', voir populateBtPool()
+           dans index.html) attendent ici d'être approuvées ou rejetées AVANT
+           d'être utilisables dans une vraie partie (voir startSerieFromPool()
+           et computeBtRounds(), qui ne lisent que status='approved'). Ça
+           remplace l'ancien fonctionnement "tout accepter par défaut, à
+           nettoyer après coup", devenu ingérable avec des centaines de titres.
+         - "Déjà approuvées" : pour le nettoyage ponctuel du lot initial de
+           942 chansons (Round 39), avec recherche + suppression définitive.
+           Affichage par lots (pas tout d'un coup) pour éviter le blocage du
+           défilement observé avec des centaines d'éléments d'un coup.
+         La suppression/approbation est bloquée côté base pour tout le monde
+         sauf un compte marqué admin (profiles.is_admin, voir
+         harmonize-schema.sql) — sur un compte normal, ces boutons échouent
+         simplement avec un message d'erreur clair. -->
     <section class="screen" id="screen-pool-admin">
       <h1>🛠 Pool communautaire</h1>
-      <p class="sub">Retire les chansons qui ne sont pas de vraies chansons identifiables. <span id="poolAdminCount"></span></p>
-      <input type="text" id="poolAdminSearch" placeholder="Filtrer par titre ou artiste..." oninput="renderPoolAdminList()" style="margin-bottom:14px;" />
+      <p class="sub">Les chansons proposées par les joueurs attendent ici ta validation avant d'être utilisables dans une vraie partie.</p>
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <button class="btn-ghost" id="poolAdminTabPending" style="width:auto;padding:8px 14px;" onclick="switchPoolAdminView('pending')">🕓 En attente <span id="poolAdminPendingCount"></span></button>
+        <button class="btn-ghost" id="poolAdminTabApproved" style="width:auto;padding:8px 14px;" onclick="switchPoolAdminView('approved')">✅ Déjà approuvées</button>
+      </div>
+      <input type="text" id="poolAdminSearch" placeholder="Filtrer par titre ou artiste..." oninput="renderPoolAdminApprovedList()" style="margin-bottom:14px;display:none;" />
       <div id="poolAdminList"></div>
+      <button class="btn-ghost" style="width:auto;padding:10px 16px;margin:12px auto 0;display:none;" id="poolAdminLoadMoreBtn" onclick="loadMorePoolAdminApproved()">Afficher plus</button>
       <button class="btn-ghost" style="margin-top:16px;" onclick="showScreen('screen-lobby')">← Retour</button>
     </section>
 
@@ -1344,7 +1359,7 @@ async function startBtSoloFromPool(){
   if(!currentUser){ showToast("Connecte-toi d'abord."); showScreen("screen-login"); return; }
   const hint = document.getElementById("btSoloSourceHint");
   hint.textContent = "Chargement du pool communautaire...";
-  const { data, error } = await sb.from("blindtest_pool").select("*").limit(300);
+  const { data, error } = await sb.from("blindtest_pool").select("*").eq("status", "approved").limit(300);
   if(error){ hint.textContent = "Erreur de chargement : " + error.message; return; }
   const tracks = data || [];
   if(tracks.length < BT_SOLO_MIN_TRACKS){
@@ -1436,7 +1451,7 @@ async function startSerieFromPool(){
   if(!currentUser){ showToast("Connecte-toi d'abord."); showScreen("screen-login"); return; }
   document.getElementById("serieSourceHint").textContent = "Chargement du pool communautaire...";
   showScreen("screen-serie");
-  const { data, error } = await sb.from("blindtest_pool").select("*").limit(300);
+  const { data, error } = await sb.from("blindtest_pool").select("*").eq("status", "approved").limit(300);
   if(error){ document.getElementById("serieSourceHint").textContent = "Erreur de chargement : " + error.message; return; }
   const tracks = data || [];
   if(tracks.length < SERIE_MIN_TRACKS){
@@ -3571,33 +3586,99 @@ function renderLobbyImportedSummary(){
     : "Aucune playlist importée pour l'instant.";
 }
 
-/* ---- Écran "🛠 Gérer le pool communautaire" (ajouté le 22/07/2026) ----
-   La suppression est bloquée côté base (policy RLS) pour tout compte qui
-   n'a pas profiles.is_admin = true — voir harmonize-schema.sql. Sur un
-   compte normal, le clic "Supprimer" échoue simplement avec un message
-   d'erreur clair (RLS), sans rien casser. */
-let poolAdminTracks = [];
+/* ---- Écran "🛠 Gérer le pool communautaire" (ajouté le 22/07/2026, revu
+   Round 45) ----
+   Approbation/suppression bloquées côté base (policy RLS) pour tout compte
+   qui n'a pas profiles.is_admin = true — voir harmonize-schema.sql. Sur un
+   compte normal, ces boutons échouent simplement avec un message d'erreur
+   clair (RLS), sans rien casser.
+
+   Deux onglets : "En attente" (status='pending', les nouvelles propositions
+   des joueurs, jamais utilisées en jeu tant qu'elles ne sont pas approuvées
+   — voir startSerieFromPool()/computeBtRounds()) et "Déjà approuvées" (pour
+   le nettoyage ponctuel du lot initial, avec pagination pour éviter de
+   charger des centaines d'éléments d'un coup dans le DOM — c'est ce qui
+   bloquait le défilement signalé par Rémi). */
+let poolAdminView = "pending";
+let poolAdminPendingTracks = [];
+let poolAdminApprovedTracks = [];
+let poolAdminApprovedShown = 40;
+const POOL_ADMIN_PAGE_SIZE = 40;
 
 async function goToPoolAdminScreen(){
   showScreen("screen-pool-admin");
+  await switchPoolAdminView("pending");
+}
+
+async function switchPoolAdminView(view){
+  poolAdminView = view;
+  document.getElementById("poolAdminTabPending").style.borderColor = view === "pending" ? "var(--accent1)" : "var(--border)";
+  document.getElementById("poolAdminTabApproved").style.borderColor = view === "approved" ? "var(--accent1)" : "var(--border)";
+  document.getElementById("poolAdminSearch").style.display = view === "approved" ? "block" : "none";
+  document.getElementById("poolAdminLoadMoreBtn").style.display = "none";
+  if(view === "pending") await loadPoolAdminPending();
+  else await loadPoolAdminApproved();
+}
+
+async function loadPoolAdminPending(){
   document.getElementById("poolAdminList").innerHTML = `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Chargement...</p>`;
-  const { data, error } = await sb.from("blindtest_pool").select("*").order("title", { ascending: true }).limit(2000);
+  const { data, error } = await sb.from("blindtest_pool").select("*").eq("status", "pending").order("added_at", { ascending: true }).limit(500);
   if(error){
     document.getElementById("poolAdminList").innerHTML = `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Erreur de chargement : ${escapeHtml(error.message)}</p>`;
     return;
   }
-  poolAdminTracks = data || [];
-  document.getElementById("poolAdminCount").textContent = `(${poolAdminTracks.length} au total)`;
-  renderPoolAdminList();
+  poolAdminPendingTracks = data || [];
+  document.getElementById("poolAdminPendingCount").textContent = poolAdminPendingTracks.length ? `(${poolAdminPendingTracks.length})` : "";
+  renderPoolAdminPendingList();
 }
 
-function renderPoolAdminList(){
+function renderPoolAdminPendingList(){
+  const el = document.getElementById("poolAdminList");
+  el.innerHTML = poolAdminPendingTracks.map(t => `
+    <div class="queue-item">
+      <div class="art-sm">🎵</div>
+      <div class="qi-info">
+        <div class="qi-title">${escapeHtml(t.title)}</div>
+        <div class="qi-meta">${escapeHtml(t.artist || "")}</div>
+      </div>
+      <button class="btn-ghost" style="width:auto;padding:8px 10px;font-size:12px;" onclick="reviewPoolTrack('${escJs(t.id)}','approved')">✅</button>
+      <button class="btn-ghost" style="width:auto;padding:8px 10px;font-size:12px;" onclick="reviewPoolTrack('${escJs(t.id)}','rejected')">❌</button>
+    </div>
+  `).join("") || `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Rien en attente pour l'instant — les nouvelles propositions des joueurs apparaîtront ici.</p>`;
+}
+
+async function reviewPoolTrack(id, status){
+  const { error } = await sb.from("blindtest_pool").update({ status }).eq("id", id);
+  if(error){ showToast("Action impossible : " + error.message); return; }
+  poolAdminPendingTracks = poolAdminPendingTracks.filter(t => t.id !== id);
+  document.getElementById("poolAdminPendingCount").textContent = poolAdminPendingTracks.length ? `(${poolAdminPendingTracks.length})` : "";
+  renderPoolAdminPendingList();
+  showToast(status === "approved" ? "Chanson approuvée." : "Chanson rejetée.");
+}
+
+async function loadPoolAdminApproved(){
+  document.getElementById("poolAdminList").innerHTML = `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Chargement...</p>`;
+  const { data, error } = await sb.from("blindtest_pool").select("*").eq("status", "approved").order("title", { ascending: true }).limit(2000);
+  if(error){
+    document.getElementById("poolAdminList").innerHTML = `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Erreur de chargement : ${escapeHtml(error.message)}</p>`;
+    return;
+  }
+  poolAdminApprovedTracks = data || [];
+  poolAdminApprovedShown = POOL_ADMIN_PAGE_SIZE;
+  renderPoolAdminApprovedList();
+}
+
+// Recherche = affiche tous les résultats correspondants (généralement peu
+// nombreux) ; sans recherche, affichage par lots de 40 pour ne pas charger
+// des centaines d'éléments d'un coup (c'est ce qui bloquait le défilement).
+function renderPoolAdminApprovedList(){
   const query = (document.getElementById("poolAdminSearch")?.value || "").trim().toLowerCase();
   const filtered = query
-    ? poolAdminTracks.filter(t => (t.title||"").toLowerCase().includes(query) || (t.artist||"").toLowerCase().includes(query))
-    : poolAdminTracks;
+    ? poolAdminApprovedTracks.filter(t => (t.title||"").toLowerCase().includes(query) || (t.artist||"").toLowerCase().includes(query))
+    : poolAdminApprovedTracks;
+  const visible = query ? filtered : filtered.slice(0, poolAdminApprovedShown);
   const el = document.getElementById("poolAdminList");
-  el.innerHTML = filtered.slice(0, 300).map(t => `
+  el.innerHTML = visible.map(t => `
     <div class="queue-item">
       <div class="art-sm">🎵</div>
       <div class="qi-info">
@@ -3607,17 +3688,20 @@ function renderPoolAdminList(){
       <button class="btn-ghost" style="width:auto;padding:8px 12px;font-size:12px;" onclick="deletePoolTrack('${escJs(t.id)}')">🗑</button>
     </div>
   `).join("") || `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Aucun résultat.</p>`;
-  if(filtered.length > 300){
-    el.innerHTML += `<p style="color:var(--text-faint);font-size:12px;text-align:center;padding:10px 0;">${filtered.length - 300} résultat(s) de plus — affine ta recherche pour les voir.</p>`;
-  }
+  const loadMoreBtn = document.getElementById("poolAdminLoadMoreBtn");
+  loadMoreBtn.style.display = (!query && filtered.length > poolAdminApprovedShown) ? "block" : "none";
+}
+
+function loadMorePoolAdminApproved(){
+  poolAdminApprovedShown += POOL_ADMIN_PAGE_SIZE;
+  renderPoolAdminApprovedList();
 }
 
 async function deletePoolTrack(id){
   const { error } = await sb.from("blindtest_pool").delete().eq("id", id);
   if(error){ showToast("Suppression impossible : " + error.message); return; }
-  poolAdminTracks = poolAdminTracks.filter(t => t.id !== id);
-  document.getElementById("poolAdminCount").textContent = `(${poolAdminTracks.length} au total)`;
-  renderPoolAdminList();
+  poolAdminApprovedTracks = poolAdminApprovedTracks.filter(t => t.id !== id);
+  renderPoolAdminApprovedList();
   showToast("Chanson retirée du pool.");
 }
 
@@ -5094,7 +5178,7 @@ async function computeBtRounds(){
 
   let poolCandidates = [];
   try {
-    const { data } = await sb.from("blindtest_pool").select("youtube_id,title,artist").limit(300);
+    const { data } = await sb.from("blindtest_pool").select("youtube_id,title,artist").eq("status", "approved").limit(300);
     poolCandidates = (data || []).filter(t => !realAnswerIds.has(t.youtube_id));
   } catch(e){
     console.warn("[Harmonize] Pool communautaire indisponible, pièges tirés du catalogue de démo uniquement :", e);
