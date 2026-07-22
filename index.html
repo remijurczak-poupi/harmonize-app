@@ -630,7 +630,14 @@
               <button class="btn-ghost" style="width:auto;flex:1;padding:10px 8px;" data-start="start" onclick="pickGamePlaybackStart('start')">⏮ Depuis le début</button>
               <button class="btn-ghost" style="width:auto;flex:1;padding:10px 8px;" data-start="middle" onclick="pickGamePlaybackStart('middle')">⏭ Vers ~45 secondes</button>
             </div>
-            <p style="font-size:11px;color:var(--text-faint);margin:0 0 14px;">Choisis les deux réglages ci-dessus pour continuer automatiquement.</p>
+            <!-- Bouton "Continuer" explicite (ajouté le 22/07/2026, demande de
+                 Rémi) : avant, choisir les 2 réglages faisait automatiquement
+                 passer à la suite — pas naturel si on revient sur cet écran
+                 avec des réglages déjà choisis (les boutons semblent déjà
+                 sélectionnés, on ne comprend pas qu'il faut recliquer dessus).
+                 Un vrai bouton, désactivé tant que les 2 réglages ne sont pas
+                 choisis, est beaucoup plus clair. -->
+            <button class="btn-primary" id="gqPlaybackContinueBtn" onclick="confirmPlaybackSettings()" disabled style="margin-bottom:10px;">Continuer</button>
             <button class="btn-ghost" onclick="currentRoom && currentRoom.mode === 'owner' ? backToOwnerSongsStep() : backToRoundsStep()">← Changer le nombre de manches</button>
           </div>
           <div id="gqStepMode" class="card" style="display:none;margin-bottom:16px;">
@@ -4021,6 +4028,7 @@ function renderQuestionPicker(){
       btn.style.borderColor = active ? "var(--accent1)" : "var(--border)";
       btn.style.color = active ? "var(--text)" : "var(--text-dim)";
     });
+    document.getElementById("gqPlaybackContinueBtn").disabled = !(gameDisplayMode && gamePlaybackStart);
     return;
   }
   if(!gameSelectionMode){
@@ -4089,7 +4097,19 @@ function pickGameDisplayMode(mode){
 
 function pickGamePlaybackStart(mode){
   gamePlaybackStart = mode;
-  if(currentRoom?.mode === "owner"){ renderOwnerLobbySetup(); confirmOwnerSettings(); return; }
+  if(currentRoom?.mode === "owner"){ renderOwnerLobbySetup(); return; }
+  renderQuestionPicker();
+}
+
+// Bouton "Continuer" explicite (ajouté le 22/07/2026, demande de Rémi) —
+// avant, choisir les 2 réglages ci-dessus déclenchait automatiquement la
+// suite, ce qui n'était pas clair en revenant sur cet écran avec des
+// réglages déjà en mémoire (les boutons semblaient déjà sélectionnés, sans
+// rien à cliquer). Un vrai bouton, activé une fois les 2 réglages choisis,
+// dispatché selon le jeu en cours.
+function confirmPlaybackSettings(){
+  if(!gameDisplayMode || !gamePlaybackStart) return;
+  if(currentRoom?.mode === "owner"){ confirmOwnerSettings(); return; }
   renderQuestionPicker();
 }
 
@@ -5026,6 +5046,7 @@ function renderOwnerLobbySetup(){
     btn.style.borderColor = active ? "var(--accent1)" : "var(--border)";
     btn.style.color = active ? "var(--text)" : "var(--text-dim)";
   });
+  document.getElementById("gqPlaybackContinueBtn").disabled = !(gameDisplayMode && gamePlaybackStart);
 }
 
 function onOwnerSongsSliderInput(value){
