@@ -54,7 +54,11 @@
     padding:20px 20px 12px;
   }
   .logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:19px;letter-spacing:-0.02em;}
-  .logo-mark{width:30px;height:30px;border-radius:9px;overflow:hidden;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  /* Fond assorti au dégradé réel du logo (violet en haut à gauche, quasi noir
+     en bas à droite, voir icons/icon-192.png) — ajouté le 23/07/2026 : sans
+     ça, un léger liseré (coin arrondi CSS vs coin arrondi de l'image) pouvait
+     laisser voir le fond de la page derrière, moins bien assorti. */
+  .logo-mark{width:30px;height:30px;border-radius:9px;overflow:hidden;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:linear-gradient(135deg,#51147e,#010d2c);}
   .logo-mark img{width:100%;height:100%;display:block;object-fit:cover;}
   .pill{font-size:12px;color:var(--text-dim);background:var(--bg-card);border:1px solid var(--border);padding:5px 10px;border-radius:999px;}
   main{flex:1;padding:0 20px 100px;}
