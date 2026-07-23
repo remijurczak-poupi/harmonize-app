@@ -329,7 +329,7 @@
         <div class="mode-icon">🎮</div>
         <div>
           <div class="mode-title">Jeux</div>
-          <div class="mode-desc">Des mini-jeux musicaux à jouer en groupe, façon Photoroulette.</div>
+          <div class="mode-desc">Des mini-jeux musicaux à jouer entre amis.</div>
         </div>
       </button>
 
@@ -1198,7 +1198,7 @@ const badgeLabel = {spotify:"SPOTIFY", deezer:"DEEZER", apple:"APPLE MUSIC", you
 // 2 catégories principales, chacune avec ses sous-modes
 const CATEGORY_MODES = {
   ecoute: ["soiree", "distance"],
-  jeux: ["owner", "questions", "blindtest", "serie"],
+  jeux: ["questions", "owner", "serie", "blindtest"],
 };
 
 const MODE_DETAIL = {
@@ -1210,24 +1210,24 @@ const MODE_DETAIL = {
     emoji:"🌐", title:"À distance",
     desc:"Chacun est chez soi, avec son casque ou ses enceintes. L'appli synchronise la lecture pour que tout le monde entende exactement le même morceau au même instant, chacun depuis son propre appareil.",
   },
-  owner: {
-    emoji:"🎲", title:"Qui a mis cette chanson ?",
-    desc:"Chacun propose quelques chansons de son choix. Le jeu est ensuite de deviner qui a mis les musiques jouées aléatoirement.",
-  },
   questions: {
     emoji:"❓", title:"Le jeu des questions",
-    desc:"Le créateur choisit des questions (\"ta chanson d'amour préférée\", \"ta chanson la plus triste\"...) parmi une liste proposée. Chacun répond avec un vrai titre AVANT que la partie commence. Ensuite on écoute les réponses une par une et on vote en direct pour deviner qui a choisi quoi.",
+    desc:"Multijoueur. Le créateur choisit des questions (\"ta chanson d'amour préférée\", \"ta chanson la plus triste\"...) parmi une liste proposée. Chacun répond avec un vrai titre AVANT que la partie commence. Ensuite on écoute les réponses une par une et on vote en direct pour deviner qui a choisi quoi.",
   },
-  blindtest: {
-    emoji:"🎧", title:"Blindtest",
-    desc:"En groupe : chacun propose quelques chansons, puis on les écoute une par une et on devine de quel titre il s'agit parmi plusieurs choix. En solo : pioche dans le pool communautaire de chansons déjà proposées par d'autres, ou dans ta propre playlist importée.",
+  owner: {
+    emoji:"🎲", title:"Qui a mis cette chanson ?",
+    desc:"Multijoueur. Chacun propose quelques chansons de son choix. Le jeu est ensuite de deviner qui a mis les musiques jouées aléatoirement.",
   },
   // Ajouté le 21/07/2026, idée notée le 19/07/2026 : toujours solo (pas de
   // salon à créer), enchaîne les manches de blindtest sans limite tant
   // qu'on répond juste — une erreur remet le compteur à zéro.
   serie: {
     emoji:"🔥", title:"Série de blindtest",
-    desc:"Enchaîne un maximum de bonnes réponses d'affilée, en solo — une erreur remet le compteur à zéro. Pioche dans le pool communautaire de chansons déjà proposées par d'autres joueurs.",
+    desc:"Solo. Enchaîne un maximum de bonnes réponses d'affilée — une erreur remet le compteur à zéro.",
+  },
+  blindtest: {
+    emoji:"🎧", title:"Blindtest",
+    desc:"Multijoueur et solo. En groupe : chacun propose quelques chansons, puis on les écoute une par une et on devine de quel titre il s'agit parmi plusieurs choix. En solo : devine à partir de chansons déjà proposées par d'autres joueurs, ou de ta propre playlist importée.",
   },
 };
 
