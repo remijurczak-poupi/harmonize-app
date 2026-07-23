@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Harmonize — installe l'application</title>
+<meta name="description" content="Écoute de la musique et joue à des jeux musicaux entre amis. Installe Harmonize sur ton téléphone en 2 minutes." />
+<meta property="og:title" content="Harmonize" />
+<meta property="og:description" content="Écoute de la musique et joue à des jeux musicaux entre amis, en soirée ou à distance." />
+<meta property="og:image" content="icons/icon-512.png" />
+<meta name="theme-color" content="#0f0d17" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<style>
+  :root{
+    --bg:#0f0d17;
+    --bg-elevated:#181524;
+    --bg-card:#1f1b2e;
+    --border:#2e2942;
+    --text:#f2f0f7;
+    --text-dim:#a79fc2;
+    --text-faint:#6f6789;
+    --accent1:#8b5cf6;
+    --accent2:#ec4899;
+    --accent-gradient:linear-gradient(135deg,var(--accent1),var(--accent2));
+    --radius:16px;
+    --radius-sm:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:radial-gradient(circle at 20% -10%, #241c3a 0%, var(--bg) 45%);
+    color:var(--text);
+    min-height:100vh;
+  }
+  .wrap{max-width:480px;margin:0 auto;padding:44px 20px 60px;}
+
+  .hero{text-align:center;margin-bottom:36px;}
+  .hero-icon{width:84px;height:84px;border-radius:22px;display:block;margin:0 auto 18px;box-shadow:0 12px 32px -12px rgba(139,92,246,.55);}
+  .hero h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0 0 10px;text-wrap:balance;}
+  .hero p{color:var(--text-dim);font-size:15.5px;line-height:1.55;margin:0;max-width:360px;margin-inline:auto;}
+
+  .btn-primary{
+    display:block;text-align:center;text-decoration:none;
+    background:var(--accent-gradient);color:white;font-weight:700;font-size:16px;
+    padding:16px;border-radius:var(--radius-sm);width:100%;border:none;cursor:pointer;
+  }
+  .btn-primary:active{transform:scale(0.98);}
+  .btn-ghost{
+    background:transparent;color:var(--text-dim);border:1px solid var(--border);
+    font-size:14px;padding:12px;border-radius:var(--radius-sm);width:100%;font-weight:500;cursor:pointer;
+  }
+
+  .cta-row{margin:28px 0 40px;}
+
+  section.block{margin-bottom:40px;}
+  .eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent1);margin:0 0 8px;}
+  h2{font-size:19px;font-weight:800;margin:0 0 14px;letter-spacing:-.005em;}
+
+  .card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;}
+
+  .tabs{display:flex;gap:8px;margin-bottom:14px;}
+  .tab-btn{
+    flex:1;background:var(--bg-elevated);color:var(--text-dim);border:1px solid var(--border);
+    padding:10px 6px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;
+  }
+  .tab-btn.active{background:var(--accent-gradient);color:#fff;border-color:transparent;}
+
+  .steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px;}
+  .steps li{display:flex;gap:12px;align-items:flex-start;}
+  .step-num{
+    flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--bg-elevated);border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700;color:var(--accent1);
+  }
+  .step-text{font-size:14.5px;line-height:1.5;color:var(--text);padding-top:2px;}
+  .step-text b{color:var(--text);}
+  .step-icon{flex-shrink:0;width:22px;height:22px;opacity:.85;}
+
+  .install-native{display:none;margin-top:16px;}
+  .already-installed{display:none;text-align:center;padding:10px 0 2px;color:var(--text-dim);font-size:13.5px;}
+
+  .features{display:flex;flex-direction:column;gap:10px;}
+  .feature{display:flex;gap:12px;align-items:flex-start;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;}
+  .feature-emoji{font-size:20px;flex-shrink:0;line-height:1.3;}
+  .feature-title{font-weight:700;font-size:14.5px;margin-bottom:2px;}
+  .feature-desc{font-size:13px;color:var(--text-dim);line-height:1.5;}
+
+  footer{text-align:center;color:var(--text-faint);font-size:12px;line-height:1.6;margin-top:12px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <img class="hero-icon" src="icons/icon-192.png" alt="Harmonize" />
+    <h1>Harmonize</h1>
+    <p>Écoutez de la musique ensemble et jouez à des jeux musicaux entre amis — en soirée, à distance, peu importe l'appli de streaming de chacun.</p>
+  </div>
+
+  <div class="cta-row">
+    <a class="btn-primary" href="index.html">🎧 Ouvrir l'application</a>
+  </div>
+
+  <section class="block">
+    <p class="eyebrow">Sur ton téléphone</p>
+    <h2>Installer Harmonize en 2 minutes</h2>
+    <div class="card">
+      <div class="tabs" role="tablist">
+        <button class="tab-btn" data-platform="ios" onclick="selectPlatform('ios')">📱 iPhone</button>
+        <button class="tab-btn" data-platform="android" onclick="selectPlatform('android')">🤖 Android</button>
+        <button class="tab-btn" data-platform="desktop" onclick="selectPlatform('desktop')">💻 Ordinateur</button>
+      </div>
+
+      <p class="already-installed" id="alreadyInstalledMsg">✅ Harmonize est déjà installée sur cet appareil !</p>
+
+      <div id="panel-ios">
+        <ol class="steps">
+          <li><span class="step-num">1</span><span class="step-text">Ouvre ce lien dans <b>Safari</b> (l'ajout à l'écran d'accueil ne marche que depuis Safari, pas Chrome, sur iPhone/iPad).</span></li>
+          <li><span class="step-num">2</span><span class="step-text">Appuie sur l'icône <b>Partager</b> (le carré avec la flèche vers le haut), en bas de l'écran.</span></li>
+          <li><span class="step-num">3</span><span class="step-text">Fais défiler la liste et appuie sur <b>« Sur l'écran d'accueil »</b>.</span></li>
+          <li><span class="step-num">4</span><span class="step-text">Appuie sur <b>« Ajouter »</b> en haut à droite. C'est fait !</span></li>
+        </ol>
+      </div>
+
+      <div id="panel-android" style="display:none;">
+        <button class="btn-primary install-native" id="androidInstallBtn" onclick="installAndroid()">📲 Installer Harmonize</button>
+        <ol class="steps">
+          <li><span class="step-num">1</span><span class="step-text">Appuie sur les <b>3 points ⋮</b> en haut à droite de Chrome.</span></li>
+          <li><span class="step-num">2</span><span class="step-text">Appuie sur <b>« Installer l'application »</b> (ou « Ajouter à l'écran d'accueil »).</span></li>
+          <li><span class="step-num">3</span><span class="step-text">Confirme en appuyant sur <b>« Installer »</b>. C'est fait !</span></li>
+        </ol>
+      </div>
+
+      <div id="panel-desktop" style="display:none;">
+        <ol class="steps">
+          <li><span class="step-num">1</span><span class="step-text">Clique sur <b>« Ouvrir l'application »</b> ci-dessus.</span></li>
+          <li><span class="step-num">2</span><span class="step-text">Dans Chrome ou Edge, une petite icône d'installation apparaît dans la barre d'adresse, à droite — clique dessus puis sur <b>« Installer »</b>.</span></li>
+          <li><span class="step-num">3</span><span class="step-text">Pas obligatoire : l'app fonctionne aussi très bien directement dans l'onglet, sans rien installer.</span></li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <p class="eyebrow">C'est quoi</p>
+    <h2>Une appli pour se retrouver autour de la musique</h2>
+    <div class="features">
+      <div class="feature">
+        <div class="feature-emoji">🪩</div>
+        <div>
+          <div class="feature-title">Soirée ou à distance</div>
+          <div class="feature-desc">Une file d'attente partagée quand vous êtes ensemble, ou une écoute synchronisée quand chacun est chez soi.</div>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-emoji">🎮</div>
+        <div>
+          <div class="feature-title">Des mini-jeux musicaux</div>
+          <div class="feature-desc">Blindtest, "Qui a mis cette chanson ?", le jeu des questions — à jouer en groupe, façon Photoroulette.</div>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-emoji">🔀</div>
+        <div>
+          <div class="feature-title">Peu importe l'appli de chacun</div>
+          <div class="feature-desc">Spotify, Deezer, YouTube... tout le monde peut rejoindre, quelle que soit son appli de streaming habituelle.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Un souci pour installer l'appli ? Redemande simplement ce lien.
+  </footer>
+
+</div>
+
+<script>
+  function detectPlatform(){
+    const ua = navigator.userAgent || "";
+    const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+    const isAndroid = /Android/.test(ua);
+    if(isIOS) return "ios";
+    if(isAndroid) return "android";
+    return "desktop";
+  }
+
+  function selectPlatform(platform){
+    ["ios","android","desktop"].forEach(p => {
+      document.getElementById("panel-" + p).style.display = (p === platform) ? "block" : "none";
+      document.querySelector('.tab-btn[data-platform="' + p + '"]').classList.toggle("active", p === platform);
+    });
+  }
+
+  selectPlatform(detectPlatform());
+
+  // Déjà installée ? (l'app tourne alors en mode "standalone", sans barre d'adresse)
+  const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  if(isStandalone){
+    document.getElementById("alreadyInstalledMsg").style.display = "block";
+  }
+
+  // Installation native Android/Chrome (bouton "Installer Harmonize" en un tap,
+  // au lieu des 3 étapes manuelles) — n'apparaît que si le navigateur propose
+  // vraiment l'installation (critères PWA remplis + pas déjà installée).
+  let deferredPrompt = null;
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    const btn = document.getElementById("androidInstallBtn");
+    if(btn) btn.style.display = "block";
+  });
+
+  async function installAndroid(){
+    if(!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    document.getElementById("androidInstallBtn").style.display = "none";
+  }
+</script>
+</body>
+</html>
