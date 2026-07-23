@@ -345,8 +345,9 @@
            Caché automatiquement si la personne utilise déjà Brave (voir
            navigator.brave, plus bas). -->
       <div class="card" style="margin-top:16px;" id="braveCard">
-        <p style="margin:0 0 12px;color:var(--text-dim);font-size:13.5px;">🦁 Moins de pubs YouTube avec le navigateur Brave (bloqueur intégré, gratuit).</p>
-        <button class="btn-ghost" onclick="openBraveDownload()">Télécharger Brave</button>
+        <p style="margin:0 0 12px;color:var(--text-dim);font-size:13.5px;line-height:1.5;">Harmonize joue la musique via YouTube — Brave a un bloqueur de pub intégré, gratuit, sans rien à configurer, pour une expérience sans interruption.</p>
+        <button class="btn-ghost" onclick="openBraveDownload()">🦁 Télécharger Brave</button>
+        <p style="margin:10px 0 0;color:var(--text-faint);font-size:11.5px;line-height:1.4;display:none;" id="braveDesktopNote">Sur ordinateur, pas besoin de changer de navigateur : une extension comme uBlock Origin sur celui que tu utilises déjà suffit aussi.</p>
       </div>
 
       <h2 style="margin-top:28px;">Tes playlists importées</h2>
@@ -6255,6 +6256,18 @@ function braveDownloadUrl(){
 function openBraveDownload(){
   window.open(braveDownloadUrl(), "_blank", "noopener");
 }
+// Sur ordinateur, une simple extension de blocage de pub sur le navigateur
+// déjà utilisé suffit — pas la peine de changer de navigateur (contrairement
+// au mobile, où seul un navigateur avec bloqueur intégré comme Brave marche
+// vraiment, voir la conversation du 23/07/2026 sur uBlock Origin et mobile).
+(function(){
+  const ua = navigator.userAgent || "";
+  const isMobile = /iPad|iPhone|iPod|Android/.test(ua);
+  if(!isMobile){
+    const note = document.getElementById("braveDesktopNote");
+    if(note) note.style.display = "block";
+  }
+})();
 // navigator.brave est une API officielle exposée par le navigateur Brave lui-même
 // (voir navigator.brave.isBrave()) — si la personne l'utilise déjà, la carte
 // ne sert à rien, on la cache.
