@@ -103,6 +103,15 @@
     <p>L'appli pour écouter de la musique à plusieurs et s'affronter dans des jeux musicaux entre amis — que vous soyez dans la même pièce ou chacun chez vous.</p>
   </div>
 
+  <section class="block" id="braveSection">
+    <p class="eyebrow">Recommandé</p>
+    <h2>Moins de pubs YouTube avec Brave</h2>
+    <div class="card">
+      <p style="margin:0 0 14px;color:var(--text-dim);font-size:13.5px;line-height:1.5;">Harmonize joue la musique via YouTube — Brave a un bloqueur de pub intégré, gratuit, sans rien à configurer. Télécharge-le avant d'installer ou d'ouvrir Harmonize pour une expérience sans interruption.</p>
+      <button class="btn-primary" id="braveBtn" onclick="openBraveDownload()">🦁 Télécharger Brave</button>
+    </div>
+  </section>
+
   <section class="block">
     <p class="eyebrow">Sur ton téléphone</p>
     <h2>Installer l'application</h2>
@@ -196,6 +205,31 @@
   }
 
   selectPlatform(detectPlatform());
+
+  // Recommandation Brave (ajoutée le 23/07/2026, voir idees.md pour toute
+  // l'enquête sur les pubs YouTube) — détection précise à 3 branches
+  // (contrairement à detectPlatform() ci-dessus, qui simplifie exprès
+  // "ordinateur" en "android" pour le choix d'onglet par défaut).
+  function braveDownloadUrl(){
+    const ua = navigator.userAgent || "";
+    if(/iPad|iPhone|iPod/.test(ua) && !window.MSStream) return "https://apps.apple.com/app/brave-browser/id1052879175";
+    if(/Android/.test(ua)) return "https://play.google.com/store/apps/details?id=com.brave.browser";
+    return "https://brave.com/download/";
+  }
+  function openBraveDownload(){
+    window.open(braveDownloadUrl(), "_blank", "noopener");
+  }
+  // navigator.brave est une API officielle exposée par le navigateur Brave
+  // lui-même (voir navigator.brave.isBrave()) — si la personne l'utilise déjà,
+  // toute la section ne sert à rien, on la cache.
+  if(navigator.brave && typeof navigator.brave.isBrave === "function"){
+    navigator.brave.isBrave().then(isBrave => {
+      if(isBrave){
+        const el = document.getElementById("braveSection");
+        if(el) el.style.display = "none";
+      }
+    }).catch(()=>{});
+  }
 
   // Déjà installée ? (l'app tourne alors en mode "standalone", sans barre d'adresse)
   const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;

@@ -338,6 +338,17 @@
         <button class="btn-ghost" onclick="joinRoom()">Rejoindre un salon avec un code</button>
       </div>
 
+      <!-- Test (ajouté le 23/07/2026, demande de Rémi) : recommander Brave
+           (bloqueur de pub intégré) pour limiter les pubs YouTube — seul
+           levier réaliste pour les modes où chacun a son propre lecteur (À
+           distance, jeux), voir idees.md pour toute l'enquête sur les pubs.
+           Caché automatiquement si la personne utilise déjà Brave (voir
+           navigator.brave, plus bas). -->
+      <div class="card" style="margin-top:16px;" id="braveCard">
+        <p style="margin:0 0 12px;color:var(--text-dim);font-size:13.5px;">🦁 Moins de pubs YouTube avec le navigateur Brave (bloqueur intégré, gratuit).</p>
+        <button class="btn-ghost" onclick="openBraveDownload()">Télécharger Brave</button>
+      </div>
+
       <h2 style="margin-top:28px;">Tes playlists importées</h2>
       <div class="card">
         <p id="importedSummary" style="margin:0 0 12px;color:var(--text-dim);font-size:13.5px;">Chargement...</p>
@@ -6230,6 +6241,30 @@ if("serviceWorker" in navigator){
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("sw.js").catch(err => console.warn("[Harmonize] Échec d'enregistrement du service worker :", err));
   });
+}
+
+// Recommandation Brave (ajoutée le 23/07/2026, voir carte "braveCard" sur
+// l'accueil et idees.md pour toute l'enquête sur les pubs YouTube) — même
+// logique de détection de plateforme que landing.html.
+function braveDownloadUrl(){
+  const ua = navigator.userAgent || "";
+  if(/iPad|iPhone|iPod/.test(ua) && !window.MSStream) return "https://apps.apple.com/app/brave-browser/id1052879175";
+  if(/Android/.test(ua)) return "https://play.google.com/store/apps/details?id=com.brave.browser";
+  return "https://brave.com/download/";
+}
+function openBraveDownload(){
+  window.open(braveDownloadUrl(), "_blank", "noopener");
+}
+// navigator.brave est une API officielle exposée par le navigateur Brave lui-même
+// (voir navigator.brave.isBrave()) — si la personne l'utilise déjà, la carte
+// ne sert à rien, on la cache.
+if(navigator.brave && typeof navigator.brave.isBrave === "function"){
+  navigator.brave.isBrave().then(isBrave => {
+    if(isBrave){
+      const el = document.getElementById("braveCard");
+      if(el) el.style.display = "none";
+    }
+  }).catch(()=>{});
 }
 </script>
 </body>
