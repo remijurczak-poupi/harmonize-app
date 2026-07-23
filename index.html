@@ -345,7 +345,7 @@
            Caché automatiquement si la personne utilise déjà Brave (voir
            navigator.brave, plus bas). -->
       <div class="card" style="margin-top:16px;" id="braveCard">
-        <p style="margin:0 0 12px;color:var(--text-dim);font-size:13.5px;line-height:1.5;">Harmonize joue la musique via YouTube — Brave a un bloqueur de pub intégré, gratuit, sans rien à configurer, pour une expérience sans interruption.</p>
+        <p style="margin:0 0 12px;color:var(--text-dim);font-size:13.5px;line-height:1.5;">Harmonize joue la musique via YouTube — Brave a un bloqueur de pub intégré, gratuit, sans rien à configurer. Télécharge-le avant d'installer ou d'ouvrir Harmonize pour une expérience sans interruption.</p>
         <button class="btn-ghost" onclick="openBraveDownload()">🦁 Télécharger Brave</button>
         <p style="margin:10px 0 0;color:var(--text-faint);font-size:11.5px;line-height:1.4;display:none;" id="braveDesktopNote">Sur ordinateur, pas besoin de changer de navigateur : une extension comme uBlock Origin sur celui que tu utilises déjà suffit aussi.</p>
       </div>
@@ -366,7 +366,8 @@
         <button class="btn-ghost" onclick="goToPoolAdminScreen()">🛠 Gérer le pool communautaire</button>
       </div>
 
-      <button class="btn-ghost" style="margin-top:20px;" onclick="handleSignOut()">Se déconnecter</button>
+      <button class="btn-ghost" style="margin-top:20px;" onclick="openEditPseudoModal()">✏️ Modifier mon pseudo</button>
+      <button class="btn-ghost" style="margin-top:10px;" onclick="handleSignOut()">Se déconnecter</button>
     </section>
 
     <!-- SCREEN: MODE SELECT (uniquement pour le créateur du salon) -->
@@ -1069,6 +1070,19 @@
       <p id="serieGameOverText" style="font-size:15px;color:var(--text-dim);margin-bottom:6px;"></p>
       <p id="serieGameOverRecordNote" style="font-size:13px;color:var(--accent1);font-weight:700;min-height:18px;margin-bottom:16px;"></p>
       <button class="btn-primary" onclick="closeSerieGameOverModal()">🔄 Recommencer une série</button>
+    </div>
+  </div>
+
+  <!-- Modifier son pseudo (ajouté le 24/07/2026, demande de Rémi) : en
+       s'inscrivant via Google ou "Jouer sans compte", le pseudo par défaut
+       (nom Google, ou "AmiXXXX") ne pouvait jamais être changé ensuite. -->
+  <div class="modal-backdrop" id="editPseudoModal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <h2>Modifier ton pseudo</h2>
+      <input type="text" id="editPseudoInput" placeholder="Ton pseudo" maxlength="30" />
+      <button class="btn-primary" style="margin-top:12px;" onclick="saveEditedPseudo()">Enregistrer</button>
+      <button class="btn-ghost" style="margin-top:10px;" onclick="closeEditPseudoModal()">Annuler</button>
     </div>
   </div>
 
@@ -1831,6 +1845,31 @@ async function afterLogin(pseudo){
   // dernier salon actif à chaque connexion/actualisation était gênant —
   // ouvrir l'app (ou l'actualiser) doit toujours amener à l'accueil.
   showScreen("screen-lobby");
+}
+
+// Modifier son pseudo (ajouté le 24/07/2026, demande de Rémi) : jusque-là,
+// impossible de changer le pseudo par défaut d'un compte Google (nom Google
+// figé) ou "Jouer sans compte" (AmiXXXX généré au hasard, ou ce qui avait été
+// tapé dans pseudoInput avant de cliquer, sans retour possible en arrière).
+function openEditPseudoModal(){
+  document.getElementById("editPseudoInput").value = state.user || "";
+  document.getElementById("editPseudoModal").classList.add("open");
+}
+function closeEditPseudoModal(){
+  document.getElementById("editPseudoModal").classList.remove("open");
+}
+async function saveEditedPseudo(){
+  const newPseudo = document.getElementById("editPseudoInput").value.trim();
+  if(!newPseudo){ showToast("Choisis un pseudo."); return; }
+  if(!currentUser) return;
+  const { data, error } = await sb.from("profiles").update({ pseudo: newPseudo }).eq("id", currentUser.id).select();
+  if(error){ showToast("Erreur : " + error.message); return; }
+  if(!data || !data.length){ showToast("Impossible de mettre à jour le pseudo."); return; }
+  state.user = newPseudo;
+  document.getElementById("userPill").textContent = "@" + newPseudo.toLowerCase().replace(/\s+/g,"");
+  document.getElementById("hiName").textContent = newPseudo;
+  closeEditPseudoModal();
+  showToast("Pseudo mis à jour !");
 }
 
 // Si une session existe déjà (retour sur la page), on reconnecte automatiquement.
