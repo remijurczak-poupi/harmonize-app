@@ -123,7 +123,7 @@
       </div>
 
       <div id="panel-android" style="display:none;">
-        <button class="btn-primary install-native" id="androidInstallBtn" onclick="installAndroid()">📲 Installer Harmonize</button>
+        <button class="btn-primary install-native" id="installBtn-android" onclick="installPWA('android')">📲 Installer Harmonize</button>
         <ol class="steps">
           <li><span class="step-num">1</span><span class="step-text">Appuie sur les <b>3 points ⋮</b> en haut à droite de Chrome.</span></li>
           <li><span class="step-num">2</span><span class="step-text">Appuie sur <b>« Installer l'application »</b> (ou « Ajouter à l'écran d'accueil »).</span></li>
@@ -132,6 +132,7 @@
       </div>
 
       <div id="panel-desktop" style="display:none;">
+        <button class="btn-primary install-native" id="installBtn-desktop" onclick="installPWA('desktop')">💻 Installer Harmonize</button>
         <ol class="steps">
           <li><span class="step-num">1</span><span class="step-text">Clique sur <b>« Ouvrir l'application »</b> ci-dessus.</span></li>
           <li><span class="step-num">2</span><span class="step-text">Dans Chrome ou Edge, une petite icône d'installation apparaît dans la barre d'adresse, à droite — clique dessus puis sur <b>« Installer »</b>.</span></li>
@@ -194,23 +195,31 @@
     document.getElementById("alreadyInstalledMsg").style.display = "block";
   }
 
-  // Installation native Android/Chrome (bouton "Installer Harmonize" en un tap,
-  // au lieu des 3 étapes manuelles) — n'apparaît que si le navigateur propose
-  // vraiment l'installation (critères PWA remplis + pas déjà installée).
+  // Installation native en un clic (ajouté le 23/07/2026, demande de Rémi :
+  // possible aussi sur ordinateur, pas seulement Android — Chrome/Edge desktop
+  // proposent la même API). N'apparaît que si le navigateur propose vraiment
+  // l'installation (critères PWA remplis + pas déjà installée) — sur iPhone,
+  // Safari n'a tout simplement aucun moyen de déclencher ça par un bouton,
+  // seules les instructions manuelles existent là-bas.
   let deferredPrompt = null;
   window.addEventListener("beforeinstallprompt", (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    const btn = document.getElementById("androidInstallBtn");
-    if(btn) btn.style.display = "block";
+    ["android","desktop"].forEach(p => {
+      const btn = document.getElementById("installBtn-" + p);
+      if(btn) btn.style.display = "block";
+    });
   });
 
-  async function installAndroid(){
+  async function installPWA(platform){
     if(!deferredPrompt) return;
     deferredPrompt.prompt();
     await deferredPrompt.userChoice;
     deferredPrompt = null;
-    document.getElementById("androidInstallBtn").style.display = "none";
+    ["android","desktop"].forEach(p => {
+      const btn = document.getElementById("installBtn-" + p);
+      if(btn) btn.style.display = "none";
+    });
   }
 </script>
 </body>
