@@ -10,6 +10,14 @@
 <meta property="og:image" content="icons/icon-512.png" />
 <meta name="theme-color" content="#0f0d17" />
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<!-- Ajouté le 23/07/2026 (bug remonté par Rémi : aucun bouton "Installer"
+     n'apparaissait jamais) : sans le manifeste lié ET le service worker
+     enregistré DEPUIS CETTE page, Chrome n'a aucune base pour juger l'app
+     "installable" ici — l'évènement qui déclenche le bouton (voir plus bas)
+     ne se déclenchait donc jamais, même si index.html les a bien lui. Comme
+     landing.html est justement la toute première page qu'un ami ouvre (avant
+     même index.html), il fallait les répéter ici aussi. -->
+<link rel="manifest" href="manifest.json" />
 <style>
   :root{
     --bg:#0f0d17;
@@ -219,6 +227,15 @@
     ["android","desktop"].forEach(p => {
       const btn = document.getElementById("installBtn-" + p);
       if(btn) btn.style.display = "none";
+    });
+  }
+
+  // Même enregistrement que index.html (voir sw.js) — nécessaire pour que
+  // Chrome considère l'app "installable" dès cette page, sans avoir eu besoin
+  // de visiter index.html avant.
+  if("serviceWorker" in navigator){
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(err => console.warn("[Harmonize] Échec d'enregistrement du service worker :", err));
     });
   }
 </script>
