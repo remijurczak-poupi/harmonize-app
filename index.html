@@ -62,6 +62,21 @@
   .screen.active{display:block;}
   @keyframes fadein{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
 
+  /* Écran de chargement (ajouté le 23/07/2026) : logo qui "bat" comme un cœur
+     pendant qu'initSession() vérifie une éventuelle session existante. */
+  .loading-center{display:flex;align-items:center;justify-content:center;min-height:60vh;}
+  .loading-logo{width:72px;height:72px;border-radius:20px;animation:heartbeat 1.8s ease-in-out infinite;}
+  @keyframes heartbeat{
+    0%, 100%{transform:scale(1);}
+    14%{transform:scale(1.18);}
+    28%{transform:scale(1);}
+    42%{transform:scale(1.18);}
+    56%{transform:scale(1);}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .loading-logo{animation:none;}
+  }
+
   /* Animation d'annonce de question (jeu des questions, ajoutée le 13/07/2026) */
   @keyframes gqQuestionPop{
     0%{opacity:0;transform:scale(.85) translateY(14px);}
@@ -256,8 +271,19 @@
 
   <main>
 
+    <!-- SCREEN: CHARGEMENT (ajouté le 23/07/2026, retour de Rémi) : affiché
+         par défaut le temps qu'initSession() vérifie si une session existe
+         déjà — avant, screen-login s'affichait une fraction de seconde à
+         chaque actualisation (même pour un compte déjà connecté) avant de
+         basculer sur l'accueil, ce qui faisait un flash disgracieux. -->
+    <section class="screen active" id="screen-loading">
+      <div class="loading-center">
+        <img src="icons/icon-192.png" alt="" class="loading-logo" />
+      </div>
+    </section>
+
     <!-- SCREEN: LOGIN / SIGNUP (vrais comptes Supabase) -->
-    <section class="screen active" id="screen-login">
+    <section class="screen" id="screen-login">
       <h1>Bienvenue 👋</h1>
       <p class="sub">Connecte-toi, ou crée un compte si c'est ta première visite.</p>
       <div class="card stack">
@@ -1114,21 +1140,6 @@ sb.auth.onAuthStateChange((event, session) => {
   if(event === "SIGNED_OUT") currentUser = null;
 });
 
-/* ---------- Se souvenir du salon en cours (survit à un rechargement de page) ----------
-   Un rechargement de page réinitialise toutes les variables JavaScript (currentRoom,
-   etc.) — c'est normal, mais ça donnait l'impression d'être "déconnecté" du salon.
-   On sauvegarde donc le salon actif dans le localStorage, pour y revenir tout seul
-   juste après avoir retrouvé la session. */
-const LAST_ROOM_KEY = "harmonize_last_room";
-function saveLastRoom(roomId, code){
-  try { localStorage.setItem(LAST_ROOM_KEY, JSON.stringify({ roomId, code })); } catch(e) {}
-}
-function clearLastRoom(){
-  try { localStorage.removeItem(LAST_ROOM_KEY); } catch(e) {}
-}
-function getLastRoom(){
-  try { return JSON.parse(localStorage.getItem(LAST_ROOM_KEY) || "null"); } catch(e) { return null; }
-}
 
 function escapeHtml(str){
   return String(str ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1787,7 +1798,6 @@ async function handleSignOut(){
   currentUser = null;
   currentUserIsAdmin = false;
   currentRoom = null;
-  clearLastRoom();
   document.getElementById("emailInput").value = "";
   document.getElementById("passwordInput").value = "";
   document.getElementById("pseudoInput").value = "";
@@ -1801,20 +1811,9 @@ async function afterLogin(pseudo){
   document.getElementById("hiName").textContent = pseudo;
   document.getElementById("poolAdminEntryCard").style.display = currentUserIsAdmin ? "block" : "none";
   loadMyImportedTracks(); // en tâche de fond, pour que le résumé de l'accueil soit prêt sans bloquer la connexion
-
-  // Si on avait laissé un salon réel ouvert avant de recharger la page (ou de
-  // revenir plus tard), on y retourne automatiquement plutôt que de renvoyer
-  // vers l'accueil — c'est ce qui donnait l'impression d'être "déconnecté du
-  // salon" à chaque actualisation.
-  const last = getLastRoom();
-  if(last?.roomId){
-    const { data: room, error } = await sb.from("rooms").select("*").eq("id", last.roomId).maybeSingle();
-    if(!error && room){
-      await enterRealRoom(room, `Retour dans le salon ${room.code}.`);
-      return;
-    }
-    clearLastRoom(); // le salon n'existe plus (ou plus accessible) : on oublie cette info périmée
-  }
+  // Retiré le 23/07/2026 (retour de Rémi) : revenir automatiquement dans le
+  // dernier salon actif à chaque connexion/actualisation était gênant —
+  // ouvrir l'app (ou l'actualiser) doit toujours amener à l'accueil.
   showScreen("screen-lobby");
 }
 
@@ -1834,6 +1833,15 @@ async function afterLogin(pseudo){
     const profile = await ensureProfile(currentUser.id, googleName);
     currentUserIsAdmin = !!profile?.is_admin;
     await afterLogin(profile?.pseudo || googleName || "Toi");
+  } else {
+    // Ajouté le 23/07/2026 : jusque-là, screen-login était affiché par défaut
+    // dans le HTML, donc un compte déjà connecté le voyait quand même
+    // s'afficher une fraction de seconde avant que ce bloc ne bascule vers
+    // l'accueil — un écran de chargement (screen-loading) est désormais actif
+    // par défaut à la place, et c'est ce bloc qui décide explicitement de
+    // basculer vers l'accueil OU l'écran de connexion, jamais plus vers un
+    // écran par défaut périmé.
+    showScreen("screen-login");
   }
 })();
 
@@ -2014,7 +2022,6 @@ async function enterRealRoom(room, toastMsg){
   updateModeUI();
   document.getElementById("tabbar").style.display = "flex";
   showToast(toastMsg);
-  saveLastRoom(room.id, room.code); // pour revenir ici tout seul après un rechargement de page
   subscribeQueue(room.id);
 
   // Le VRAI "jeu des questions" ET "Qui a mis cette chanson ?" (ajouté le

@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Harmonize — installe l'application</title>
-<meta name="description" content="Écoute de la musique et joue à des jeux musicaux entre amis. Installe Harmonize sur ton téléphone en 2 minutes." />
+<meta name="description" content="Écoute de la musique et joue à des jeux musicaux entre amis. Installe Harmonize sur ton téléphone en 3 clics." />
 <meta property="og:title" content="Harmonize" />
 <meta property="og:description" content="Écoute de la musique et joue à des jeux musicaux entre amis, en soirée ou à distance." />
 <meta property="og:image" content="icons/icon-512.png" />
@@ -94,7 +94,7 @@
   <div class="hero">
     <img class="hero-icon" src="icons/icon-192.png" alt="Harmonize" />
     <h1>Harmonize</h1>
-    <p>Écoutez de la musique ensemble et jouez à des jeux musicaux entre amis — en soirée, à distance, peu importe l'appli de streaming de chacun.</p>
+    <p>L'appli pour écouter de la musique à plusieurs et s'affronter dans des jeux musicaux entre amis — que vous soyez dans la même pièce ou chacun chez vous.</p>
   </div>
 
   <div class="cta-row">
@@ -103,7 +103,7 @@
 
   <section class="block">
     <p class="eyebrow">Sur ton téléphone</p>
-    <h2>Installer Harmonize en 2 minutes</h2>
+    <h2>Installer Harmonize en 3 clics</h2>
     <div class="card">
       <div class="tabs" role="tablist">
         <button class="tab-btn" data-platform="ios" onclick="selectPlatform('ios')">📱 iPhone</button>
@@ -159,13 +159,6 @@
           <div class="feature-desc">Blindtest, "Qui a mis cette chanson ?", le jeu des questions — à jouer en groupe, façon Photoroulette.</div>
         </div>
       </div>
-      <div class="feature">
-        <div class="feature-emoji">🔀</div>
-        <div>
-          <div class="feature-title">Peu importe l'appli de chacun</div>
-          <div class="feature-desc">Spotify, Deezer, YouTube... tout le monde peut rejoindre, quelle que soit son appli de streaming habituelle.</div>
-        </div>
-      </div>
     </div>
   </section>
 
@@ -176,13 +169,14 @@
 </div>
 
 <script>
+  // Android par défaut (demande de Rémi, 23/07/2026) : seul un vrai iPhone
+  // détecté bascule sur les instructions iOS — tous les autres cas (Android,
+  // ordinateur, détection incertaine) tombent sur Android par défaut, plutôt
+  // que sur "Ordinateur" comme avant.
   function detectPlatform(){
     const ua = navigator.userAgent || "";
     const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
-    const isAndroid = /Android/.test(ua);
-    if(isIOS) return "ios";
-    if(isAndroid) return "android";
-    return "desktop";
+    return isIOS ? "ios" : "android";
   }
 
   function selectPlatform(platform){
