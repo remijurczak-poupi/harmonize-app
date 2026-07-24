@@ -773,10 +773,6 @@
           <div id="sdActiveAnswers" class="stack" style="margin-bottom:20px;"></div>
           <button class="btn-primary" onclick="finishSingleDeviceTurn()">✅ J'ai fini, passer le téléphone</button>
         </div>
-        <div id="sdHandoff" style="display:none;text-align:center;">
-          <p style="font-size:15px;color:var(--text-dim);margin:30px 0;">📱 Passe le téléphone à la personne suivante — elle ne doit pas voir cet écran avant d'appuyer ci-dessous.</p>
-          <button class="btn-primary" onclick="closeSingleDeviceHandoff()">C'est bon, à moi !</button>
-        </div>
       </div>
 
 
@@ -1412,11 +1408,8 @@ let gameSelectedQuestionIds = []; // sélection en cours de construction par le 
 // questions"/"Qui a mis cette chanson ?" en salon single_device : le
 // téléphone tourne, une seule personne "active" à la fois. Purement local à
 // CET appareil (jamais en base) : singleDeviceActivePlayer est le prénom en
-// cours de réponse (ou null si on est sur l'écran "qui commence son tour" ou
-// l'écran de transition "passe le téléphone"), singleDeviceHandoff indique
-// qu'on est sur cet écran de transition (entre 2 tours).
+// cours de réponse (ou null si on est sur l'écran "qui commence son tour").
 let singleDeviceActivePlayer = null;
-let singleDeviceHandoff = false;
 
 // Étapes du lobby (ajouté le 12/07/2026) : le créateur choisit d'abord un
 // nombre de manches, puis un mode de sélection des questions (à la main, ou
@@ -2233,7 +2226,6 @@ async function enterRealRoom(room, toastMsg){
     gameAutoRevealRoundIdx = -1;
     gameQuestionIntroRoundIdx = -1;
     singleDeviceActivePlayer = null;
-    singleDeviceHandoff = false;
     renderRoomAvatars("gqRoomAvatars");
     showScreen("screen-game-lobby");
     await loadGameAnswers(room.id);
@@ -4365,9 +4357,12 @@ function updateLaunchButton(questionIds){
 
 /* ---- Phase 2, mode "un seul téléphone" (ajouté le 24/07/2026) : le
    téléphone tourne, une personne "active" à la fois — voir
-   singleDeviceActivePlayer/singleDeviceHandoff. Réutilise openGameAnswerModal()/
+   singleDeviceActivePlayer. Réutilise openGameAnswerModal()/
    saveGameAnswerTrack() telles quelles (voir plus bas), qui taguent la
-   réponse avec local_player_name quand currentRoom.single_device est actif. ---- */
+   réponse avec local_player_name quand currentRoom.single_device est actif.
+   Pas d'écran de transition "passe le téléphone" séparé (retiré le
+   24/07/2026, retour de Rémi) : l'écran "qui commence son tour ?" ne montre
+   déjà aucune réponse, donc rien à cacher en y retournant directement. ---- */
 function getSingleDeviceLocalNames(){
   const names = [];
   gameAnswers.forEach(a => { if(a.local_player_name && !names.includes(a.local_player_name)) names.push(a.local_player_name); });
@@ -4379,10 +4374,8 @@ function renderSingleDeviceAnswering(){
   const isOwnerMode = currentRoom.mode === "owner";
   const total = questionIds.length;
 
-  document.getElementById("sdPickPlayer").style.display = (!singleDeviceActivePlayer && !singleDeviceHandoff) ? "block" : "none";
-  document.getElementById("sdTurnActive").style.display = (singleDeviceActivePlayer && !singleDeviceHandoff) ? "block" : "none";
-  document.getElementById("sdHandoff").style.display = singleDeviceHandoff ? "block" : "none";
-  if(singleDeviceHandoff) return;
+  document.getElementById("sdPickPlayer").style.display = !singleDeviceActivePlayer ? "block" : "none";
+  document.getElementById("sdTurnActive").style.display = singleDeviceActivePlayer ? "block" : "none";
 
   if(singleDeviceActivePlayer){
     document.getElementById("sdActiveName").textContent = singleDeviceActivePlayer;
@@ -4459,12 +4452,6 @@ function startSingleDeviceTurn(){
 
 function finishSingleDeviceTurn(){
   singleDeviceActivePlayer = null;
-  singleDeviceHandoff = true;
-  renderGameLobby();
-}
-
-function closeSingleDeviceHandoff(){
-  singleDeviceHandoff = false;
   renderGameLobby();
 }
 
@@ -5190,7 +5177,6 @@ async function rejouerMemeSalon(){
   gameAutoRevealRoundIdx = -1;
   gameQuestionIntroRoundIdx = -1;
   singleDeviceActivePlayer = null;
-  singleDeviceHandoff = false;
   showToast(currentRoom.mode === "owner" ? "🔄 Nouvelle partie ! Proposez de nouvelles chansons." : "🔄 Nouvelle partie ! Choisissez de nouvelles questions.");
   renderGameLobby();
 }
