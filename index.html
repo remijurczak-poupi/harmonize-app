@@ -383,6 +383,15 @@
       <h1 id="confirmTitle">Créer ce salon ?</h1>
       <p class="sub">Un vrai code sera généré pour que tes amis puissent te rejoindre. Rien n'est créé tant que tu n'as pas confirmé.</p>
       <div class="mode-card" id="confirmCard" style="cursor:default;"></div>
+      <!-- Mode "un seul téléphone" (ajouté le 24/07/2026), proposé uniquement
+           pour les 3 jeux multijoueur — voir previewMode()/singleDeviceLabel(). -->
+      <label class="card" id="singleDeviceOption" style="display:none;margin-top:14px;align-items:flex-start;gap:10px;cursor:pointer;">
+        <input type="checkbox" id="singleDeviceCheckbox" style="margin-top:3px;width:18px;height:18px;flex-shrink:0;" />
+        <span>
+          <span style="font-weight:600;">📱 Jouer sur un seul téléphone</span><br/>
+          <span style="color:var(--text-dim);font-size:13px;line-height:1.4;" id="singleDeviceHint"></span>
+        </span>
+      </label>
       <button class="btn-primary" onclick="confirmCreateRoom()">🚀 Créer le salon</button>
       <!-- Bouton solo (ajouté le 19/07/2026), affiché uniquement pour le
            Blindtest — voir previewMode()/goSoloBlindtest(). Pas besoin d'amis
@@ -726,6 +735,32 @@
         </div>
       </div>
 
+      <!-- Phase 2, mode "un seul téléphone" (ajouté le 24/07/2026) : le
+           téléphone tourne, chacun répond en privé à son tour puis le passe
+           au suivant — voir renderSingleDeviceAnswering() dans le JS. -->
+      <div id="gqSingleDeviceAnswering" style="display:none;">
+        <div id="sdPickPlayer">
+          <h2 style="margin-top:0;">Qui commence son tour ?</h2>
+          <p style="font-size:12.5px;color:var(--text-faint);margin-top:-8px;margin-bottom:14px;" id="sdPickPlayerHint"></p>
+          <div id="sdPlayersList" class="stack" style="margin-bottom:16px;"></div>
+          <input type="text" id="sdNewPlayerName" placeholder="Prénom de la personne suivante" maxlength="24" style="margin-bottom:10px;" />
+          <button class="btn-primary" onclick="startSingleDeviceTurn()">▶️ Commencer le tour</button>
+          <div style="text-align:center;margin-top:22px;">
+            <button class="btn-primary" id="sdLaunchBtn" onclick="launchGame()" disabled>🚀 Lancer la partie</button>
+            <p id="sdLaunchHint" style="font-size:12px;color:var(--text-faint);margin-top:8px;"></p>
+          </div>
+        </div>
+        <div id="sdTurnActive" style="display:none;">
+          <h2 style="margin-top:0;">Au tour de <span id="sdActiveName"></span></h2>
+          <div id="sdActiveAnswers" class="stack" style="margin-bottom:20px;"></div>
+          <button class="btn-primary" onclick="finishSingleDeviceTurn()">✅ J'ai fini, passer le téléphone</button>
+        </div>
+        <div id="sdHandoff" style="display:none;text-align:center;">
+          <p style="font-size:15px;color:var(--text-dim);margin:30px 0;">📱 Passe le téléphone à la personne suivante — elle ne doit pas voir cet écran avant d'appuyer ci-dessous.</p>
+          <button class="btn-primary" onclick="closeSingleDeviceHandoff()">C'est bon, à moi !</button>
+        </div>
+      </div>
+
 
       <!-- Phase 3 : la partie — écoute manche par manche + vote en direct +
            points selon la vitesse de réponse (construite le 12/07/2026). -->
@@ -800,6 +835,14 @@
             <p id="gqGuessTimeUpHint" style="display:none;font-size:12px;color:var(--text-faint);text-align:center;margin-top:12px;">⏰ Temps écoulé pour voter sur cette manche — révélation dans un instant.</p>
           </div>
 
+          <!-- Mode "un seul téléphone" (ajouté le 24/07/2026) : pas de vote, on
+               devine à voix haute — juste un bouton pour révéler quand le
+               groupe est prêt, voir renderGamePlaying(). -->
+          <div id="gqSingleDeviceRevealBox" style="display:none;text-align:center;margin-bottom:16px;">
+            <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">🎧 Devinez à voix haute qui a proposé ce morceau, puis révélez la réponse !</p>
+            <button class="btn-primary" onclick="revealGameRound()">🔍 Révéler</button>
+          </div>
+
           <div id="gqRevealBox" style="display:none;margin-bottom:16px;"></div>
 
           <!-- Le bouton "🔍 Révéler" manuel a été retiré le 13/07/2026 (à la
@@ -832,9 +875,16 @@
             <div style="font-size:32px;margin-bottom:10px;">🏆</div>
             <p style="font-size:15px;font-weight:700;margin-bottom:6px;">Partie terminée !</p>
           </div>
-          <div id="gqPodium" style="display:flex;align-items:flex-end;justify-content:center;gap:10px;margin:24px 0;"></div>
-          <h2 style="margin-top:8px;">Classement final</h2>
-          <div id="gqFinalScoreboard" class="stack"></div>
+          <!-- Classement/podium : uniquement pour les parties votées — mode
+               "un seul téléphone" (ajouté le 24/07/2026) n'a pas de score. -->
+          <div id="gqFinishedScored">
+            <div id="gqPodium" style="display:flex;align-items:flex-end;justify-content:center;gap:10px;margin:24px 0;"></div>
+            <h2 style="margin-top:8px;">Classement final</h2>
+            <div id="gqFinalScoreboard" class="stack"></div>
+          </div>
+          <div id="gqFinishedSingleDevice" style="display:none;text-align:center;margin:20px 0;">
+            <p style="font-size:13.5px;color:var(--text-dim);">Merci d'avoir joué ! Pas de classement pour cette partie sur un seul téléphone.</p>
+          </div>
           <div style="text-align:center;margin-top:20px;">
             <button class="btn-primary" style="width:auto;padding:12px 24px;" onclick="rejouerMemeSalon()">🔄 Rejouer dans ce salon</button>
             <p style="font-size:11px;color:var(--text-faint);margin-top:8px;">Retour au choix des questions, avec les mêmes amis, sans quitter le salon.</p>
@@ -913,7 +963,20 @@
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
             <span class="pill" id="btRoundCounter">Manche 1/5</span>
           </div>
-          <div class="card" style="margin-bottom:16px;">
+
+          <!-- Mode "un seul téléphone" (ajouté le 24/07/2026) : un seul
+               appareil gère vraiment la musique (comme "Diffuser ici" en
+               mode Soirée) — les autres ne créent pas leur propre lecteur, ce
+               qui évite une pub différente sur chaque téléphone. Purement
+               local (jamais synchronisé en base) : chacun choisit sur SON
+               appareil s'il diffuse ou non — voir toggleBtSingleDeviceBroadcast(). -->
+          <div id="btSingleDeviceCard" class="card" style="display:none;text-align:center;margin-bottom:16px;">
+            <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">🔊 Écoute en cours sur l'appareil qui diffuse — pas de deuxième lecteur ici, pour éviter une pub en plus.</p>
+            <button class="btn-primary" onclick="toggleBtSingleDeviceBroadcast()">🔊 C'est cet appareil qui diffuse</button>
+          </div>
+
+          <div id="btPlayerCardWrap" class="card" style="margin-bottom:16px;">
+            <button class="btn-ghost" id="btStopBroadcastBtn" style="display:none;width:auto;padding:6px 12px;font-size:12px;margin-bottom:10px;" onclick="toggleBtSingleDeviceBroadcast()">🔇 Arrêter de diffuser ici</button>
             <div style="position:relative;min-height:180px;">
               <div id="btYtPlayer"></div>
               <div id="btAudioCover" onclick="toggleBtPlayPause()" style="display:none;position:absolute;inset:0;cursor:pointer;background:linear-gradient(160deg,var(--accent1),var(--accent2));align-items:center;justify-content:center;flex-direction:column;gap:6px;border-radius:12px;color:#fff;text-align:center;padding:12px;">
@@ -955,6 +1018,13 @@
             <p id="btGuessTimeUpHint" style="display:none;font-size:12px;color:var(--text-faint);text-align:center;margin-top:12px;">⏰ Temps écoulé pour deviner sur cette manche — révélation dans un instant.</p>
           </div>
 
+          <!-- Mode "un seul téléphone" (ajouté le 24/07/2026) : pas de vote,
+               on devine à voix haute — voir renderBtPlaying(). -->
+          <div id="btSingleDeviceRevealBox" style="display:none;text-align:center;margin-bottom:16px;">
+            <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">🎧 Devinez à voix haute de quelle chanson il s'agit, puis révélez la réponse !</p>
+            <button class="btn-primary" onclick="revealBtRound()">🔍 Révéler</button>
+          </div>
+
           <div id="btRevealBox" style="display:none;margin-bottom:16px;"></div>
 
           <div id="btNextBox" style="display:none;text-align:center;margin-bottom:20px;">
@@ -973,9 +1043,15 @@
             <div style="font-size:32px;margin-bottom:10px;">🏆</div>
             <p style="font-size:15px;font-weight:700;margin-bottom:6px;">Partie terminée !</p>
           </div>
-          <div id="btPodium" style="display:flex;align-items:flex-end;justify-content:center;gap:10px;margin:24px 0;"></div>
-          <h2 style="margin-top:8px;">Classement final</h2>
-          <div id="btFinalScoreboard" class="stack"></div>
+          <!-- Mode "un seul téléphone" (ajouté le 24/07/2026) : pas de score. -->
+          <div id="btFinishedScored">
+            <div id="btPodium" style="display:flex;align-items:flex-end;justify-content:center;gap:10px;margin:24px 0;"></div>
+            <h2 style="margin-top:8px;">Classement final</h2>
+            <div id="btFinalScoreboard" class="stack"></div>
+          </div>
+          <div id="btFinishedSingleDevice" style="display:none;text-align:center;margin:20px 0;">
+            <p style="font-size:13.5px;color:var(--text-dim);">Merci d'avoir joué ! Pas de classement pour cette partie sur un seul téléphone.</p>
+          </div>
           <div style="text-align:center;margin-top:20px;">
             <button class="btn-primary" style="width:auto;padding:12px 24px;" onclick="rejouerBtMemeSalon()">🔄 Rejouer dans ce salon</button>
             <p style="font-size:11px;color:var(--text-faint);margin-top:8px;">Retour au choix des réglages, avec les mêmes amis, sans quitter le salon.</p>
@@ -1314,6 +1390,16 @@ let gameAnswers = [];
 let gamePickingQuestionId = null;
 let gameSelectedQuestionIds = []; // sélection en cours de construction par le créateur, avant validation
 
+// Mode "un seul téléphone" (ajouté le 24/07/2026) — pour "Le jeu des
+// questions"/"Qui a mis cette chanson ?" en salon single_device : le
+// téléphone tourne, une seule personne "active" à la fois. Purement local à
+// CET appareil (jamais en base) : singleDeviceActivePlayer est le prénom en
+// cours de réponse (ou null si on est sur l'écran "qui commence son tour" ou
+// l'écran de transition "passe le téléphone"), singleDeviceHandoff indique
+// qu'on est sur cet écran de transition (entre 2 tours).
+let singleDeviceActivePlayer = null;
+let singleDeviceHandoff = false;
+
 // Étapes du lobby (ajouté le 12/07/2026) : le créateur choisit d'abord un
 // nombre de manches, puis un mode de sélection des questions (à la main, ou
 // tirées au sort). gameRoundsTarget = null tant que l'étape 1 n'est pas
@@ -1377,6 +1463,12 @@ let btRoundIntroIdx = -1;
 let btVoteTimerInterval = null;
 let btVoteTimerRoundIdx = -1;
 let btPlayer = null; // lecteur YouTube de CET appareil, distinct de gamePlayer (écran différent)
+// Mode "un seul téléphone" (ajouté le 24/07/2026) : contrairement à la
+// soumission (inchangée), un seul appareil crée vraiment un lecteur YouTube à
+// l'écoute — sinon chaque téléphone déclencherait sa propre pub. Purement
+// local à CET appareil (jamais synchronisé en base, même principe que
+// isBroadcasting en mode Soirée) — voir toggleBtSingleDeviceBroadcast().
+let btSingleDeviceBroadcasting = false;
 let btAnswerSearchResults = [];
 let btAnswerSearchDebounce = null;
 
@@ -1967,7 +2059,9 @@ function previewMode(mode){
   if(mode === "serie"){ startSerieFromPool(); return; }
   pendingMode = mode;
   const d = MODE_DETAIL[mode];
-  document.getElementById("confirmTitle").textContent = `Créer ce salon : ${d.emoji} ${d.title} ?`;
+  // Le "?" n'est ajouté que si le titre du mode n'en a pas déjà un lui-même
+  // (ex. "Qui a mis cette chanson ?"), pour éviter un double "? ?".
+  document.getElementById("confirmTitle").textContent = `Créer ce salon : ${d.emoji} ${d.title}${d.title.endsWith("?") ? "" : " ?"}`;
   document.getElementById("confirmCard").innerHTML = `
     <div class="mode-icon">${d.emoji}</div>
     <div>
@@ -1978,8 +2072,29 @@ function previewMode(mode){
   // Le Blindtest solo (ajouté le 19/07/2026) ne nécessite pas de vrai salon —
   // voir goSoloBlindtest(). Les autres modes n'ont pas cette alternative.
   document.getElementById("btSoloInstead").style.display = mode === "blindtest" ? "block" : "none";
+  // Mode "un seul téléphone" (ajouté le 24/07/2026) : proposé seulement pour
+  // les 3 jeux multijoueur, avec un texte différent selon le mécanisme réel
+  // (téléphone qui tourne pour questions/owner, simple écoute partagée pour
+  // blindtest) — voir SINGLE_DEVICE_HINT.
+  const singleDeviceOption = document.getElementById("singleDeviceOption");
+  const checkbox = document.getElementById("singleDeviceCheckbox");
+  checkbox.checked = false;
+  if(SINGLE_DEVICE_HINT[mode]){
+    singleDeviceOption.style.display = "flex";
+    document.getElementById("singleDeviceHint").textContent = SINGLE_DEVICE_HINT[mode];
+  } else {
+    singleDeviceOption.style.display = "none";
+  }
   showScreen("screen-confirm");
 }
+
+// Textes d'aide du réglage "un seul téléphone" (ajouté le 24/07/2026) — un
+// seul par mode concerné, absent des autres (mode masqué dans ce cas).
+const SINGLE_DEVICE_HINT = {
+  questions: "Le téléphone tourne : chacun choisit ses réponses en privé à son tour, puis le passe au suivant. À l'écoute, on devine à voix haute — pas de vote, pas de classement.",
+  owner: "Le téléphone tourne : chacun choisit ses chansons en privé à son tour, puis le passe au suivant. À l'écoute, on devine à voix haute — pas de vote, pas de classement.",
+  blindtest: "Chacun propose ses chansons depuis son propre téléphone comme d'habitude — seule l'écoute se fait sur un seul appareil (comme \"Diffuser ici\" en mode Soirée). On devine à voix haute, pas de vote ni de classement."
+};
 
 // Quitte n'importe quel écran vers l'accueil en coupant proprement tout
 // lecteur actif au passage (ajouté le 19/07/2026, nécessaire depuis que le
@@ -2007,7 +2122,8 @@ async function confirmCreateRoom(){
   if(!pendingMode) return;
   const mode = pendingMode;
   pendingMode = null;
-  await selectMode(mode);
+  const singleDevice = SINGLE_DEVICE_HINT[mode] ? document.getElementById("singleDeviceCheckbox").checked : false;
+  await selectMode(mode, singleDevice);
 }
 
 // Modes déjà reliés à une vraie base de données (les autres restent en
@@ -2036,10 +2152,10 @@ const REAL_MODES = ["soiree", "distance", "questions", "blindtest", "owner"];
 // de démo (MOCK_ROOMS/enterMockRoom) a été retiré le 22/07/2026, Round 50 :
 // il ne servait plus qu'à masquer des bugs de navigation derrière du faux
 // contenu (voir idees.md).
-async function selectMode(mode){
+async function selectMode(mode, singleDevice){
   if(!currentUser){ showToast("Connecte-toi d'abord."); showScreen("screen-login"); return; }
   const code = generateRoomCode();
-  const { data, error } = await sb.from("rooms").insert({ code, mode, created_by: currentUser.id }).select().single();
+  const { data, error } = await sb.from("rooms").insert({ code, mode, created_by: currentUser.id, single_device: !!singleDevice }).select().single();
   if(error){ showToast("Erreur à la création du salon : " + error.message); return; }
   await enterRealRoom(data, `Salon créé pour de vrai — code ${data.code}. Partage ce code à tes amis pour qu'ils te rejoignent !`);
 }
@@ -2098,6 +2214,8 @@ async function enterRealRoom(room, toastMsg){
     gameMyGuessSelection = new Set();
     gameAutoRevealRoundIdx = -1;
     gameQuestionIntroRoundIdx = -1;
+    singleDeviceActivePlayer = null;
+    singleDeviceHandoff = false;
     renderRoomAvatars("gqRoomAvatars");
     showScreen("screen-game-lobby");
     await loadGameAnswers(room.id);
@@ -2117,6 +2235,7 @@ async function enterRealRoom(room, toastMsg){
     btMyGuess = null;
     btAutoRevealRoundIdx = -1;
     btRoundIntroIdx = -1;
+    btSingleDeviceBroadcasting = false;
     renderRoomAvatars("btRoomAvatars");
     showScreen("screen-blindtest-lobby");
     await loadGameAnswers(room.id);
@@ -3933,15 +4052,20 @@ function renderGameLobby(){
   if(!currentRoom) return;
   renderRoomAvatars("gqRoomAvatars");
   const phase = currentRoom.game_phase || "lobby";
+  const singleDevice = !!currentRoom.single_device;
   document.getElementById("gqPhaseLobby").style.display = phase === "lobby" ? "block" : "none";
-  document.getElementById("gqPhaseAnswering").style.display = phase === "answering" ? "block" : "none";
+  document.getElementById("gqPhaseAnswering").style.display = (phase === "answering" && !singleDevice) ? "block" : "none";
+  document.getElementById("gqSingleDeviceAnswering").style.display = (phase === "answering" && singleDevice) ? "block" : "none";
   document.getElementById("gqPhasePlaying").style.display = (phase === "playing" || phase === "finished") ? "block" : "none";
   document.getElementById("gqPlayingActive").style.display = phase === "playing" ? "block" : "none";
   document.getElementById("gqPhaseFinished").style.display = phase === "finished" ? "block" : "none";
 
   const isOwnerMode = currentRoom.mode === "owner";
   if(phase === "lobby") { isOwnerMode ? renderOwnerLobbySetup() : renderQuestionPicker(); }
-  else if(phase === "answering") { isOwnerMode ? renderOwnerAnsweringPhase() : renderAnsweringPhase(); }
+  else if(phase === "answering") {
+    if(singleDevice){ renderSingleDeviceAnswering(); }
+    else { isOwnerMode ? renderOwnerAnsweringPhase() : renderAnsweringPhase(); }
+  }
   else if(phase === "playing") renderGamePlaying();
   else renderGameFinished();
 }
@@ -4221,6 +4345,111 @@ function updateLaunchButton(questionIds){
   }
 }
 
+/* ---- Phase 2, mode "un seul téléphone" (ajouté le 24/07/2026) : le
+   téléphone tourne, une personne "active" à la fois — voir
+   singleDeviceActivePlayer/singleDeviceHandoff. Réutilise openGameAnswerModal()/
+   saveGameAnswerTrack() telles quelles (voir plus bas), qui taguent la
+   réponse avec local_player_name quand currentRoom.single_device est actif. ---- */
+function getSingleDeviceLocalNames(){
+  const names = [];
+  gameAnswers.forEach(a => { if(a.local_player_name && !names.includes(a.local_player_name)) names.push(a.local_player_name); });
+  return names;
+}
+
+function renderSingleDeviceAnswering(){
+  const questionIds = currentRoom.game_question_ids || [];
+  const isOwnerMode = currentRoom.mode === "owner";
+  const total = questionIds.length;
+
+  document.getElementById("sdPickPlayer").style.display = (!singleDeviceActivePlayer && !singleDeviceHandoff) ? "block" : "none";
+  document.getElementById("sdTurnActive").style.display = (singleDeviceActivePlayer && !singleDeviceHandoff) ? "block" : "none";
+  document.getElementById("sdHandoff").style.display = singleDeviceHandoff ? "block" : "none";
+  if(singleDeviceHandoff) return;
+
+  if(singleDeviceActivePlayer){
+    document.getElementById("sdActiveName").textContent = singleDeviceActivePlayer;
+    const myAnswers = gameAnswers.filter(a => a.local_player_name === singleDeviceActivePlayer);
+    document.getElementById("sdActiveAnswers").innerHTML = questionIds.map(qid => {
+      const q = GAME_QUESTIONS.find(x => x.id === qid);
+      const label = q ? q.label : (isOwnerMode ? `🎵 Chanson n°${String(qid).slice(2)}` : qid);
+      const mine = myAnswers.find(a => a.question_id === qid);
+      return `
+        <div class="search-result" style="align-items:flex-start;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:600;">${escapeHtml(label)}</div>
+            ${mine
+              ? `<div style="font-size:12.5px;color:var(--text-dim);margin-top:2px;">✅ ${escapeHtml(mine.title)} — ${escapeHtml(mine.artist||"")}</div>`
+              : `<div style="font-size:12.5px;color:var(--text-faint);margin-top:2px;">${isOwnerMode ? "Pas encore proposée" : "Pas encore répondu"}</div>`}
+          </div>
+          <button class="add-btn" onclick="openGameAnswerModal('${qid}')" title="${mine ? "Changer" : (isOwnerMode ? "Proposer" : "Répondre")}" style="width:auto;padding:0 12px;">${mine ? "✏️ Modifier" : (isOwnerMode ? "➕ Proposer" : "➕ Répondre")}</button>
+        </div>
+      `;
+    }).join("");
+    return;
+  }
+
+  // Écran "qui commence son tour" : liste de qui a déjà joué (sans pouvoir
+  // rouvrir ses réponses en un clic — voir le tour suivant, saisir le MÊME
+  // prénom permet de reprendre/corriger, mais il faut le retaper soi-même,
+  // pas juste taper sur un bouton qui exposerait les réponses de quelqu'un
+  // d'autre à la personne qui tient le téléphone).
+  const doneNames = getSingleDeviceLocalNames();
+  document.getElementById("sdPickPlayerHint").textContent = doneNames.length
+    ? `${doneNames.length} joueur(s) ont déjà ${isOwnerMode ? "proposé" : "répondu"}. Pour corriger ses réponses, retape son prénom exactement.`
+    : `Personne n'a encore ${isOwnerMode ? "proposé" : "répondu"} — commencez par la première personne.`;
+  document.getElementById("sdPlayersList").innerHTML = doneNames.map(name => {
+    const count = gameAnswers.filter(a => a.local_player_name === name && questionIds.includes(a.question_id)).length;
+    const done = total > 0 && count >= total;
+    return `
+      <div class="search-result">
+        <div class="avatar" style="width:30px;height:30px;background:var(--accent1);font-size:12px;">${escapeHtml((name||"?")[0].toUpperCase())}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:600;">${escapeHtml(name)}</div>
+          <div style="font-size:11.5px;color:var(--text-faint);">${count}/${total} ${isOwnerMode ? "proposition(s)" : "réponse(s)"}${done ? " ✅" : ""}</div>
+        </div>
+      </div>
+    `;
+  }).join("");
+  updateSingleDeviceLaunchButton(doneNames, total);
+}
+
+function updateSingleDeviceLaunchButton(doneNames, total){
+  const btn = document.getElementById("sdLaunchBtn");
+  const hint = document.getElementById("sdLaunchHint");
+  const questionIds = currentRoom.game_question_ids || [];
+  const allDone = doneNames.length > 0 && doneNames.every(name =>
+    gameAnswers.filter(a => a.local_player_name === name && questionIds.includes(a.question_id)).length >= total
+  );
+  if(allDone){
+    btn.disabled = false;
+    hint.textContent = `${doneNames.length} joueur(s) prêt(s) — lance la partie, ou fais jouer quelqu'un de plus.`;
+  } else {
+    btn.disabled = true;
+    hint.textContent = "Fais répondre au moins une personne (à toutes les manches) pour pouvoir lancer.";
+  }
+}
+
+function startSingleDeviceTurn(){
+  if(!currentRoom) return;
+  const input = document.getElementById("sdNewPlayerName");
+  const name = (input.value || "").trim();
+  if(!name){ showToast("Tape un prénom pour commencer le tour."); return; }
+  singleDeviceActivePlayer = name;
+  input.value = "";
+  renderGameLobby();
+}
+
+function finishSingleDeviceTurn(){
+  singleDeviceActivePlayer = null;
+  singleDeviceHandoff = true;
+  renderGameLobby();
+}
+
+function closeSingleDeviceHandoff(){
+  singleDeviceHandoff = false;
+  renderGameLobby();
+}
+
 // Réutilisée par "Le jeu des questions" ET le Blindtest (ajouté le
 // 19/07/2026) — game_excluded_user_ids est une colonne générique de "rooms",
 // currentRoom.mode dit lequel des deux écrans redessiner ensuite.
@@ -4269,9 +4498,17 @@ function computeGameRounds(){
           artist: a.artist || "",
           thumbnail: a.thumbnail || "",
           owner_user_ids: [],
+          // Mode "un seul téléphone" (ajouté le 24/07/2026) : toutes les
+          // réponses viennent du MÊME compte réel (celui de l'appareil qui
+          // tourne) — owner_user_ids ne sert donc à rien pour savoir qui a
+          // proposé quoi. owner_local_names porte cette info à la place (voir
+          // local_player_name dans game_answers) — vide pour les parties
+          // classiques.
+          owner_local_names: [],
         });
       }
       groups.get(key).owner_user_ids.push(a.user_id);
+      if(a.local_player_name) groups.get(key).owner_local_names.push(a.local_player_name);
     });
     rounds.push(...groups.values());
   });
@@ -4390,8 +4627,31 @@ function renderGamePlaying(){
 
   ensureGamePlayer(round);
 
-  const iAmOwner = (round.owner_user_ids || []).includes(currentUser?.id);
+  const singleDevice = !!currentRoom.single_device;
   const isOwnerGame = currentRoom.mode === "owner";
+
+  // Mode "un seul téléphone" (ajouté le 24/07/2026) : pas de vote, pas de
+  // score — on devine à voix haute, voir gqSingleDeviceRevealBox. Tout le
+  // bloc vote (gqOwnerNote/gqGuessBox/minuteur/classement) reste caché.
+  if(singleDevice){
+    document.getElementById("gqOwnerNote").style.display = "none";
+    document.getElementById("gqGuessBox").style.display = "none";
+    document.getElementById("gqScoreboardBox").style.display = "none";
+    document.getElementById("gqSingleDeviceRevealBox").style.display = !revealed ? "block" : "none";
+    document.getElementById("gqRevealBox").style.display = revealed ? "block" : "none";
+    if(revealed) renderGameReveal(round);
+    const isLast = idx >= total - 1;
+    document.getElementById("gqNextBox").style.display = revealed ? "block" : "none";
+    if(revealed){
+      const actionBtn = document.getElementById("gqRevealBtn");
+      actionBtn.textContent = isLast ? "🏁 Terminer la partie" : "➡️ Chanson suivante";
+      actionBtn.onclick = nextGameRound;
+    }
+    return;
+  }
+  document.getElementById("gqSingleDeviceRevealBox").style.display = "none";
+
+  const iAmOwner = (round.owner_user_ids || []).includes(currentUser?.id);
   document.getElementById("gqOwnerNoteText").textContent = isOwnerGame
     ? "🎵 C'est l'une de tes propositions ! Profite du morceau — les autres devinent qui l'a proposé."
     : "🎵 C'est l'une de tes réponses ! Profite du morceau — les autres devinent qui l'a choisi.";
@@ -4714,6 +4974,22 @@ async function revealGameRound(){
 }
 
 function renderGameReveal(round){
+  const isOwnerGameForLabel = currentRoom.mode === "owner";
+  // Mode "un seul téléphone" : pas de vote donc pas de points à afficher —
+  // juste la réponse, à partir des prénoms locaux (owner_local_names) plutôt
+  // que des vrais comptes (tous identiques dans ce mode).
+  if(currentRoom.single_device){
+    const names = (round.owner_local_names || []).join(", ");
+    const chosenLabel = isOwnerGameForLabel ? "Proposé par : " : "Choisi par : ";
+    const noneLabel = isOwnerGameForLabel ? "Personne n'a proposé ça" : "Personne n'a choisi ça";
+    document.getElementById("gqRevealBox").innerHTML = `
+      <div class="card" style="text-align:center;">
+        <div style="font-size:13px;color:var(--text-dim);margin-bottom:6px;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
+        <div style="font-size:15px;font-weight:700;">${names ? chosenLabel + escapeHtml(names) : noneLabel}</div>
+      </div>
+    `;
+    return;
+  }
   const owners = round.owner_user_ids || [];
   const ownerNames = owners.map(uid => getPseudoForUserId(uid)).join(", ");
   const myGuesses = gameGuesses.filter(g => g.round_index === currentRoom.game_current_round && g.guesser_user_id === currentUser?.id);
@@ -4817,6 +5093,11 @@ function renderGameScoreboard(){
 // reste du classement en liste juste en dessous.
 function renderGameFinished(){
   stopGamePlayer();
+  // Mode "un seul téléphone" : pas de vote, donc pas de score ni de podium —
+  // juste un message de fin (ajouté le 24/07/2026).
+  document.getElementById("gqFinishedScored").style.display = currentRoom.single_device ? "none" : "block";
+  document.getElementById("gqFinishedSingleDevice").style.display = currentRoom.single_device ? "block" : "none";
+  if(currentRoom.single_device) return;
   const scores = computeGameScores();
   const entries = getGameParticipantIds()
     .map(uid => [uid, getPseudoForUserId(uid), scores[uid] || 0])
@@ -4890,6 +5171,8 @@ async function rejouerMemeSalon(){
   gameMyGuessSelection = new Set();
   gameAutoRevealRoundIdx = -1;
   gameQuestionIntroRoundIdx = -1;
+  singleDeviceActivePlayer = null;
+  singleDeviceHandoff = false;
   showToast(currentRoom.mode === "owner" ? "🔄 Nouvelle partie ! Proposez de nouvelles chansons." : "🔄 Nouvelle partie ! Choisissez de nouvelles questions.");
   renderGameLobby();
 }
@@ -5095,14 +5378,23 @@ async function renderGameAnswerResults(q){
 // snake_case, comme en base) — voir pickGameAnswer()/pickGameAnswerFromMine().
 async function saveGameAnswerTrack(title, artist, youtubeId, thumbnail){
   if(!gamePickingQuestionId || !currentRoom) return;
+  // Mode "un seul téléphone" (ajouté le 24/07/2026) : toutes les réponses
+  // viennent du même compte réel (celui de l'appareil qui tourne) — c'est
+  // local_player_name qui distingue les réponses des différents joueurs
+  // locaux entre elles (voir singleDeviceActivePlayer, et la contrainte
+  // élargie dans harmonize-schema.sql). Vide ('') pour toutes les autres
+  // parties, y compris le Blindtest en mode "un seul téléphone" simple (sa
+  // soumission reste par appareil, pas de téléphone qui tourne).
+  const localPlayerName = (currentRoom.single_device && singleDeviceActivePlayer) ? singleDeviceActivePlayer : "";
   const { error } = await sb.from("game_answers").upsert({
     room_id: currentRoom.id,
     question_id: gamePickingQuestionId,
     user_id: currentUser.id,
+    local_player_name: localPlayerName,
     title, artist,
     youtube_id: youtubeId,
     thumbnail: thumbnail || "",
-  }, { onConflict: "room_id,question_id,user_id" });
+  }, { onConflict: "room_id,question_id,user_id,local_player_name" });
   if(error){ showToast("Erreur d'enregistrement de ta réponse : " + error.message); return; }
   showToast(`Réponse enregistrée : "${title}"`);
   closeGameAnswerModal();
@@ -5540,6 +5832,13 @@ function currentBtRound(){
   return rounds[currentRoom?.game_current_round] || null;
 }
 
+// Mode "un seul téléphone" (ajouté le 24/07/2026) — voir btSingleDeviceBroadcasting.
+function toggleBtSingleDeviceBroadcast(){
+  btSingleDeviceBroadcasting = !btSingleDeviceBroadcasting;
+  if(!btSingleDeviceBroadcasting) stopBtPlayer();
+  renderBlindtestLobby();
+}
+
 function renderBtPlaying(){
   const rounds = currentRoom.game_rounds || [];
   const idx = currentRoom.game_current_round || 0;
@@ -5556,6 +5855,14 @@ function renderBtPlaying(){
   // déblocage de 10 secondes, on ne réaffiche ni le cache ni la couche de
   // clic par-dessus, même si ce rendu est déclenché par une mise à jour
   // reçue entre-temps (vote d'un autre participant, etc.).
+  const singleDevice = !!currentRoom.single_device;
+  // Mode "un seul téléphone" : un seul appareil crée vraiment un lecteur —
+  // les autres voient juste un message (voir toggleBtSingleDeviceBroadcast()).
+  const isPlayerDevice = !singleDevice || btSingleDeviceBroadcasting;
+  document.getElementById("btSingleDeviceCard").style.display = (singleDevice && !btSingleDeviceBroadcasting) ? "block" : "none";
+  document.getElementById("btPlayerCardWrap").style.display = isPlayerDevice ? "block" : "none";
+  document.getElementById("btStopBroadcastBtn").style.display = (singleDevice && btSingleDeviceBroadcasting) ? "inline-block" : "none";
+
   const audioOnly = currentRoom.game_display_mode === "audio";
   const cover = document.getElementById("btAudioCover");
   if(cover) cover.style.display = (audioOnly && !revealed && !btAdSkipActive) ? "flex" : "none";
@@ -5572,7 +5879,27 @@ function renderBtPlaying(){
   const adSkipBtn = document.getElementById("btAdSkipBtn");
   if(adSkipBtn) adSkipBtn.style.display = audioOnly ? "" : "none";
 
-  ensureBtPlayer(round);
+  if(isPlayerDevice) ensureBtPlayer(round);
+
+  // Mode "un seul téléphone" : pas de vote, on devine à voix haute — tout le
+  // bloc vote (btOwnerNote/btGuessBox/minuteur/classement) reste caché.
+  if(singleDevice){
+    document.getElementById("btOwnerNote").style.display = "none";
+    document.getElementById("btGuessBox").style.display = "none";
+    document.getElementById("btScoreboardBox").style.display = "none";
+    document.getElementById("btSingleDeviceRevealBox").style.display = !revealed ? "block" : "none";
+    document.getElementById("btRevealBox").style.display = revealed ? "block" : "none";
+    if(revealed) renderBtReveal(round);
+    const isLastSd = idx >= total - 1;
+    document.getElementById("btNextBox").style.display = revealed ? "block" : "none";
+    if(revealed){
+      const actionBtn = document.getElementById("btRevealBtn");
+      actionBtn.textContent = isLastSd ? "🏁 Terminer la partie" : "➡️ Chanson suivante";
+      actionBtn.onclick = nextBtRound;
+    }
+    return;
+  }
+  document.getElementById("btSingleDeviceRevealBox").style.display = "none";
 
   const iAmOwner = (round.owner_user_ids || []).includes(currentUser?.id);
 
@@ -5694,6 +6021,7 @@ async function toggleBtPlayPause(){
 function stopBtPlayer(){
   if(btPlayer){ try { btPlayer.destroy(); } catch(e) {} btPlayer = null; }
   stopBtVoteTimer();
+  btSingleDeviceBroadcasting = false;
 }
 
 // Ajouté le 19/07/2026 : remonté par Rémi en testant sur téléphone — une pub
@@ -5850,6 +6178,18 @@ async function revealBtRound(){
 }
 
 function renderBtReveal(round){
+  const owners = round.owner_user_ids || [];
+  const ownerNames = owners.map(uid => getPseudoForUserId(uid)).join(", ");
+  // Mode "un seul téléphone" : pas de vote donc pas de points à afficher.
+  if(currentRoom.single_device){
+    document.getElementById("btRevealBox").innerHTML = `
+      <div class="card" style="text-align:center;">
+        <div style="font-size:15px;font-weight:700;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
+        <div style="font-size:12.5px;color:var(--text-dim);margin-top:6px;">Proposée par : ${escapeHtml(ownerNames || "quelqu'un")}</div>
+      </div>
+    `;
+    return;
+  }
   const myGuess = btGuesses.find(g => g.round_index === currentRoom.game_current_round && g.guesser_user_id === currentUser?.id);
   let myPoints = 0;
   let lightning = false;
@@ -5858,8 +6198,6 @@ function renderBtReveal(round){
     myPoints = pts.total;
     lightning = pts.lightning;
   }
-  const owners = round.owner_user_ids || [];
-  const ownerNames = owners.map(uid => getPseudoForUserId(uid)).join(", ");
   const iAmOwner = owners.includes(currentUser?.id);
   document.getElementById("btRevealBox").innerHTML = `
     <div class="card" style="text-align:center;">
@@ -5934,6 +6272,11 @@ function renderBtScoreboard(){
 
 function renderBtFinished(){
   stopBtPlayer();
+  btSingleDeviceBroadcasting = false;
+  // Mode "un seul téléphone" : pas de vote, donc pas de score ni de podium.
+  document.getElementById("btFinishedScored").style.display = currentRoom.single_device ? "none" : "block";
+  document.getElementById("btFinishedSingleDevice").style.display = currentRoom.single_device ? "block" : "none";
+  if(currentRoom.single_device) return;
   const scores = computeBtScores();
   const entries = getGameParticipantIds()
     .map(uid => [uid, getPseudoForUserId(uid), scores[uid] || 0])
@@ -6009,6 +6352,7 @@ async function rejouerBtMemeSalon(){
   btMyGuess = null;
   btAutoRevealRoundIdx = -1;
   btRoundIntroIdx = -1;
+  btSingleDeviceBroadcasting = false;
   showToast("🔄 Nouvelle partie ! Proposez de nouvelles chansons.");
   renderBlindtestLobby();
 }
