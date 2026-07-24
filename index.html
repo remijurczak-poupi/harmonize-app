@@ -97,6 +97,19 @@
   .card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;}
   .stack{display:flex;flex-direction:column;gap:12px;}
 
+  /* Interrupteur on/off façon iOS (ajouté le 24/07/2026, remplace une case à
+     cocher classique — choisi par Rémi pour être plus simple à toucher sur
+     téléphone). Technique standard : la vraie case à cocher reste dans le DOM
+     (accessible, lue tel quel en JS via .checked) mais rendue invisible ;
+     .toggle-track/.toggle-thumb sont stylés à la place, et réagissent à
+     :checked sur la case juste avant eux dans le HTML. */
+  .toggle-switch{position:relative;display:inline-block;width:46px;height:27px;flex-shrink:0;}
+  .toggle-switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;}
+  .toggle-track{position:absolute;inset:0;background:var(--bg-elevated);border:1px solid var(--border);border-radius:999px;transition:background .15s,border-color .15s;}
+  .toggle-track::after{content:"";position:absolute;top:2px;left:2px;width:21px;height:21px;border-radius:50%;background:var(--text-faint);transition:transform .15s,background .15s;}
+  .toggle-switch input:checked + .toggle-track{background:var(--accent1);border-color:var(--accent1);}
+  .toggle-switch input:checked + .toggle-track::after{transform:translateX(19px);background:#fff;}
+
   input[type=text], input[type=password], input[type=email]{
     width:100%;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);
     padding:13px 14px;border-radius:var(--radius-sm);font-size:15px;outline:none;
@@ -384,12 +397,17 @@
       <p class="sub">Un vrai code sera généré pour que tes amis puissent te rejoindre. Rien n'est créé tant que tu n'as pas confirmé.</p>
       <div class="mode-card" id="confirmCard" style="cursor:default;"></div>
       <!-- Mode "un seul téléphone" (ajouté le 24/07/2026), proposé uniquement
-           pour les 3 jeux multijoueur — voir previewMode()/singleDeviceLabel(). -->
-      <label class="card" id="singleDeviceOption" style="display:none;margin-top:14px;align-items:flex-start;gap:10px;cursor:pointer;">
-        <input type="checkbox" id="singleDeviceCheckbox" style="margin-top:3px;width:18px;height:18px;flex-shrink:0;" />
+           pour les 3 jeux multijoueur — voir previewMode()/singleDeviceLabel().
+           Interrupteur plutôt qu'une case à cocher (choisi par Rémi, plus
+           simple à toucher sur téléphone) — voir .toggle-switch dans le CSS. -->
+      <label class="card" id="singleDeviceOption" style="display:none;margin-top:14px;align-items:center;justify-content:space-between;gap:14px;cursor:pointer;">
         <span>
           <span style="font-weight:600;">📱 Jouer sur un seul téléphone</span><br/>
           <span style="color:var(--text-dim);font-size:13px;line-height:1.4;" id="singleDeviceHint"></span>
+        </span>
+        <span class="toggle-switch">
+          <input type="checkbox" id="singleDeviceCheckbox" />
+          <span class="toggle-track"></span>
         </span>
       </label>
       <button class="btn-primary" onclick="confirmCreateRoom()">🚀 Créer le salon</button>
