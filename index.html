@@ -47,6 +47,18 @@
     background:radial-gradient(circle at 20% -10%, #241c3a 0%, var(--bg) 45%);
     color:var(--text);
     min-height:100vh;
+    /* Texte non sélectionnable partout (ajouté le 24/07/2026, demande de
+       Rémi) — sauf le code du salon (voir #roomCode/#gqRoomCode/#btRoomCode
+       plus bas), qui doit rester copiable pour le partager. N'affecte jamais
+       la saisie dans les champs (input/textarea gardent toujours leur propre
+       sélection, quoi qu'il arrive sur leurs parents). -webkit-touch-callout
+       en plus pour cacher aussi le menu "Copier" au appui long sur iOS. */
+    -webkit-user-select:none;-moz-user-select:none;user-select:none;
+    -webkit-touch-callout:none;
+  }
+  #roomCode, #gqRoomCode, #btRoomCode{
+    -webkit-user-select:text;-moz-user-select:text;user-select:text;
+    -webkit-touch-callout:default;
   }
   .app{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;position:relative;}
   header.topbar{
