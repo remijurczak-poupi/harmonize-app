@@ -1635,6 +1635,12 @@ let seriePlayer = null;
 let serieStreak = 0;
 let serieAnswered = false;
 let serieCurrentCorrect = null;
+// Chansons déjà jouées (comme "bonne réponse") pendant CETTE série (ajouté
+// le 24/07/2026, retour de Rémi : une même chanson pouvait revenir plusieurs
+// fois pendant une même série) — remis à zéro à chaque nouvelle série (voir
+// beginSerieSession()). Une fois tout le pool épuisé (streak très longue),
+// on recommence à piocher dans tout le pool plutôt que de bloquer le jeu.
+let serieUsedIds = new Set();
 let serieRecordToday = 0;
 let serieRecordAllTime = 0;
 const SERIE_MIN_TRACKS = 4; // il faut au moins 1 bonne réponse + 3 pièges
@@ -1662,6 +1668,7 @@ async function startSerieFromPool(){
 async function beginSerieSession(tracks){
   serieQueue = tracks.filter(t => t.youtube_id);
   serieStreak = 0;
+  serieUsedIds = new Set();
   document.getElementById("serieSourceHint").textContent = "Enchaîne un maximum de bonnes réponses sans te tromper !";
   await loadSerieRecords();
   updateSerieCounters();
@@ -1696,13 +1703,36 @@ function updateSerieCounters(){
   document.getElementById("serieRecordAllTime").textContent = serieRecordAllTime;
 }
 
+// Choisit des pièges dans la même langue que la bonne réponse en priorité
+// (ajouté le 24/07/2026, retour de Rémi : la bonne réponse était souvent
+// trop facile à deviner par élimination) — si la chanson n'a pas de langue
+// connue, ou pas assez de pièges dans cette langue, on complète avec le
+// reste du pool au hasard, exactement comme avant. Partagé entre Série de
+// blindtest et Blindtest solo (même pool, même logique).
+function pickDecoysPreferringLanguage(correct, others, count){
+  const sameLanguage = correct.language ? others.filter(t => t.language === correct.language) : [];
+  const rest = others.filter(t => !sameLanguage.includes(t));
+  const decoyPool = [...shuffleArray(sameLanguage), ...shuffleArray(rest)];
+  return decoyPool.slice(0, Math.min(count, decoyPool.length));
+}
+
 function startSerieRound(){
   serieAnswered = false;
   resetSerieAdSkipUI();
   document.getElementById("serieResultPanel").style.display = "none";
-  const correct = serieQueue[Math.floor(Math.random() * serieQueue.length)];
+  // Jamais 2 fois la même chanson à deviner dans une même série (ajouté le
+  // 24/07/2026, retour de Rémi) — on pioche parmi celles pas encore jouées ;
+  // une fois tout le pool épuisé (streak très longue), on recommence à
+  // piocher dans tout le pool plutôt que de bloquer le jeu.
+  let notYetUsed = serieQueue.filter(t => !serieUsedIds.has(t.youtube_id));
+  if(!notYetUsed.length){
+    serieUsedIds = new Set();
+    notYetUsed = serieQueue;
+  }
+  const correct = notYetUsed[Math.floor(Math.random() * notYetUsed.length)];
+  serieUsedIds.add(correct.youtube_id);
   const others = serieQueue.filter(t => t.youtube_id !== correct.youtube_id);
-  const decoys = shuffleArray(others).slice(0, Math.min(3, others.length));
+  const decoys = pickDecoysPreferringLanguage(correct, others, 3);
   const options = shuffleArray([correct, ...decoys]);
   serieCurrentCorrect = correct;
   document.getElementById("serieGuessGrid").innerHTML = options.map(o => `
@@ -6448,6 +6478,44 @@ function renderBtFinished(){
   `).join("");
 }
 
+// Langue déclarée d'un lot de vidéos YouTube (ajouté le 24/07/2026, retour
+// de Rémi : en Blindtest en série, la bonne réponse était souvent trop
+// facile à deviner par élimination parmi les pièges — l'idée est de
+// proposer des pièges dans la même langue en priorité). Coût très faible
+// (1 unité de quota par appel, jusqu'à 50 vidéos par appel — contre 100
+// pour une seule recherche, voir searchYouTube()) : on utilise "videos.list"
+// plutôt que "search.list". Pas toujours renseignée par la personne qui a
+// mis la vidéo en ligne — dans ce cas la chanson reste sans langue connue
+// (null), et les pièges restent choisis au hasard pour elle, comme avant.
+async function fetchYoutubeLanguages(videoIds){
+  const languages = {};
+  for(let i = 0; i < videoIds.length; i += 50){
+    const batch = videoIds.slice(i, i + 50);
+    let succeeded = false;
+    for(const key of YOUTUBE_API_KEYS){
+      const url = "https://www.googleapis.com/youtube/v3/videos"
+        + "?part=snippet&id=" + batch.map(encodeURIComponent).join(",")
+        + "&key=" + key;
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        if(res.ok){
+          (data.items || []).forEach(item => {
+            const lang = item.snippet?.defaultAudioLanguage || item.snippet?.defaultLanguage || null;
+            // Seulement les 2 premières lettres (ex. "fr-FR" → "fr") pour
+            // regrouper les variantes régionales d'une même langue.
+            languages[item.id] = lang ? lang.slice(0, 2).toLowerCase() : null;
+          });
+          succeeded = true;
+          break;
+        }
+      } catch(e){ /* on essaie la clé suivante */ }
+    }
+    if(!succeeded) console.warn("[Harmonize] Impossible de récupérer la langue d'un lot de vidéos (toutes les clés ont échoué).");
+  }
+  return languages;
+}
+
 // Alimente le pool communautaire (voir blindtest_pool dans
 // harmonize-schema.sql) avec toutes les chansons de cette partie, pour le
 // mode solo "chansons aléatoires". Doublons ignorés (ON CONFLICT côté
@@ -6457,8 +6525,22 @@ function renderBtFinished(){
 async function populateBtPool(rounds){
   const rows = (rounds || [])
     .filter(r => r.youtube_id)
-    .map(r => ({ youtube_id: r.youtube_id, title: r.title, artist: r.artist || "", thumbnail: r.thumbnail || "" }));
+    .map(r => ({ youtube_id: r.youtube_id, title: r.title, artist: r.artist || "", thumbnail: r.thumbnail || "", language: null }));
   if(!rows.length) return;
+
+  // Langue détectée uniquement pour les chansons VRAIMENT nouvelles dans le
+  // pool — inutile de dépenser du quota pour celles déjà connues, de toute
+  // façon ignorées par l'upsert ci-dessous (ignoreDuplicates).
+  try {
+    const { data: existing } = await sb.from("blindtest_pool").select("youtube_id").in("youtube_id", rows.map(r => r.youtube_id));
+    const existingIds = new Set((existing || []).map(r => r.youtube_id));
+    const newRows = rows.filter(r => !existingIds.has(r.youtube_id));
+    if(newRows.length){
+      const languages = await fetchYoutubeLanguages(newRows.map(r => r.youtube_id));
+      newRows.forEach(r => { r.language = languages[r.youtube_id] || null; });
+    }
+  } catch(e){ console.warn("[Harmonize] Détection de langue ignorée :", e.message); }
+
   const { error } = await sb.from("blindtest_pool").upsert(rows, { onConflict: "youtube_id", ignoreDuplicates: true });
   if(error) console.warn("[Harmonize] Échec de l'alimentation du pool blindtest :", error.message);
 }
@@ -6666,7 +6748,11 @@ function startBlindtestRound(){
 
   const correctTrack = btSoloQueue[(roundState.currentRound - 1) % btSoloQueue.length];
   const pool = btSoloQueue.filter(t => t.youtube_id !== correctTrack.youtube_id);
-  const decoys = shuffleArray(pool).slice(0, Math.min(3, pool.length));
+  // Pièges dans la même langue en priorité (ajouté le 24/07/2026) — voir
+  // pickDecoysPreferringLanguage(). Sans effet si la source est "Ma
+  // playlist" (imported_tracks n'a pas de langue), les pièges restent alors
+  // choisis au hasard comme avant.
+  const decoys = pickDecoysPreferringLanguage(correctTrack, pool, 3);
   const options = shuffleArray([correctTrack, ...decoys]);
   const optionsHtml = options.map(o => `
     <button class="guess-option" data-key="${escapeHtml(o.youtube_id)}" onclick="guess('${escJs(o.youtube_id)}','${escJs(correctTrack.youtube_id)}')">
