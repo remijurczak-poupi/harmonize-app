@@ -641,8 +641,9 @@
                demande de Rémi) : affichés uniquement en vrai Blindtest solo
                (voir startBlindtestRound()), pas dans les autres jeux encore en
                démo qui partagent cet écran. -->
-          <div id="btSoloVoteRow" style="display:none;align-items:center;justify-content:center;gap:10px;margin:8px 0;">
+          <div id="btSoloVoteRow" style="display:none;align-items:center;justify-content:center;gap:10px;margin:8px 0;flex-wrap:wrap;">
             <span class="pill" id="btSoloCountdown">15</span>
+            <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="btSoloSkipForward()">⏩ Avancer de 45s</button>
             <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="revealBtSoloAdSkip()">📺 Pub bloquée ?</button>
           </div>
           <div class="guess-grid" id="guessGrid"></div>
@@ -831,8 +832,13 @@
               <div id="gqAdSkipBanner" style="display:none;position:absolute;top:0;left:0;right:0;height:55%;pointer-events:none;background:linear-gradient(160deg,var(--accent1),var(--accent2));border-radius:12px 12px 0 0;"></div>
               <div id="gqClickBlocker" onclick="toggleGamePlayPause()" style="position:absolute;inset:0;cursor:pointer;" title="Cliquer pour mettre en pause / reprendre — pour tout le monde"></div>
             </div>
-            <div style="display:flex;gap:8px;margin-top:10px;">
+            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
               <button class="btn-ghost" style="width:auto;padding:8px 14px;" onclick="toggleGamePlayPause()" id="gamePlayPauseBtn">⏸ Pause</button>
+              <!-- Ajouté le 24/07/2026, retour d'un bêta-testeur : certaines
+                   chansons ont une intro trop longue pour deviner qui l'a
+                   choisie dans les premières secondes. Synchronisé pour tout
+                   le monde comme le bouton pause — voir skipGameForward(). -->
+              <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="skipGameForward()">⏩ Avancer de 45s</button>
               <!-- Ajouté le 19/07/2026, même correctif que le Blindtest
                    (revealAdSkipButton()) : les 2 couches ci-dessus bloquent
                    aussi le bouton natif "Passer" d'une éventuelle pub. -->
@@ -1018,8 +1024,12 @@
               <div id="btAdSkipBanner" style="display:none;position:absolute;top:0;left:0;right:0;height:55%;pointer-events:none;background:linear-gradient(160deg,var(--accent1),var(--accent2));border-radius:12px 12px 0 0;"></div>
               <div id="btClickBlocker" onclick="toggleBtPlayPause()" style="position:absolute;inset:0;cursor:pointer;" title="Cliquer pour mettre en pause / reprendre — pour tout le monde"></div>
             </div>
-            <div style="display:flex;gap:8px;margin-top:10px;">
+            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
               <button class="btn-ghost" style="width:auto;padding:8px 14px;" onclick="toggleBtPlayPause()" id="btPlayPauseBtn">⏸ Pause</button>
+              <!-- Ajouté le 24/07/2026, retour d'un bêta-testeur — même
+                   besoin que côté "Le jeu des questions", voir
+                   skipGameForward(). -->
+              <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="skipBtForward()">⏩ Avancer de 45s</button>
               <!-- Ajouté le 19/07/2026 : les 2 couches ci-dessus recouvrent
                    TOUTE la vidéo (y compris le bouton natif "Passer" d'une
                    éventuelle pub YouTube), les rendant impossibles à
@@ -1209,10 +1219,27 @@
 const SUPABASE_URL = "https://xtznaxkxtxfctwygohpj.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh0em5heGt4dHhmY3R3eWdvaHBqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2ODgxNTYsImV4cCI6MjA5OTI2NDE1Nn0.rqIsV9WPwI2EZubO9DA0L4jqeIIk0KCUA8j3RvqXhUY";
 
-// Clé API YouTube (Google Cloud) — restreinte à "YouTube Data API v3" et au site
-// music-harmonize.netlify.app côté Google Cloud Console, donc sans risque d'être
-// visible ici : elle ne peut pas servir ailleurs ni faire plus que des lectures.
-const YOUTUBE_API_KEY = "AIzaSyBje4ANRBK_pyBTd_sBwQZVBtxQsAMgvfk";
+// Clé(s) API YouTube (Google Cloud) — chacune restreinte à "YouTube Data API
+// v3" et au site music-harmonize.netlify.app côté Google Cloud Console, donc
+// sans risque d'être visible ici : elles ne peuvent pas servir ailleurs ni
+// faire plus que des lectures.
+// Plusieurs clés en réserve (ajouté le 24/07/2026, suite à un vrai blocage
+// remonté par un bêta-testeur : "Quota exceeded") — le quota gratuit de
+// Google (~100 recherches/jour) est partagé par TOUTE l'appli, tous joueurs
+// confondus, donc vite dépassé. Une clé = un projet Google Cloud = son propre
+// quota gratuit : en avoir plusieurs multiplie d'autant le plafond réel (voir
+// searchYouTube(), qui essaie chaque clé dans l'ordre et bascule sur la
+// suivante si l'une est à quota). Rémi : pour ajouter une clé, crée un
+// nouveau projet dans https://console.cloud.google.com, active "YouTube Data
+// API v3" dessus, crée une clé API, restreins-la de la même façon que la
+// première (API + site), puis ajoute-la ci-dessous.
+const YOUTUBE_API_KEYS = [
+  "AIzaSyBje4ANRBK_pyBTd_sBwQZVBtxQsAMgvfk",
+  "AIzaSyDX07vRpFdJ3yMQMIeaSML-OF4rkGWKy7o",
+  "AIzaSyAOF_c_C4TUX9lwDCKsdjDG7OcA15eUan0",
+  "AIzaSyAkhC9SobEhoo5eMaiQtrDSb2e4Zt71HQs",
+  "AIzaSyBHZJzbXMp507vCneJ-LU41fgWPYS1PKpc",
+];
 
 // Client OAuth Google (Google Cloud Console → Google Auth Platform → Clients) —
 // utilisé pour demander à chacun la permission de lire ET modifier ses propres
@@ -1579,6 +1606,16 @@ function stopBtSoloPlayer(){
   stopBtSoloVoteTimer();
   resetBtSoloAdSkipUI();
   if(btSoloPlayer){ try { btSoloPlayer.destroy(); } catch(e){} btSoloPlayer = null; }
+}
+
+// Avance de 45s dans la vidéo en cours (ajouté le 24/07/2026, retour d'un
+// bêta-testeur) — même besoin que serieSkipForward() : certaines chansons ont
+// une intro trop longue/pas reconnaissable pour deviner dans les premières
+// secondes.
+function btSoloSkipForward(){
+  if(!btSoloPlayer || typeof btSoloPlayer.getCurrentTime !== "function") return;
+  const current = btSoloPlayer.getCurrentTime();
+  btSoloPlayer.seekTo(current + 45, true);
 }
 
 // ---- Série de Blindtest (ajouté le 21/07/2026, idée notée le 19/07/2026) ----
@@ -3069,25 +3106,61 @@ async function renderSearchResults(q){
   `).join("");
 }
 
+// Cache partagé des recherches (ajouté le 24/07/2026, voir harmonize-schema.sql)
+// : une recherche déjà faite par N'IMPORTE QUI récemment ne recoûte plus de
+// quota — les résultats d'une recherche ne périment jamais vraiment (le titre
+// d'une vidéo ne change pas), 90 jours est juste une marge de sécurité.
+const YOUTUBE_CACHE_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
+
 // Appelle l'API YouTube Data v3 pour chercher de vraies vidéos musicales.
 // videoCategoryId=10 = catégorie "Musique", pour limiter le bruit (clips,
 // lives, extraits...) autant que possible.
+// Quota partagé par toute l'appli (remonté par un bêta-testeur : "Quota
+// exceeded" bloquait complètement de jouer) — 2 filets de sécurité ajoutés le
+// 24/07/2026 : un cache partagé (ci-dessous) évite de repayer du quota pour
+// une recherche déjà faite par quelqu'un d'autre, et plusieurs clés API en
+// rotation (voir YOUTUBE_API_KEYS) multiplient le plafond réel si le cache ne
+// suffit pas.
 async function searchYouTube(q){
-  const url = "https://www.googleapis.com/youtube/v3/search"
-    + "?part=snippet&type=video&videoCategoryId=10&maxResults=8"
-    + "&q=" + encodeURIComponent(q)
-    + "&key=" + YOUTUBE_API_KEY;
-  const res = await fetch(url);
-  const data = await res.json();
-  if(!res.ok){
-    throw new Error(data?.error?.message || ("erreur " + res.status));
+  const cacheKey = q.trim().toLowerCase();
+
+  try {
+    const { data: cached } = await sb.from("youtube_search_cache").select("results, created_at").eq("query", cacheKey).maybeSingle();
+    if(cached && (Date.now() - new Date(cached.created_at).getTime()) < YOUTUBE_CACHE_MAX_AGE_MS){
+      return cached.results;
+    }
+  } catch(e){ /* le cache est un bonus : une panne ici ne doit jamais bloquer la recherche */ }
+
+  let lastError = null;
+  for(const key of YOUTUBE_API_KEYS){
+    const url = "https://www.googleapis.com/youtube/v3/search"
+      + "?part=snippet&type=video&videoCategoryId=10&maxResults=8"
+      + "&q=" + encodeURIComponent(q)
+      + "&key=" + key;
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      if(res.ok){
+        const results = (data.items || []).map(item => ({
+          title: decodeHtmlEntities(item.snippet.title),
+          artist: decodeHtmlEntities(item.snippet.channelTitle),
+          youtubeId: item.id.videoId,
+          thumbnail: item.snippet.thumbnails?.default?.url || item.snippet.thumbnails?.medium?.url || "",
+        }));
+        // Alimente le cache partagé (best-effort : une panne ici ne doit pas
+        // faire échouer la recherche, le résultat est de toute façon déjà
+        // renvoyé à la personne qui cherche).
+        try { await sb.from("youtube_search_cache").upsert({ query: cacheKey, results, created_at: new Date().toISOString() }); } catch(e){}
+        return results;
+      }
+      lastError = new Error(data?.error?.message || ("erreur " + res.status));
+    } catch(e){
+      lastError = e;
+    }
+    // Cette clé a échoué (quota dépassé, mal configurée...) : on essaie la
+    // suivante avant d'abandonner.
   }
-  return (data.items || []).map(item => ({
-    title: decodeHtmlEntities(item.snippet.title),
-    artist: decodeHtmlEntities(item.snippet.channelTitle),
-    youtubeId: item.id.videoId,
-    thumbnail: item.snippet.thumbnails?.default?.url || item.snippet.thumbnails?.medium?.url || "",
-  }));
+  throw lastError;
 }
 
 // Point d'entrée commun pour ajouter un titre à la file, que ce soit depuis un
@@ -4734,9 +4807,18 @@ function ensureGamePlayer(round){
   if(!ytApiReady || typeof YT === "undefined" || !YT.Player){ setTimeout(() => renderGameLobby(), 300); return; }
   if(!round || !round.youtube_id) return;
   if(!gamePlayer){
+    // Mode "audio seulement" (ajouté le 24/07/2026, retour d'un bêta-testeur
+    // avec une mauvaise connexion) : jusqu'ici, ce mode cachait juste la
+    // vidéo avec un cache visuel — le lecteur restait créé en pleine taille
+    // (180px), donc YouTube envoyait quand même un flux vidéo normal, sans
+    // aucune économie de données. Un lecteur minuscule (1x1, même principe
+    // que le Blindtest solo/la Série de blindtest, déjà toujours en audio)
+    // pousse YouTube à choisir un débit bien plus bas — sans rien changer
+    // visuellement, puisque ce mode cache déjà la vidéo derrière gqAudioCover.
+    const audioOnly = currentRoom?.game_display_mode === "audio";
     gamePlayer = new YT.Player("gameYtPlayer", {
-      height: "180",
-      width: "100%",
+      height: audioOnly ? "1" : "180",
+      width: audioOnly ? "1" : "100%",
       videoId: round.youtube_id,
       playerVars: { autoplay: 1, controls: 0, disablekb: 1, playsinline: 1, fs: 0, rel: 0, iv_load_policy: 3, modestbranding: 1 },
       events: {
@@ -4795,6 +4877,28 @@ async function toggleGamePlayPause(){
   } else {
     update = { playback_state: "playing", playback_started_at: new Date().toISOString() };
   }
+  const { data, error } = await sb.from("rooms").update(update).eq("id", currentRoom.id).select().single();
+  if(error){ showToast("Erreur : " + error.message); return; }
+  currentRoom = data;
+  applyGamePlaybackState();
+}
+
+// Avance de 45s pour tout le monde (ajouté le 24/07/2026, retour d'un
+// bêta-testeur : certaines chansons ont une intro trop longue pour deviner
+// qui l'a choisie dans les premières secondes). Synchronisé comme
+// toggleGamePlayPause() — ouvert à n'importe quel participant, pas de chef de
+// salon.
+async function skipGameForward(){
+  if(!currentRoom) return;
+  const playing = currentRoom.playback_state === "playing";
+  const basePosition = Number(currentRoom.playback_position) || 0;
+  const elapsed = playing && currentRoom.playback_started_at
+    ? Math.max(0, (Date.now() - new Date(currentRoom.playback_started_at).getTime()) / 1000)
+    : 0;
+  const newPosition = basePosition + elapsed + 45;
+  const update = playing
+    ? { playback_position: newPosition, playback_started_at: new Date().toISOString() }
+    : { playback_position: newPosition };
   const { data, error } = await sb.from("rooms").update(update).eq("id", currentRoom.id).select().single();
   if(error){ showToast("Erreur : " + error.message); return; }
   currentRoom = data;
@@ -5967,9 +6071,12 @@ function ensureBtPlayer(round){
   if(!ytApiReady || typeof YT === "undefined" || !YT.Player){ setTimeout(() => renderBlindtestLobby(), 300); return; }
   if(!round || !round.youtube_id) return;
   if(!btPlayer){
+    // Mode "audio seulement" : même correctif que ensureGamePlayer() (voir
+    // son commentaire) — lecteur minuscule pour une vraie économie de données.
+    const audioOnly = currentRoom?.game_display_mode === "audio";
     btPlayer = new YT.Player("btYtPlayer", {
-      height: "180",
-      width: "100%",
+      height: audioOnly ? "1" : "180",
+      width: audioOnly ? "1" : "100%",
       videoId: round.youtube_id,
       playerVars: { autoplay: 1, controls: 0, disablekb: 1, playsinline: 1, fs: 0, rel: 0, iv_load_policy: 3, modestbranding: 1 },
       events: {
@@ -6028,6 +6135,24 @@ async function toggleBtPlayPause(){
   } else {
     update = { playback_state: "playing", playback_started_at: new Date().toISOString() };
   }
+  const { data, error } = await sb.from("rooms").update(update).eq("id", currentRoom.id).select().single();
+  if(error){ showToast("Erreur : " + error.message); return; }
+  currentRoom = data;
+  applyBtPlaybackState();
+}
+
+// Avance de 45s pour tout le monde — même principe que skipGameForward().
+async function skipBtForward(){
+  if(!currentRoom) return;
+  const playing = currentRoom.playback_state === "playing";
+  const basePosition = Number(currentRoom.playback_position) || 0;
+  const elapsed = playing && currentRoom.playback_started_at
+    ? Math.max(0, (Date.now() - new Date(currentRoom.playback_started_at).getTime()) / 1000)
+    : 0;
+  const newPosition = basePosition + elapsed + 45;
+  const update = playing
+    ? { playback_position: newPosition, playback_started_at: new Date().toISOString() }
+    : { playback_position: newPosition };
   const { data, error } = await sb.from("rooms").update(update).eq("id", currentRoom.id).select().single();
   if(error){ showToast("Erreur : " + error.message); return; }
   currentRoom = data;
