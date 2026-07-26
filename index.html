@@ -389,6 +389,9 @@
            n'importe qui même OUVRIR cet écran — voir afterLogin(). -->
       <div class="card" style="margin-top:16px;display:none;" id="poolAdminEntryCard">
         <button class="btn-ghost" onclick="goToPoolAdminScreen()">🛠 Gérer le pool communautaire</button>
+        <!-- Tableau de bord d'activité (ajouté le 24/07/2026), même réglage
+             de visibilité que le bouton ci-dessus. -->
+        <button class="btn-ghost" style="margin-top:10px;" onclick="goToStatsScreen()">📊 Statistiques</button>
       </div>
 
       <button class="btn-ghost" style="margin-top:20px;" onclick="openEditPseudoModal()">✏️ Modifier mon pseudo</button>
@@ -541,13 +544,35 @@
     <section class="screen" id="screen-pool-admin">
       <h1>🛠 Pool communautaire</h1>
       <p class="sub">Les chansons proposées par les joueurs attendent ici ta validation avant d'être utilisables dans une vraie partie.</p>
-      <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
         <button class="btn-ghost" id="poolAdminTabPending" style="width:auto;padding:8px 14px;" onclick="switchPoolAdminView('pending')">🕓 En attente <span id="poolAdminPendingCount"></span></button>
         <button class="btn-ghost" id="poolAdminTabApproved" style="width:auto;padding:8px 14px;" onclick="switchPoolAdminView('approved')">✅ Déjà approuvées</button>
       </div>
+      <!-- Rattrapage ponctuel (ajouté le 24/07/2026) : détecte la langue des
+           chansons déjà présentes dans le pool avant l'ajout de la
+           détection automatique — voir backfillPoolLanguages(). Coût quota
+           minime (~1 appel par lot de 50 chansons). -->
+      <button class="btn-ghost" id="poolBackfillLangBtn" style="margin-bottom:16px;font-size:12.5px;" onclick="backfillPoolLanguages()">🌐 Détecter les langues manquantes</button>
       <input type="text" id="poolAdminSearch" placeholder="Filtrer par titre ou artiste..." oninput="renderPoolAdminApprovedList()" style="margin-bottom:14px;display:none;" />
       <div id="poolAdminList"></div>
       <button class="btn-ghost" style="width:auto;padding:10px 16px;margin:12px auto 0;display:none;" id="poolAdminLoadMoreBtn" onclick="loadMorePoolAdminApproved()">Afficher plus</button>
+      <button class="btn-ghost" style="margin-top:16px;" onclick="showScreen('screen-lobby')">← Retour</button>
+    </section>
+
+    <!-- SCREEN: STATISTIQUES (ajouté le 24/07/2026) — réservé aux admins,
+         même principe que screen-pool-admin. Comptes créés/salons créés
+         viennent de colonnes déjà existantes (profiles.created_at,
+         rooms.created_at) ; parties commencées/terminées viennent du
+         nouveau journal activity_events (voir harmonize-schema.sql) —
+         rooms.game_phase n'a lui aucun historique. Tout est agrégé côté
+         appli (pas de fonction SQL côté Supabase), sur le même principe que
+         le reste de l'app. -->
+    <section class="screen" id="screen-stats">
+      <h1>📊 Statistiques</h1>
+      <p class="sub">Activité des 30 derniers jours. "Comptes actifs" compte les comptes ayant joué à un jeu OU ajouté un titre à une file d'écoute ce jour-là.</p>
+      <div id="statsContent">
+        <p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Chargement...</p>
+      </div>
       <button class="btn-ghost" style="margin-top:16px;" onclick="showScreen('screen-lobby')">← Retour</button>
     </section>
 
@@ -3840,6 +3865,115 @@ async function goToPoolAdminScreen(){
   await switchPoolAdminView("pending");
 }
 
+/* ---- Écran "📊 Statistiques" (ajouté le 24/07/2026) — réservé aux admins,
+   même principe que screen-pool-admin ci-dessus. ---- */
+const STATS_DAYS = 30;
+
+async function goToStatsScreen(){
+  if(!currentUserIsAdmin){ showToast("Cet écran est réservé aux comptes admin."); return; }
+  showScreen("screen-stats");
+  await renderStatsScreen();
+}
+
+// Regroupe une date par JOUR LOCAL (celui de l'appareil qui affiche l'écran
+// — cohérent puisque ce tableau de bord n'a qu'un seul vrai lecteur, Rémi),
+// plutôt que par jour UTC — sinon des événements de fin de soirée pourraient
+// se retrouver comptés sur le mauvais jour selon le décalage horaire.
+function statsDayKey(dateStrOrDate){
+  const d = new Date(dateStrOrDate);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// Tout est agrégé côté appli (pas de fonction SQL côté Supabase, comme pour
+// le reste de l'app) : "comptes créés" et "salons créés" viennent de
+// colonnes déjà existantes (profiles.created_at, rooms.created_at) ;
+// "parties commencées/terminées" viennent du nouveau journal
+// activity_events (voir harmonize-schema.sql et logActivityEvent()) —
+// rooms.game_phase n'a lui aucun historique, juste l'état actuel. "Comptes
+// actifs" = comptes ayant répondu à un jeu (game_answers) OU ajouté un
+// titre à une file d'écoute (queue_items) ce jour-là, réunis dans un même
+// ensemble pour ne pas compter 2 fois la même personne.
+async function renderStatsScreen(){
+  const el = document.getElementById("statsContent");
+  el.innerHTML = `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Chargement...</p>`;
+
+  const sinceIso = new Date(Date.now() - STATS_DAYS * 24 * 60 * 60 * 1000).toISOString();
+
+  const [profilesRes, roomsRes, answersRes, queueRes, eventsRes] = await Promise.all([
+    sb.from("profiles").select("created_at").gte("created_at", sinceIso).limit(5000),
+    sb.from("rooms").select("created_at").gte("created_at", sinceIso).limit(5000),
+    sb.from("game_answers").select("user_id, created_at").gte("created_at", sinceIso).limit(5000),
+    sb.from("queue_items").select("proposed_by, created_at").gte("created_at", sinceIso).limit(5000),
+    sb.from("activity_events").select("event_type, created_at").gte("created_at", sinceIso).limit(5000),
+  ]);
+
+  const firstError = [profilesRes, roomsRes, answersRes, queueRes, eventsRes].map(r => r.error).find(Boolean);
+  if(firstError){
+    el.innerHTML = `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Erreur de chargement : ${escapeHtml(firstError.message)}</p>`;
+    return;
+  }
+
+  const days = {};
+  const ensureDay = (key) => {
+    if(!days[key]) days[key] = { accountsCreated: 0, activeUsers: new Set(), roomsCreated: 0, gamesStarted: 0, gamesFinished: 0 };
+    return days[key];
+  };
+  // Initialise tous les jours de la période, même sans aucune activité, pour
+  // ne pas avoir de "trous" dans le tableau.
+  for(let i = 0; i < STATS_DAYS; i++){
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    ensureDay(statsDayKey(d));
+  }
+
+  (profilesRes.data || []).forEach(r => { ensureDay(statsDayKey(r.created_at)).accountsCreated++; });
+  (roomsRes.data || []).forEach(r => { ensureDay(statsDayKey(r.created_at)).roomsCreated++; });
+  (answersRes.data || []).forEach(r => { ensureDay(statsDayKey(r.created_at)).activeUsers.add(r.user_id); });
+  (queueRes.data || []).forEach(r => { ensureDay(statsDayKey(r.created_at)).activeUsers.add(r.proposed_by); });
+  (eventsRes.data || []).forEach(r => {
+    const day = ensureDay(statsDayKey(r.created_at));
+    if(r.event_type === "game_started") day.gamesStarted++;
+    if(r.event_type === "game_finished") day.gamesFinished++;
+  });
+
+  const sortedDays = Object.keys(days).sort((a, b) => b.localeCompare(a)); // le plus récent en premier
+
+  el.innerHTML = `
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px;white-space:nowrap;">
+        <thead>
+          <tr style="text-align:left;color:var(--text-faint);">
+            <th style="padding:6px 8px;">Jour</th>
+            <th style="padding:6px 8px;">Comptes créés</th>
+            <th style="padding:6px 8px;">Comptes actifs</th>
+            <th style="padding:6px 8px;">Salons créés</th>
+            <th style="padding:6px 8px;">Parties lancées</th>
+            <th style="padding:6px 8px;">Parties terminées</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${sortedDays.map(day => {
+            const d = days[day];
+            return `
+              <tr style="border-top:1px solid var(--border);">
+                <td style="padding:6px 8px;font-weight:600;">${escapeHtml(day)}</td>
+                <td style="padding:6px 8px;">${d.accountsCreated}</td>
+                <td style="padding:6px 8px;">${d.activeUsers.size}</td>
+                <td style="padding:6px 8px;">${d.roomsCreated}</td>
+                <td style="padding:6px 8px;">${d.gamesStarted}</td>
+                <td style="padding:6px 8px;">${d.gamesFinished}</td>
+              </tr>
+            `;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
 async function switchPoolAdminView(view){
   poolAdminView = view;
   document.getElementById("poolAdminTabPending").style.borderColor = view === "pending" ? "var(--accent1)" : "var(--border)";
@@ -4650,6 +4784,18 @@ function computeGameRounds(){
 // reproposer sur la vidéo suivante. Retiré pour vérifier cette hypothèse ;
 // voir Round 27 de idees.md. Le bouton "📺 Pub bloquée ?" (Round 23), qui ne
 // détruit jamais rien en plein milieu, reste en place.
+// Journal d'activité (ajouté le 24/07/2026, voir activity_events dans
+// harmonize-schema.sql) : une ligne à chaque lancement/fin de partie, pour
+// le tableau de bord "📊 Statistiques" — rooms.game_phase n'a lui aucun
+// historique (écrasé à chaque manche/rejouer). Best-effort : une panne ici
+// ne doit jamais empêcher de jouer, juste fausser légèrement les stats.
+async function logActivityEvent(eventType, roomId, mode){
+  try {
+    const { error } = await sb.from("activity_events").insert({ event_type: eventType, room_id: roomId, mode });
+    if(error) console.warn("[Harmonize] Échec du journal d'activité :", error.message);
+  } catch(e){ console.warn("[Harmonize] Échec du journal d'activité :", e.message); }
+}
+
 async function launchGame(){
   if(!isGameCreator()) return;
   const rounds = computeGameRounds();
@@ -4668,6 +4814,7 @@ async function launchGame(){
   }).eq("id", currentRoom.id).select().single();
   if(error){ showToast("Erreur au lancement de la partie : " + error.message); return; }
   currentRoom = data;
+  logActivityEvent("game_started", currentRoom.id, currentRoom.mode);
   showToast(`🚀 Partie lancée ! ${rounds.length} manche(s).`);
   renderGameLobby();
 }
@@ -5201,7 +5348,10 @@ async function nextGameRound(){
   // Nourrit aussi le pool communautaire depuis "Le jeu des questions"
   // (ajouté le 22/07/2026, demande de Rémi) — même fonction que Blindtest,
   // les manches ont exactement la même forme (youtube_id/title/artist).
-  if(currentRoom.game_phase === "finished") await populateBtPool(rounds);
+  if(currentRoom.game_phase === "finished"){
+    logActivityEvent("game_finished", currentRoom.id, currentRoom.mode);
+    await populateBtPool(rounds);
+  }
   renderGameLobby();
 }
 
@@ -5970,6 +6120,7 @@ async function launchBlindtest(){
   }).eq("id", currentRoom.id).select().single();
   if(error){ showToast("Erreur au lancement de la partie : " + error.message); return; }
   currentRoom = data;
+  logActivityEvent("game_started", currentRoom.id, currentRoom.mode);
   showToast(`🚀 Partie lancée ! ${rounds.length} manche(s).`);
   renderBlindtestLobby();
 }
@@ -6408,7 +6559,10 @@ async function nextBtRound(){
   btAdSkipClickedAtRound = null;
   btAdSkipClickedAtTime = null;
   if(currentRoom.game_phase === "playing") applyBtPlaybackState();
-  if(currentRoom.game_phase === "finished") await populateBtPool(rounds);
+  if(currentRoom.game_phase === "finished"){
+    logActivityEvent("game_finished", currentRoom.id, currentRoom.mode);
+    await populateBtPool(rounds);
+  }
   renderBlindtestLobby();
 }
 
@@ -6514,6 +6668,50 @@ async function fetchYoutubeLanguages(videoIds){
     if(!succeeded) console.warn("[Harmonize] Impossible de récupérer la langue d'un lot de vidéos (toutes les clés ont échoué).");
   }
   return languages;
+}
+
+// Rattrape la langue des chansons déjà présentes dans le pool AVANT l'ajout
+// de la détection automatique (24/07/2026) — sans ce rattrapage ponctuel,
+// la préférence de langue des pièges (Série de blindtest, Blindtest solo)
+// ne devient utile qu'au fil des semaines, chanson neuve par chanson neuve.
+// Coût minime : ~1 appel par lot de 50 chansons (voir fetchYoutubeLanguages()),
+// donc environ 19 appels pour ~940 chansons — négligeable face au quota
+// journalier. Réservé aux admins (même écran que la modération du pool, déjà
+// couvert par la policy RLS "Modération du pool réservée aux admins").
+async function backfillPoolLanguages(){
+  const btn = document.getElementById("poolBackfillLangBtn");
+  const setBtnText = (text) => { if(btn) btn.textContent = text; };
+  if(btn) btn.disabled = true;
+
+  const { data, error } = await sb.from("blindtest_pool").select("youtube_id").is("language", null);
+  if(error){
+    showToast("Erreur : " + error.message);
+    if(btn){ btn.disabled = false; setBtnText("🌐 Détecter les langues manquantes"); }
+    return;
+  }
+  const ids = (data || []).map(r => r.youtube_id);
+  if(!ids.length){
+    showToast("Toutes les chansons du pool ont déjà une langue détectée (ou pas d'info disponible).");
+    if(btn){ btn.disabled = false; setBtnText("🌐 Détecter les langues manquantes"); }
+    return;
+  }
+
+  let done = 0;
+  let tagged = 0;
+  for(let i = 0; i < ids.length; i += 50){
+    const batch = ids.slice(i, i + 50);
+    const languages = await fetchYoutubeLanguages(batch);
+    await Promise.all(batch.map(async id => {
+      const lang = languages[id];
+      if(!lang) return;
+      const { error: updateError } = await sb.from("blindtest_pool").update({ language: lang }).eq("youtube_id", id);
+      if(!updateError) tagged++;
+    }));
+    done += batch.length;
+    setBtnText(`⏳ ${done}/${ids.length}...`);
+  }
+  showToast(`Langue détectée pour ${tagged} chanson(s) sur ${ids.length} (les autres n'ont pas cette info sur YouTube — pièges toujours au hasard pour elles).`);
+  if(btn){ btn.disabled = false; setBtnText("🌐 Détecter les langues manquantes"); }
 }
 
 // Alimente le pool communautaire (voir blindtest_pool dans
