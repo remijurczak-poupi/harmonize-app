@@ -3182,6 +3182,25 @@ const YOUTUBE_CACHE_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
 async function searchYouTube(q){
   const cacheKey = q.trim().toLowerCase();
 
+  // Recherche "pool-first" (ajoutée le 27/07/2026) : si le pool communautaire
+  // approuvé contient déjà une chanson correspondante, on la renvoie direct —
+  // zéro quota YouTube consommé, zéro appel réseau à l'API. Ne remplace pas le
+  // cache de recherche ci-dessous (qui mémorise n'importe quelle recherche
+  // déjà faite) : le pool, lui, ne contient que ce qui a été approuvé.
+  try {
+    const poolQuery = q.trim().replace(/[%_,()]/g, " ");
+    if(poolQuery){
+      const { data: poolMatches } = await sb.from("blindtest_pool")
+        .select("youtube_id, title, artist, thumbnail")
+        .eq("status", "approved")
+        .or(`title.ilike.%${poolQuery}%,artist.ilike.%${poolQuery}%`)
+        .limit(8);
+      if(poolMatches && poolMatches.length){
+        return poolMatches.map(r => ({ title: r.title, artist: r.artist, youtubeId: r.youtube_id, thumbnail: r.thumbnail }));
+      }
+    }
+  } catch(e){ /* le pool est un bonus : une panne ici ne doit jamais bloquer la recherche */ }
+
   try {
     const { data: cached } = await sb.from("youtube_search_cache").select("results, created_at").eq("query", cacheKey).maybeSingle();
     if(cached && (Date.now() - new Date(cached.created_at).getTime()) < YOUTUBE_CACHE_MAX_AGE_MS){
