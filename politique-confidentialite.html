@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Politique de confidentialité — Harmonize</title>
+<meta name="theme-color" content="#0f0d17" />
+<style>
+  :root{
+    --bg:#0f0d17;
+    --bg-elevated:#181524;
+    --bg-card:#1f1b2e;
+    --border:#2e2942;
+    --text:#f2f0f7;
+    --text-dim:#a79fc2;
+    --text-faint:#6f6789;
+    --accent1:#8b5cf6;
+    --accent2:#ec4899;
+    --accent-gradient:linear-gradient(135deg,var(--accent1),var(--accent2));
+    --radius:16px;
+    --radius-sm:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:radial-gradient(circle at 20% -10%, #241c3a 0%, var(--bg) 45%);
+    color:var(--text);
+    min-height:100vh;
+  }
+  .page{max-width:680px;margin:0 auto;padding:32px 20px 60px;}
+  header{display:flex;align-items:center;gap:10px;margin-bottom:28px;}
+  .logo-mark{
+    width:36px;height:36px;border-radius:10px;flex-shrink:0;
+    background:linear-gradient(135deg,#51147e,#010d2c);
+    display:flex;align-items:center;justify-content:center;overflow:hidden;
+  }
+  .logo-mark img{width:100%;height:100%;object-fit:cover;}
+  header .name{font-weight:700;font-size:18px;}
+  h1{font-size:26px;margin:0 0 6px;}
+  .updated{color:var(--text-faint);font-size:13px;margin-bottom:28px;}
+  h2{font-size:17px;margin:32px 0 10px;color:var(--text);}
+  p, li{color:var(--text-dim);font-size:14.5px;line-height:1.65;}
+  ul{padding-left:20px;margin:8px 0;}
+  li{margin-bottom:6px;}
+  a{color:var(--accent1);}
+  .card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin:16px 0;}
+  .disclaimer{font-size:12.5px;color:var(--text-faint);border-top:1px solid var(--border);margin-top:40px;padding-top:20px;}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px;}
+  th, td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text-dim);}
+  th{color:var(--text-faint);font-weight:600;}
+  .back{display:inline-block;margin-top:32px;color:var(--text-dim);text-decoration:none;font-size:14px;}
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <span class="logo-mark"><img src="icons/icon-192.png" alt="" /></span>
+    <span class="name">Harmonize</span>
+  </header>
+
+  <h1>Politique de confidentialité</h1>
+  <p class="updated">Dernière mise à jour : 24 juillet 2026</p>
+
+  <p>Harmonize est un projet indépendant, créé pour permettre à un groupe d'amis d'écouter de la musique ensemble et de jouer à des jeux musicaux. Cette page explique simplement quelles données sont collectées, pourquoi, et comment les faire supprimer.</p>
+
+  <h2>Qui est responsable de ces données</h2>
+  <p>Harmonize est développé et géré par une seule personne, à titre de projet personnel. Pour toute question ou demande concernant tes données, écris à <a href="mailto:remi.jurczak@gmail.com">remi.jurczak@gmail.com</a>.</p>
+
+  <h2>Quelles données sont collectées</h2>
+  <div class="card">
+    <table>
+      <tr><th>Donnée</th><th>Pourquoi</th></tr>
+      <tr><td>Pseudo</td><td>Affiché aux autres participants d'un salon</td></tr>
+      <tr><td>Adresse email et mot de passe (si compte créé par email)</td><td>Se reconnecter à ton compte</td></tr>
+      <tr><td>Identifiant Google (si connexion via "Continuer avec Google")</td><td>Créer/reconnaître ton compte sans mot de passe séparé</td></tr>
+      <tr><td>Réponses, propositions de chansons, votes, scores</td><td>Faire fonctionner les jeux, visibles par les autres participants du même salon</td></tr>
+      <tr><td>Chansons ajoutées à une file d'attente ou au pool communautaire</td><td>Faire fonctionner l'écoute partagée et les jeux</td></tr>
+      <tr><td>Date de connexion / d'activité</td><td>Statistiques internes d'usage (nombre de comptes actifs par jour) — jamais partagées ni vendues</td></tr>
+    </table>
+  </div>
+  <p>Il est aussi possible de jouer <strong>sans créer de compte</strong> ("Jouer sans compte") : un identifiant anonyme est alors créé, sans email ni mot de passe.</p>
+
+  <h2>Connexions optionnelles à des services tiers</h2>
+  <p>Si tu choisis de connecter ton compte Google (YouTube) ou Spotify pour importer tes playlists :</p>
+  <ul>
+    <li>Harmonize ne voit et ne stocke <strong>jamais ton mot de passe</strong> — la connexion passe entièrement par une fenêtre officielle de Google ou Spotify.</li>
+    <li>L'autorisation demandée est limitée à la <strong>lecture</strong> de tes playlists (titres, artistes), pour les importer dans l'appli.</li>
+    <li>Une autorisation supplémentaire (ajout à une playlist YouTube) n'est utilisée que si tu cliques explicitement sur le bouton dédié pour y ajouter un titre — jamais automatiquement.</li>
+    <li>Tu peux révoquer ces autorisations à tout moment depuis les paramètres de ton compte Google ou Spotify.</li>
+  </ul>
+
+  <h2>Où sont hébergées les données</h2>
+  <p>Les données de compte et de jeu sont hébergées chez <a href="https://supabase.com" target="_blank" rel="noopener">Supabase</a>, un prestataire technique (base de données et authentification). La recherche et la lecture de musique passent par l'API de YouTube (Google). Harmonize ne vend ni ne partage de données avec d'autres entreprises à des fins commerciales ou publicitaires.</p>
+
+  <h2>Combien de temps les données sont gardées</h2>
+  <p>Les données sont conservées tant que ton compte existe. Un salon (partie) reste accessible par son code tant qu'il n'a pas été supprimé manuellement.</p>
+
+  <h2>Tes droits</h2>
+  <p>Conformément au RGPD (Règlement Général sur la Protection des Données), tu peux à tout moment demander :</p>
+  <ul>
+    <li>l'accès aux données te concernant ;</li>
+    <li>leur correction ;</li>
+    <li>leur suppression complète (compte et données de jeu associées) ;</li>
+    <li>une copie de tes données dans un format exploitable.</li>
+  </ul>
+  <p>Pour cela, écris à <a href="mailto:remi.jurczak@gmail.com">remi.jurczak@gmail.com</a> — la demande sera traitée dans un délai raisonnable (moins d'un mois). La suppression de compte n'est pas encore automatisée dans l'appli elle-même, elle se fait sur simple demande par email.</p>
+
+  <h2>Cookies et stockage local</h2>
+  <p>Harmonize utilise le stockage local de ton navigateur (pas de cookies publicitaires ni de traceurs tiers) uniquement pour garder ta session de connexion active.</p>
+
+  <h2>Mineurs</h2>
+  <p>Harmonize ne cible pas spécifiquement un public mineur et ne demande pas de vérification d'âge. Si tu es parent ou tuteur et souhaites qu'un compte d'un enfant mineur soit supprimé, contacte-nous à l'adresse ci-dessus.</p>
+
+  <h2>Modifications de cette politique</h2>
+  <p>Cette page peut évoluer si l'appli change. La date de dernière mise à jour en haut de page reflète toujours la version en vigueur.</p>
+
+  <p class="disclaimer">Cette page décrit honnêtement le fonctionnement réel d'Harmonize, projet indépendant à but non commercial pour l'instant. Elle ne constitue pas un conseil juridique formel ; en cas de doute, un professionnel du droit peut être consulté.</p>
+
+  <a class="back" href="index.html">← Retour à Harmonize</a>
+</div>
+</body>
+</html>
