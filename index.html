@@ -770,6 +770,18 @@
           <div id="gqStepManual" style="display:none;">
             <div class="card" style="margin-bottom:16px;">
               <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;" id="gqLobbyIntro"></p>
+              <!-- Question personnalisée (ajoutée le 29/07/2026, demande de Rémi) :
+                   champ libre toujours affiché en haut de la liste, pour taper sa
+                   propre question plutôt que de choisir dans le catalogue
+                   GAME_QUESTIONS. Le texte tapé est utilisé tel quel comme "id"
+                   dans gameSelectedQuestionIds/game_question_ids/question_id
+                   (colonnes text, sans contrainte de format) — aucun id
+                   synthétique ni migration nécessaire, voir addCustomQuestion(). -->
+              <div style="display:flex;gap:8px;margin-bottom:14px;">
+                <input type="text" id="gqCustomQuestionInput" placeholder="Ou écris ta propre question..." maxlength="120" style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomQuestion();}" />
+                <button class="btn-ghost" id="gqAddCustomBtn" style="width:auto;padding:0 16px;" onclick="addCustomQuestion()">Ajouter</button>
+              </div>
+              <div id="gqCustomQuestionsList" class="stack"></div>
               <div id="gqQuestionPicker" class="stack"></div>
             </div>
             <button class="btn-primary" id="gqValidateBtn" onclick="confirmQuestionSelection()">Valider la sélection (<span id="gqSelectedCount">0</span>/<span id="gqSelectedTarget">0</span>)</button>
@@ -1414,43 +1426,83 @@ const MODE_DETAIL = {
   },
 };
 
-// Catalogue des 30 questions du VRAI "jeu des questions" (ajouté le 12/07/2026,
-// à la demande de Rémi). Le créateur d'un vrai salon "questions"
-// choisit parmi ces 30 lesquelles utiliser pour sa partie (voir
-// renderQuestionPicker() / confirmQuestionSelection()). Identifiants stables
-// (q1..q30) : à ne jamais renuméroter, ils sont enregistrés dans
-// rooms.game_question_ids et dans game_answers.question_id en base.
+// Catalogue des 69 questions du VRAI "jeu des questions" (ajouté le 12/07/2026,
+// étendu de 30 à 69 le 29/07/2026 à la demande de Rémi). Le créateur d'un vrai
+// salon "questions" choisit parmi ces questions lesquelles utiliser pour sa
+// partie (voir renderQuestionPicker() / confirmQuestionSelection()).
+// Identifiants stables (q1..q69) : à ne jamais renuméroter, ils sont
+// enregistrés dans rooms.game_question_ids et dans game_answers.question_id
+// en base.
 const GAME_QUESTIONS = [
-  {id:"q1",  label:"💘 Ta chanson d'amour préférée"},
-  {id:"q2",  label:"😢 Ta chanson la plus triste"},
+  {id:"q1",  label:"💘 La meilleure chanson d'amour"},
+  {id:"q2",  label:"😢 La chanson la plus triste"},
   {id:"q3",  label:"💃 La chanson qui te fait le plus danser"},
-  {id:"q4",  label:"🙄 Une chanson que tu détestes (mais que tu connais par cœur)"},
+  {id:"q4",  label:"🙄 La chanson que tu détestes (mais que tu connais par cœur)"},
   {id:"q5",  label:"🧑‍🎓 La chanson de ton adolescence"},
-  {id:"q6",  label:"🙈 Ta chanson \"honte\" que tu écoutes en cachette"},
+  {id:"q6",  label:"🙈 La chanson \"honte\" que tu écoutes en cachette"},
   {id:"q7",  label:"📸 La chanson qui te rappelle un souvenir précis"},
-  {id:"q8",  label:"🚗 Ta chanson pour un road trip"},
+  {id:"q8",  label:"🚗 La chanson pour un road trip"},
   {id:"q9",  label:"🚿 La chanson que tu chantes sous la douche"},
-  {id:"q10", label:"🏋️ Ta chanson pour te motiver au sport"},
+  {id:"q10", label:"🏋️ La chanson pour te motiver au sport"},
   {id:"q11", label:"💧 La chanson qui te fait pleurer à tous les coups"},
-  {id:"q12", label:"🎤 Ta chanson de karaoké préférée"},
+  {id:"q12", label:"🎤 La meilleure chanson de karaoké"},
   {id:"q13", label:"🏖️ La chanson qui te rappelle tes meilleures vacances"},
-  {id:"q14", label:"🎉 Ta chanson pour une soirée entre amis"},
+  {id:"q14", label:"🎉 La meilleure chanson à mettre en soirée"},
   {id:"q15", label:"🧸 La chanson que tu écoutais en boucle petit(e)"},
-  {id:"q16", label:"⏰ Ta chanson pour te réveiller le matin"},
+  {id:"q16", label:"⏰ La chanson pour te réveiller le matin"},
   {id:"q17", label:"🥶 La chanson qui te donne des frissons"},
-  {id:"q18", label:"🎬 Ta chanson préférée tirée d'un film ou d'une série"},
+  {id:"q18", label:"🎬 La meilleure chanson tirée d'un film ou d'une série"},
   {id:"q19", label:"💍 La chanson que tu voudrais pour ton mariage"},
-  {id:"q20", label:"🌍 Ta chanson préférée dans une langue étrangère"},
+  {id:"q20", label:"🌍 La meilleure chanson dans une langue étrangère"},
   {id:"q21", label:"👨‍👩‍👧 La chanson qui te fait penser à ta famille"},
-  {id:"q22", label:"👨‍🍳 Ta chanson pour cuisiner"},
+  {id:"q22", label:"👨‍🍳 La chanson pour cuisiner"},
   {id:"q23", label:"📼 La chanson la plus \"has been\" de ta playlist (que tu assumes quand même)"},
-  {id:"q24", label:"📅 Ta chanson préférée de cette année"},
+  {id:"q24", label:"📅 La meilleure chanson de cette année"},
   {id:"q25", label:"😤 La chanson que tout le monde adore mais que tu détestes"},
-  {id:"q26", label:"💌 Ta chanson pour un premier rendez-vous"},
+  {id:"q26", label:"💌 La chanson pour mettre une ambiance romantique"},
   {id:"q27", label:"😄 La chanson qui te redonne le sourire à tous les coups"},
-  {id:"q28", label:"😴 Ta chanson pour dormir ou te détendre"},
+  {id:"q28", label:"😴 La chanson pour dormir ou te détendre"},
   {id:"q29", label:"🪞 La chanson qui te décrit le mieux"},
-  {id:"q30", label:"🏆 Ta chanson \"c'est un chef d'œuvre, il faut que tu l'écoutes\""},
+  {id:"q30", label:"🏆 La chanson \"c'est un chef d'œuvre, il faut que tu l'écoutes\""},
+  {id:"q31", label:"💔 La chanson chagrin d'amour"},
+  {id:"q32", label:"🏎️ La chanson qui te donne envie de rouler à fond"},
+  {id:"q33", label:"🎁 La chanson que tu as découverte grâce à un(e) ami(e)"},
+  {id:"q34", label:"🙊 La chanson que tu n'assumerais jamais devant tout le monde"},
+  {id:"q35", label:"⭐ La meilleure chanson de ton artiste/groupe préféré"},
+  {id:"q36", label:"🔁 La chanson que tu écoutes en boucle en ce moment"},
+  {id:"q37", label:"☀️ La chanson qui te donne la pêche le lundi matin"},
+  {id:"q38", label:"🔥 La chanson pour une soirée autour d'un feu de camp"},
+  {id:"q39", label:"🎙️ La chanson que tu rêverais de faire au karaoké mais que tu n'oses pas"},
+  {id:"q40", label:"😂 La chanson qui te fait mourir de rire"},
+  {id:"q41", label:"🇫🇷 La chanson de ton pays/région que tu es fier(e) de faire découvrir"},
+  {id:"q42", label:"👭 La chanson qui te rappelle un(e) ancien(ne) ami(e)"},
+  {id:"q43", label:"👶 La chanson que tes parents te faisaient écouter petit(e)"},
+  {id:"q44", label:"🔄 La chanson que tu détestais avant et que tu adores maintenant"},
+  {id:"q45", label:"🥂 La chanson pour un dernier verre entre amis"},
+  {id:"q46", label:"💼 La chanson qui te motive avant un entretien ou un examen"},
+  {id:"q47", label:"📻 La chanson que tu changes direct quand elle passe à la radio"},
+  {id:"q48", label:"🗺️ La chanson qui te rappelle un lieu précis"},
+  {id:"q49", label:"⚰️ La chanson que tu voudrais à ton enterrement (super l'ambiance...)"},
+  {id:"q50", label:"🎶 La chanson que tu chantes faux mais à fond quand même"},
+  {id:"q51", label:"💑 La chanson qui résume ta vie amoureuse"},
+  {id:"q52", label:"🐾 La chanson que tu associes à ton animal de compagnie"},
+  {id:"q53", label:"📼 La chanson d'un artiste que plus personne n'écoute... sauf toi"},
+  {id:"q54", label:"🌅 La chanson qui te rend nostalgique d'un été précis"},
+  {id:"q55", label:"🥵 La chanson qui te donne chaud"},
+  {id:"q56", label:"🎸 La meilleure chanson rock"},
+  {id:"q57", label:"🎧 La meilleure chanson rap"},
+  {id:"q58", label:"✨ La meilleure chanson pop"},
+  {id:"q59", label:"🤘 La meilleure chanson metal"},
+  {id:"q60", label:"🎛️ La meilleure chanson electro"},
+  {id:"q61", label:"🕺 La meilleure chanson des années 80"},
+  {id:"q62", label:"📺 La meilleure chanson des années 90"},
+  {id:"q63", label:"💿 La meilleure chanson des années 2000"},
+  {id:"q64", label:"📱 La meilleure chanson des années 2010"},
+  {id:"q65", label:"🚀 La meilleure chanson des années 2020"},
+  {id:"q66", label:"🙄 La chanson que tu détestes"},
+  {id:"q67", label:"💎 La chanson pépite que toi seul(e) connais"},
+  {id:"q68", label:"🔀 Le meilleur remix"},
+  {id:"q69", label:"🍺 La meilleure chanson paillarde"},
 ];
 
 let state = {
@@ -4432,9 +4484,47 @@ function renderQuestionPicker(){
       </label>
     `;
   }).join("");
+  renderCustomQuestionsList();
+  const full = gameSelectedQuestionIds.length >= gameRoundsTarget;
+  document.getElementById("gqCustomQuestionInput").disabled = full;
+  document.getElementById("gqAddCustomBtn").disabled = full;
   document.getElementById("gqSelectedCount").textContent = gameSelectedQuestionIds.length;
   document.getElementById("gqSelectedTarget").textContent = gameRoundsTarget;
   document.getElementById("gqValidateBtn").disabled = gameSelectedQuestionIds.length !== gameRoundsTarget;
+}
+
+// Liste des questions personnalisées déjà ajoutées à la sélection en cours
+// (ajouté le 29/07/2026) — ce sont les entrées de gameSelectedQuestionIds qui
+// ne correspondent à aucun id du catalogue GAME_QUESTIONS : le texte tapé par
+// le créateur EST l'id. Affichées à part, avec un bouton pour les retirer
+// (les entrées du catalogue, elles, se décochent via leur case).
+function renderCustomQuestionsList(){
+  const customTexts = gameSelectedQuestionIds.filter(id => !GAME_QUESTIONS.some(q => q.id === id));
+  document.getElementById("gqCustomQuestionsList").innerHTML = customTexts.map((text, i) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border);">
+      <span style="font-size:13.5px;flex:1;min-width:0;">✏️ ${escapeHtml(text)}</span>
+      <button class="add-btn" onclick="removeCustomQuestion(${i})" title="Retirer cette question" style="width:auto;padding:0 10px;flex-shrink:0;">✕</button>
+    </div>
+  `).join("");
+}
+
+function addCustomQuestion(){
+  const input = document.getElementById("gqCustomQuestionInput");
+  const text = input.value.trim();
+  if(!text) return;
+  if(gameSelectedQuestionIds.includes(text)){ showToast("Cette question est déjà dans la sélection."); return; }
+  if(gameSelectedQuestionIds.length >= gameRoundsTarget){ showToast(`Tu as déjà choisi tes ${gameRoundsTarget} question(s).`); return; }
+  gameSelectedQuestionIds.push(text);
+  input.value = "";
+  renderQuestionPicker();
+}
+
+function removeCustomQuestion(index){
+  const customTexts = gameSelectedQuestionIds.filter(id => !GAME_QUESTIONS.some(q => q.id === id));
+  const text = customTexts[index];
+  const i = gameSelectedQuestionIds.indexOf(text);
+  if(i !== -1) gameSelectedQuestionIds.splice(i, 1);
+  renderQuestionPicker();
 }
 
 function pickGameRoundsCount(n){
@@ -4876,7 +4966,9 @@ function renderGamePlaying(){
   const q = GAME_QUESTIONS.find(x => x.id === round.question_id);
   // "Qui a mis cette chanson ?" (round.question_id vaut "ow1".."owN", ne
   // correspond à aucune vraie question) : libellé générique à la place.
-  const roundLabel = q ? q.label : (currentRoom.mode === "owner" ? "🎲 Devine qui a proposé cette chanson !" : "");
+  // Sinon, si l'id n'est pas dans le catalogue, c'est une question
+  // personnalisée (ajouté le 29/07/2026) — round.question_id EST le texte tapé.
+  const roundLabel = q ? q.label : (currentRoom.mode === "owner" ? "🎲 Devine qui a proposé cette chanson !" : round.question_id);
   document.getElementById("gqRoundQuestion").textContent = roundLabel;
   showGameQuestionIntro(idx, total, roundLabel);
 
@@ -5511,7 +5603,9 @@ function openGameAnswerModal(questionId){
   gamePickingQuestionId = questionId;
   const q = GAME_QUESTIONS.find(x => x.id === questionId);
   const isSongSlot = /^(bt|ow)\d+$/.test(String(questionId));
-  const label = q ? q.label : (isSongSlot ? `🎵 Chanson n°${String(questionId).slice(2)}` : "Réponds à la question");
+  // Ni dans le catalogue ni un slot chanson : question personnalisée (ajouté
+  // le 29/07/2026) — questionId EST le texte tapé par le créateur.
+  const label = q ? q.label : (isSongSlot ? `🎵 Chanson n°${String(questionId).slice(2)}` : questionId);
   document.getElementById("gameAnswerModalTitle").textContent = label;
   document.getElementById("gameAnswerSearchInput").value = "";
   document.getElementById("gameAnswerResults").innerHTML = `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Tape le nom d'un titre ou d'un artiste...</p>`;
