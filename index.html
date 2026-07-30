@@ -798,11 +798,18 @@
               </div>
               <div id="gqCustomQuestionsList" class="stack"></div>
             </div>
-            <!-- Validation remontée ici, au-dessus de la liste (ajoutée le
-                 29/07/2026, retour de Rémi) : avec 69 questions au catalogue,
-                 il fallait scroller tout en bas pour la retrouver. -->
-            <button class="btn-primary" id="gqValidateBtn" onclick="confirmQuestionSelection()">Valider la sélection (<span id="gqSelectedCount">0</span>/<span id="gqSelectedTarget">0</span>)</button>
-            <button class="btn-ghost" style="margin:10px 0 16px;" onclick="backToModeStep()">← Retour</button>
+            <!-- Validation remontée + fixée ici, au-dessus de la liste (ajoutée
+                 le 29/07/2026, retour de Rémi) : avec 69 questions au
+                 catalogue, il fallait scroller tout en bas pour la retrouver,
+                 puis Rémi a demandé qu'elle reste visible en permanence, pas
+                 seulement plus haut dans la page. top:187px = hauteur réelle
+                 mesurée de header.topbar (64px) + .room-hero (122.5px,
+                 mesuré en conditions réelles) — à ajuster si l'un des deux
+                 change un jour de hauteur. -->
+            <div style="position:sticky;top:187px;z-index:10;background:var(--bg);padding:8px 0 16px;">
+              <button class="btn-primary" id="gqValidateBtn" onclick="confirmQuestionSelection()">Valider la sélection (<span id="gqSelectedCount">0</span>/<span id="gqSelectedTarget">0</span>)</button>
+              <button class="btn-ghost" style="margin-top:10px;" onclick="backToModeStep()">← Retour</button>
+            </div>
             <div class="card">
               <div id="gqQuestionPicker" class="stack"></div>
             </div>
