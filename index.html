@@ -2170,6 +2170,19 @@ async function afterLogin(pseudo){
   // Retiré le 23/07/2026 (retour de Rémi) : revenir automatiquement dans le
   // dernier salon actif à chaque connexion/actualisation était gênant —
   // ouvrir l'app (ou l'actualiser) doit toujours amener à l'accueil.
+  // Réintroduit le 01/08/2026, mais uniquement pour CET onglet/cette session
+  // (sessionStorage, voir routeToRoomScreen()/goHome()) : un rechargement en
+  // plein jeu (touche actualiser, ou l'app relancée en arrière-plan) rejoint
+  // maintenant automatiquement le même salon, sans revenir sur la décision
+  // du 23/07 — une prochaine ouverture "à froid" (nouvel onglet, app
+  // totalement fermée puis rouverte) efface sessionStorage et ramène donc
+  // bien à l'accueil comme avant.
+  const savedRoomCode = sessionStorage.getItem("harmonizeActiveRoomCode");
+  if(savedRoomCode){
+    const { data: room } = await sb.from("rooms").select("*").eq("code", savedRoomCode).maybeSingle();
+    if(room){ await enterRealRoom(room); return; }
+    sessionStorage.removeItem("harmonizeActiveRoomCode");
+  }
   showScreen("screen-lobby");
 }
 
@@ -2389,6 +2402,10 @@ function goHome(){
   stopQueuePolling();
   stopAnyPlayback();
   currentRoom = null;
+  // Sortie explicite du salon (ajouté le 01/08/2026) : on oublie le salon
+  // retenu pour cet onglet (voir routeToRoomScreen()) — une actualisation
+  // après avoir cliqué "Accueil" doit bien rester à l'accueil.
+  sessionStorage.removeItem("harmonizeActiveRoomCode");
   showScreen("screen-lobby");
 }
 
@@ -2566,6 +2583,13 @@ async function routeToRoomScreen(room, toastMsg){
   // un reliquat de l'ancien mode démo — voir selectMode()) — pas de message
   // à montrer dans ce cas.
   if(toastMsg) showToast(toastMsg);
+  // Retenu pour cet onglet/cette session de navigateur (ajouté le 01/08/2026,
+  // retour de Rémi : une actualisation en plein jeu renvoyait à l'accueil) —
+  // sessionStorage et non localStorage : effacé à la fermeture de l'onglet,
+  // donc une actualisation reste bien dans le salon, mais une prochaine
+  // ouverture de l'app repart bien à l'accueil, comme décidé le 23/07/2026
+  // (voir afterLogin()/goHome()).
+  sessionStorage.setItem("harmonizeActiveRoomCode", room.code);
 
   // Le VRAI "jeu des questions" ET "Qui a mis cette chanson ?" (ajouté le
   // 22/07/2026) partagent le même écran (lobby + réponses/propositions), pas
@@ -3204,7 +3228,15 @@ function applyDistancePlaybackState(){
 // titre suivant), ce qui peut se faire bloquer en muet par certains
 // navigateurs mobiles faute d'un vrai clic direct sur CE lecteur.
 function unlockDistanceSound(){
-  if(!distancePlayer) return;
+  // Même correctif que unlockGameSound() (voir son commentaire, ajouté le
+  // 01/08/2026) : retente de rejoindre l'écoute (donc de créer le lecteur)
+  // s'il n'existe pas du tout — joinDistanceListening(false) affiche déjà
+  // lui-même un message clair si l'API YouTube n'a toujours pas fini de
+  // charger.
+  if(!distancePlayer){
+    joinDistanceListening(false);
+    return;
+  }
   try { distancePlayer.unMute(); } catch(e){}
   try { distancePlayer.playVideo(); } catch(e){}
   showToast("🔊 Son débloqué !");
@@ -5398,7 +5430,18 @@ function applyGamePlaybackState(){
 // compte comme une action volontaire de la personne : le navigateur
 // autorise alors le son sans discuter.
 function unlockGameSound(){
-  if(!gamePlayer) return;
+  // Ajouté le 01/08/2026, retour de testeur : sur certains réseaux mobiles,
+  // l'API YouTube met parfois trop de temps à charger et gamePlayer ne se
+  // crée jamais (ensureGamePlayer() retente alors indéfiniment en silence,
+  // sans image ni son) — dans ce cas, ce bouton ne faisait jusqu'ici rien du
+  // tout. On retente la création ici plutôt que de se contenter d'un lecteur
+  // déjà là qu'on démute.
+  if(!gamePlayer){
+    const round = currentGameRound();
+    if(round) ensureGamePlayer(round);
+    showToast(gamePlayer ? "🔄 Nouvelle tentative de lecture..." : "⏳ Le lecteur n'a pas fini de charger — réessaie dans quelques secondes.");
+    return;
+  }
   try { gamePlayer.unMute(); } catch(e){}
   try { gamePlayer.playVideo(); } catch(e){}
   showToast("🔊 Son débloqué !");
@@ -6676,7 +6719,15 @@ function applyBtPlaybackState(){
 // Débloque le son sur CET appareil — même correctif et même raison que
 // unlockGameSound() côté "Le jeu des questions" (ajouté le 31/07/2026).
 function unlockBtSound(){
-  if(!btPlayer) return;
+  // Même correctif que unlockGameSound() (voir son commentaire, ajouté le
+  // 01/08/2026) : retente la création du lecteur s'il n'existe pas du tout,
+  // plutôt que de se contenter de démuter un lecteur qui n'a jamais existé.
+  if(!btPlayer){
+    const round = currentBtRound();
+    if(round) ensureBtPlayer(round);
+    showToast(btPlayer ? "🔄 Nouvelle tentative de lecture..." : "⏳ Le lecteur n'a pas fini de charger — réessaie dans quelques secondes.");
+    return;
+  }
   try { btPlayer.unMute(); } catch(e){}
   try { btPlayer.playVideo(); } catch(e){}
   showToast("🔊 Son débloqué !");
