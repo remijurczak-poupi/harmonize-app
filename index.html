@@ -174,6 +174,11 @@
   .avatars-inline{display:flex;}
   .avatars-inline .avatar{margin-right:-8px;border:2px solid rgba(255,255,255,.9);}
   .real-badge{font-size:9.5px;font-weight:800;padding:1px 6px;border-radius:5px;background:rgba(255,255,255,.25);letter-spacing:.03em;}
+  /* Bouton "Copier" à côté du code du salon (ajouté le 31/07/2026, retour de
+     testeurs : impossible de sélectionner/copier le code à la main sur
+     certains appareils) — voir copyRoomCode(). */
+  .copy-code-btn{background:rgba(255,255,255,.2);border:none;color:inherit;font-size:11px;font-weight:700;padding:3px 9px;border-radius:6px;cursor:pointer;letter-spacing:normal;text-transform:none;}
+  .copy-code-btn:active{background:rgba(255,255,255,.35);}
 
   .now-playing{
     display:flex;gap:12px;align-items:center;background:var(--bg-card);border:1px solid var(--border);
@@ -421,13 +426,13 @@
       <h1 id="modesTitle">Choisis un mode</h1>
       <p class="sub" id="modesSub">C'est toi qui crées le salon : choisis le mode pour tout le groupe. Ceux qui rejoindront avec ton code entreront directement dans ce mode.</p>
       <div id="modeCardsContainer"></div>
-      <button class="btn-ghost" style="margin-top:6px;" onclick="showScreen('screen-lobby')">← Retour</button>
+      <button class="btn-ghost" style="margin-top:6px;" onclick="backFromModeSelect()">← Retour</button>
     </section>
 
     <!-- SCREEN: CONFIRM CREATE (étape obligatoire avant de créer un salon) -->
     <section class="screen" id="screen-confirm">
       <h1 id="confirmTitle">Créer ce salon ?</h1>
-      <p class="sub">Un vrai code sera généré pour que tes amis puissent te rejoindre. Rien n'est créé tant que tu n'as pas confirmé.</p>
+      <p class="sub" id="confirmSub">Un vrai code sera généré pour que tes amis puissent te rejoindre. Rien n'est créé tant que tu n'as pas confirmé.</p>
       <div class="mode-card" id="confirmCard" style="cursor:default;"></div>
       <!-- Mode "un seul téléphone" (ajouté le 24/07/2026), proposé uniquement
            pour les 3 jeux multijoueur — voir previewMode()/singleDeviceLabel().
@@ -443,7 +448,7 @@
           <span class="toggle-track"></span>
         </span>
       </label>
-      <button class="btn-primary" onclick="confirmCreateRoom()">🚀 Créer le salon</button>
+      <button class="btn-primary" id="confirmCreateBtn" onclick="confirmCreateRoom()">🚀 Créer le salon</button>
       <!-- Bouton solo (ajouté le 19/07/2026), affiché uniquement pour le
            Blindtest — voir previewMode()/goSoloBlindtest(). Pas besoin d'amis
            ni de vrai salon : on pioche directement dans le pool communautaire
@@ -597,7 +602,7 @@
     <!-- SCREEN: ROOM -->
     <section class="screen" id="screen-room">
       <div class="room-hero">
-        <div class="code">Salon · <span id="roomCode">------</span> <span class="real-badge">RÉEL</span></div>
+        <div class="code">Salon · <span id="roomCode">------</span> <span class="real-badge">RÉEL</span> <button class="copy-code-btn" onclick="copyRoomCode()" title="Copier le code du salon">📋 Copier</button></div>
         <div class="name" id="roomModeName">🪩 Soirée</div>
         <div class="avatars-inline" id="roomAvatars"></div>
       </div>
@@ -716,7 +721,7 @@
          tous les participants du salon. -->
     <section class="screen" id="screen-game-lobby">
       <div class="room-hero">
-        <div class="code">Salon · <span id="gqRoomCode">------</span> <span class="real-badge">RÉEL</span></div>
+        <div class="code">Salon · <span id="gqRoomCode">------</span> <span class="real-badge">RÉEL</span> <button class="copy-code-btn" onclick="copyRoomCode()" title="Copier le code du salon">📋 Copier</button></div>
         <!-- Dynamique depuis le 22/07/2026 : cet écran est maintenant partagé
              avec "Qui a mis cette chanson ?" (voir enterRealRoom()). -->
         <div class="name" id="gqRoomModeName">❓ Le jeu des questions</div>
@@ -910,6 +915,10 @@
                    (revealAdSkipButton()) : les 2 couches ci-dessus bloquent
                    aussi le bouton natif "Passer" d'une éventuelle pub. -->
               <button class="btn-ghost" id="gameAdSkipBtn" style="width:auto;padding:8px 14px;font-size:12px;" onclick="revealGameAdSkipButton()">📺 Pub bloquée ?</button>
+              <!-- Ajouté le 31/07/2026, retour de testeurs : dans un groupe de
+                   5, seuls 2 avaient du son (politique anti-autoplay de
+                   certains navigateurs mobiles) — voir unlockGameSound(). -->
+              <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="unlockGameSound()">🔊 Pas de son ?</button>
             </div>
           </div>
 
@@ -987,6 +996,9 @@
           <div style="text-align:center;margin-top:20px;">
             <button class="btn-primary" style="width:auto;padding:12px 24px;" onclick="rejouerMemeSalon()">🔄 Rejouer dans ce salon</button>
             <p style="font-size:11px;color:var(--text-faint);margin-top:8px;">Retour au choix des questions, avec les mêmes amis, sans quitter le salon.</p>
+            <!-- Ajouté le 31/07/2026, retour de testeurs : il fallait recréer un
+                 salon de zéro pour jouer à autre chose — voir openChangeGameScreen(). -->
+            <button class="btn-ghost" style="width:auto;padding:12px 24px;margin-top:10px;" onclick="openChangeGameScreen()">🔀 Changer de jeu</button>
           </div>
         </div>
       </div>
@@ -998,7 +1010,7 @@
          fixes), puis on les devine une par une en choix multiple. -->
     <section class="screen" id="screen-blindtest-lobby">
       <div class="room-hero">
-        <div class="code">Salon · <span id="btRoomCode">------</span> <span class="real-badge">RÉEL</span></div>
+        <div class="code">Salon · <span id="btRoomCode">------</span> <span class="real-badge">RÉEL</span> <button class="copy-code-btn" onclick="copyRoomCode()" title="Copier le code du salon">📋 Copier</button></div>
         <div class="name">🎧 Blindtest</div>
         <div class="avatars-inline" id="btRoomAvatars"></div>
       </div>
@@ -1104,6 +1116,10 @@
                    pouvoir taper directement sur "Passer" en dessous — voir
                    revealAdSkipButton(). -->
               <button class="btn-ghost" id="btAdSkipBtn" style="width:auto;padding:8px 14px;font-size:12px;" onclick="revealAdSkipButton()">📺 Pub bloquée ?</button>
+              <!-- Ajouté le 31/07/2026, retour de testeurs : dans un groupe de
+                   5, seuls 2 avaient du son (politique anti-autoplay de
+                   certains navigateurs mobiles) — voir unlockBtSound(). -->
+              <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="unlockBtSound()">🔊 Pas de son ?</button>
             </div>
           </div>
 
@@ -1158,6 +1174,9 @@
           <div style="text-align:center;margin-top:20px;">
             <button class="btn-primary" style="width:auto;padding:12px 24px;" onclick="rejouerBtMemeSalon()">🔄 Rejouer dans ce salon</button>
             <p style="font-size:11px;color:var(--text-faint);margin-top:8px;">Retour au choix des réglages, avec les mêmes amis, sans quitter le salon.</p>
+            <!-- Ajouté le 31/07/2026, retour de testeurs : il fallait recréer un
+                 salon de zéro pour jouer à autre chose — voir openChangeGameScreen(). -->
+            <button class="btn-ghost" style="width:auto;padding:12px 24px;margin-top:10px;" onclick="openChangeGameScreen()">🔀 Changer de jeu</button>
           </div>
         </div>
       </div>
@@ -2225,7 +2244,10 @@ function chooseCategory(cat){
 }
 
 function renderModeCards(){
-  const modes = CATEGORY_MODES[creationCategory] || [];
+  let modes = CATEGORY_MODES[creationCategory] || [];
+  // "Série de blindtest" est solo (voir previewMode()) : n'a pas de sens en
+  // changeant de jeu au sein d'un vrai salon multijoueur (ajouté le 31/07/2026).
+  if(changingGameInRoom) modes = modes.filter(m => m !== "serie");
   const container = document.getElementById("modeCardsContainer");
   container.innerHTML = modes.map(m => {
     const d = MODE_DETAIL[m];
@@ -2248,6 +2270,33 @@ function renderModeCards(){
 // avant de créer quoi que ce soit (et surtout avant d'écrire une vraie ligne en base).
 let pendingMode = null;
 
+// "Changer de jeu" sans quitter le salon (ajouté le 31/07/2026, retour de
+// testeurs : "impossibilité de rester dans un même salon et lancer un
+// nouveau jeu, il faut recréer un salon de zéro"). true entre le clic sur
+// "🔀 Changer de jeu" (podium du jeu des questions/owner ou du Blindtest) et
+// la confirmation du nouveau jeu — réutilise le même écran "Choisis un jeu"
+// que la création, mais la confirmation MET À JOUR le salon en cours
+// (changeGameType()) au lieu d'en créer un nouveau (selectMode()).
+let changingGameInRoom = false;
+
+// Ouvre le choix de jeu depuis le podium d'une partie terminée, sans quitter
+// le salon en cours (même code, mêmes participants).
+function openChangeGameScreen(){
+  changingGameInRoom = true;
+  chooseCategory("jeux");
+}
+
+// Bouton "← Retour" de l'écran "Choisis un jeu" : vers l'accueil normalement,
+// mais vers le podium du salon en cours si on était en train d'en changer.
+function backFromModeSelect(){
+  if(changingGameInRoom){
+    changingGameInRoom = false;
+    goToCurrentScreen();
+    return;
+  }
+  showScreen("screen-lobby");
+}
+
 function previewMode(mode){
   // "Série de blindtest" (ajouté le 21/07/2026) est TOUJOURS solo, comme
   // "Le jeu des questions"/Blindtest quand ils étaient encore 100% démo —
@@ -2258,7 +2307,16 @@ function previewMode(mode){
   const d = MODE_DETAIL[mode];
   // Le "?" n'est ajouté que si le titre du mode n'en a pas déjà un lui-même
   // (ex. "Qui a mis cette chanson ?"), pour éviter un double "? ?".
-  document.getElementById("confirmTitle").textContent = `Créer ce salon : ${d.emoji} ${d.title}${d.title.endsWith("?") ? "" : " ?"}`;
+  const questionMark = d.title.endsWith("?") ? "" : " ?";
+  // Textes différents selon qu'on crée un nouveau salon ou qu'on change de
+  // jeu dans le salon en cours (ajouté le 31/07/2026, voir changingGameInRoom).
+  document.getElementById("confirmTitle").textContent = changingGameInRoom
+    ? `Lancer : ${d.emoji} ${d.title}${questionMark}`
+    : `Créer ce salon : ${d.emoji} ${d.title}${questionMark}`;
+  document.getElementById("confirmSub").textContent = changingGameInRoom
+    ? "Le salon garde le même code — tout le monde bascule automatiquement sur ce nouveau jeu."
+    : "Un vrai code sera généré pour que tes amis puissent te rejoindre. Rien n'est créé tant que tu n'as pas confirmé.";
+  document.getElementById("confirmCreateBtn").textContent = changingGameInRoom ? "🔀 Lancer ce jeu" : "🚀 Créer le salon";
   document.getElementById("confirmCard").innerHTML = `
     <div class="mode-icon">${d.emoji}</div>
     <div>
@@ -2267,8 +2325,9 @@ function previewMode(mode){
     </div>
   `;
   // Le Blindtest solo (ajouté le 19/07/2026) ne nécessite pas de vrai salon —
-  // voir goSoloBlindtest(). Les autres modes n'ont pas cette alternative.
-  document.getElementById("btSoloInstead").style.display = mode === "blindtest" ? "block" : "none";
+  // voir goSoloBlindtest(). N'a pas de sens en changeant de jeu dans un vrai
+  // salon multijoueur (ajouté le 31/07/2026).
+  document.getElementById("btSoloInstead").style.display = (mode === "blindtest" && !changingGameInRoom) ? "block" : "none";
   // Mode "un seul téléphone" (ajouté le 24/07/2026) : proposé seulement pour
   // les 3 jeux multijoueur, avec un texte différent selon le mécanisme réel
   // (téléphone qui tourne pour questions/owner, simple écoute partagée pour
@@ -2320,6 +2379,13 @@ async function confirmCreateRoom(){
   const mode = pendingMode;
   pendingMode = null;
   const singleDevice = SINGLE_DEVICE_HINT[mode] ? document.getElementById("singleDeviceCheckbox").checked : false;
+  // "Changer de jeu" dans le salon en cours (ajouté le 31/07/2026) plutôt que
+  // créer un nouveau salon — voir openChangeGameScreen()/changeGameType().
+  if(changingGameInRoom){
+    changingGameInRoom = false;
+    await changeGameType(mode, singleDevice);
+    return;
+  }
   await selectMode(mode, singleDevice);
 }
 
@@ -2357,6 +2423,69 @@ async function selectMode(mode, singleDevice){
   await enterRealRoom(data, `Salon créé pour de vrai — code ${data.code}. Partage ce code à tes amis pour qu'ils te rejoignent !`);
 }
 
+// Change le jeu du salon EN PLACE, même code, mêmes participants (ajouté le
+// 31/07/2026, retour de testeurs : "impossibilité de rester dans un même
+// salon et lancer un nouveau jeu, il faut recréer un nouveau salon de 0").
+// Contrairement à selectMode() (qui INSÈRE une nouvelle ligne), ceci MET À
+// JOUR la ligne "rooms" existante : même code, donc personne n'a besoin de
+// le repartager. Remet à zéro l'état de partie (mêmes colonnes que
+// "🔄 Rejouer dans ce salon", voir rejouerMemeSalon()/rejouerBtMemeSalon())
+// pour repartir d'un lobby propre, quel que soit l'ancien jeu.
+// Le canal temps réel du salon reste abonné tel quel (pas besoin de le
+// recréer) : le handler UPDATE sur "rooms" dans subscribeQueue() détecte que
+// le mode a changé et fait basculer l'écran de TOUS les participants, pas
+// seulement celui qui a choisi le nouveau jeu.
+async function changeGameType(mode, singleDevice){
+  if(!currentRoom) return;
+  const { data, error } = await sb.from("rooms").update({
+    mode,
+    single_device: !!singleDevice,
+    game_phase: "lobby",
+    game_question_ids: [],
+    game_rounds: [],
+    game_current_round: 0,
+    game_round_started_at: null,
+    game_round_revealed: false,
+    game_excluded_user_ids: [],
+    playback_state: "paused",
+    playback_position: 0,
+    playback_started_at: null,
+  }).eq("id", currentRoom.id).select().single();
+  if(error){ showToast("Erreur : " + error.message); return; }
+  const d = MODE_DETAIL[mode] || {};
+  await routeToRoomScreen(data, `🔀 Nouveau jeu : ${d.emoji || ""} ${d.title || mode} !`);
+}
+
+// Copie le code du salon en cours dans le presse-papiers (ajouté le
+// 31/07/2026, retour de testeurs : sur certains appareils, impossible de
+// sélectionner le texte du code à la main pour le copier). navigator.clipboard
+// est la méthode moderne, mais peut être indisponible/refusée selon le
+// navigateur — repli sur document.execCommand("copy") via un champ caché,
+// qui fonctionne quasiment partout.
+async function copyRoomCode(){
+  const code = currentRoom?.code;
+  if(!code) return;
+  try {
+    await navigator.clipboard.writeText(code);
+    showToast(`Code "${code}" copié !`);
+    return;
+  } catch(e){ /* on tente le repli ci-dessous */ }
+  const input = document.createElement("input");
+  input.value = code;
+  input.style.position = "fixed";
+  input.style.opacity = "0";
+  document.body.appendChild(input);
+  input.focus();
+  input.select();
+  try {
+    document.execCommand("copy");
+    showToast(`Code "${code}" copié !`);
+  } catch(e){
+    showToast(`Impossible de copier automatiquement — le code est : ${code}`);
+  }
+  document.body.removeChild(input);
+}
+
 // Rejoindre un vrai salon par son code.
 async function joinRoom(){
   const code = (document.getElementById("joinCode").value.trim() || "").toUpperCase();
@@ -2383,6 +2512,17 @@ async function enterRealRoom(room, toastMsg){
   if(realtimeChannel){ sb.removeChannel(realtimeChannel); realtimeChannel = null; }
   stopQueuePolling();
   stopAnyPlayback(); // on repart d'un lecteur arrêté (Soirée ou À distance) si on venait d'un autre salon
+  subscribeQueue(room.id);
+  await routeToRoomScreen(room, toastMsg);
+}
+
+// Partie de enterRealRoom() qui affiche le bon écran pour un salon donné
+// (extraite le 31/07/2026, voir changeGameType()) : tout ce qui dépend du
+// MODE du salon, mais RIEN qui touche au canal temps réel (déjà en place et
+// abonné, pas besoin de le recréer quand on change juste de jeu dans le même
+// salon — seul enterRealRoom(), lui, gère ce canal en plus, pour une vraie
+// entrée dans un salon).
+async function routeToRoomScreen(room, toastMsg){
   currentRoom = room;
   state.mode = room.mode === "distance" ? "distance" : (room.mode === "questions" || room.mode === "blindtest" || room.mode === "owner" ? room.mode : "soiree");
   state.category = (room.mode === "questions" || room.mode === "blindtest" || room.mode === "owner") ? "jeux" : "ecoute";
@@ -2390,7 +2530,6 @@ async function enterRealRoom(room, toastMsg){
   updateModeUI();
   document.getElementById("tabbar").style.display = "flex";
   showToast(toastMsg);
-  subscribeQueue(room.id);
 
   // Le VRAI "jeu des questions" ET "Qui a mis cette chanson ?" (ajouté le
   // 22/07/2026) partagent le même écran (lobby + réponses/propositions), pas
@@ -2527,6 +2666,16 @@ function subscribeQueue(roomId){
       loadRealQueue(roomId);
     })
     .on("postgres_changes", { event:"UPDATE", schema:"public", table:"rooms", filter:"id=eq." + roomId }, (payload) => {
+      // "Changer de jeu" (ajouté le 31/07/2026, voir changeGameType()) : si le
+      // mode du salon vient de changer, on refait le routage d'écran COMPLET
+      // (routeToRoomScreen(), la partie de enterRealRoom() qui ne touche pas
+      // au canal temps réel) pour que l'écran de CE participant bascule aussi
+      // vers le nouveau jeu — pas seulement chez la personne qui l'a choisi.
+      if(currentRoom && payload.new.mode !== currentRoom.mode){
+        const d = MODE_DETAIL[payload.new.mode] || {};
+        routeToRoomScreen(payload.new, `🔀 Nouveau jeu : ${d.emoji || ""} ${d.title || payload.new.mode} !`);
+        return;
+      }
       currentRoom = payload.new;
       if(state.mode === "distance") applyDistancePlaybackState();
       if(state.mode === "questions" || state.mode === "owner") renderGameLobby();
@@ -2807,6 +2956,10 @@ function renderPlayerCard(){
                empêche d'atteindre le bouton natif "Ignorer" de YouTube — ce
                bouton la désactive juste quelques secondes. -->
           <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="revealDistanceAdSkip()">📺 Pub bloquée ?</button>
+          <!-- Ajouté le 31/07/2026, retour de testeurs : dans un groupe de
+               5, seuls 2 avaient du son (politique anti-autoplay de certains
+               navigateurs mobiles) — voir unlockDistanceSound(). -->
+          <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="unlockDistanceSound()">🔊 Pas de son ?</button>
         </div>
         <p style="font-size:11px;color:var(--text-faint);margin-top:6px;">Pause, reprise et "suivant" sont partagés : ce que fait une personne se répercute aussitôt chez tout le monde. La barre de défilement de YouTube est volontairement désactivée : avancer/reculer dans le titre pour tout le monde n'est pas encore possible (à construire si tu en as besoin).</p>
       </div>
@@ -3006,6 +3159,19 @@ function applyDistancePlaybackState(){
     if(!playing && playerState === YT.PlayerState.PLAYING) distancePlayer.pauseVideo();
   }
   updateDistancePlayPauseLabel(playing);
+}
+
+// Débloque le son sur CET appareil — même correctif et même raison que
+// unlockGameSound() côté "Le jeu des questions" (ajouté le 31/07/2026) :
+// chaque appareil en mode À distance lance sa propre lecture en réaction au
+// temps réel (quand un autre participant met en pause/reprend/passe au
+// titre suivant), ce qui peut se faire bloquer en muet par certains
+// navigateurs mobiles faute d'un vrai clic direct sur CE lecteur.
+function unlockDistanceSound(){
+  if(!distancePlayer) return;
+  try { distancePlayer.unMute(); } catch(e){}
+  try { distancePlayer.playVideo(); } catch(e){}
+  showToast("🔊 Son débloqué !");
 }
 
 // Change l'état partagé (pause <-> lecture) en base. Comme pour l'ajout d'un
@@ -4937,6 +5103,16 @@ async function logActivityEvent(eventType, roomId, mode){
 
 async function launchGame(){
   if(!isGameCreator()) return;
+  // Recharge les réponses fraîches depuis Supabase juste avant de calculer les
+  // manches (corrigé le 31/07/2026, retour de testeurs : "on joue quelques
+  // questions et d'un coup ça met un écran de fin pour tout le monde"). Avant
+  // ce correctif, computeGameRounds() utilisait gameAnswers tel quel en
+  // mémoire — si une réponse d'un participant venait d'arriver et n'avait pas
+  // encore été reçue en temps réel par l'appareil du créateur au moment du
+  // clic sur "Lancer la partie", la question correspondante se retrouvait
+  // avec ZÉRO manche, réduisant silencieusement le nombre total de manches
+  // en dessous de ce qui était prévu.
+  await loadGameAnswers(currentRoom.id);
   const rounds = computeGameRounds();
   if(!rounds.length){ showToast("Aucune réponse à jouer — attends que tout le monde ait répondu."); return; }
   const nowIso = new Date().toISOString();
@@ -5175,6 +5351,21 @@ function applyGamePlaybackState(){
     if(!playing && playerState === YT.PlayerState.PLAYING) gamePlayer.pauseVideo();
   }
   updateGamePlayPauseLabel(playing);
+}
+
+// Débloque le son sur CET appareil (ajouté le 31/07/2026, retour de
+// testeurs : dans un groupe de 5, seuls 2 avaient du son). La lecture de
+// chaque manche démarre automatiquement dès qu'un participant fait avancer
+// la partie (via le temps réel) — sur certains navigateurs mobiles, une
+// vidéo qui démarre "toute seule" comme ça peut être bloquée en muet
+// (politique anti-autoplay du navigateur). Un vrai clic sur CE bouton, lui,
+// compte comme une action volontaire de la personne : le navigateur
+// autorise alors le son sans discuter.
+function unlockGameSound(){
+  if(!gamePlayer) return;
+  try { gamePlayer.unMute(); } catch(e){}
+  try { gamePlayer.playVideo(); } catch(e){}
+  showToast("🔊 Son débloqué !");
 }
 
 function updateGamePlayPauseLabel(playing){
@@ -6439,6 +6630,15 @@ function applyBtPlaybackState(){
     if(!playing && playerState === YT.PlayerState.PLAYING) btPlayer.pauseVideo();
   }
   updateBtPlayPauseLabel(playing);
+}
+
+// Débloque le son sur CET appareil — même correctif et même raison que
+// unlockGameSound() côté "Le jeu des questions" (ajouté le 31/07/2026).
+function unlockBtSound(){
+  if(!btPlayer) return;
+  try { btPlayer.unMute(); } catch(e){}
+  try { btPlayer.playVideo(); } catch(e){}
+  showToast("🔊 Son débloqué !");
 }
 
 function updateBtPlayPauseLabel(playing){
