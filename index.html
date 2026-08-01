@@ -173,11 +173,10 @@
   .room-hero .name{font-size:20px;font-weight:700;margin:2px 0 10px;}
   .avatars-inline{display:flex;}
   .avatars-inline .avatar{margin-right:-8px;border:2px solid rgba(255,255,255,.9);}
-  .real-badge{font-size:9.5px;font-weight:800;padding:1px 6px;border-radius:5px;background:rgba(255,255,255,.25);letter-spacing:.03em;}
   /* Bouton "Copier" à côté du code du salon (ajouté le 31/07/2026, retour de
      testeurs : impossible de sélectionner/copier le code à la main sur
      certains appareils) — voir copyRoomCode(). */
-  .copy-code-btn{background:rgba(255,255,255,.2);border:none;color:inherit;font-size:11px;font-weight:700;padding:3px 9px;border-radius:6px;cursor:pointer;letter-spacing:normal;text-transform:none;}
+  .copy-code-btn{background:rgba(255,255,255,.2);border:none;color:inherit;font-size:13px;line-height:1;padding:5px 8px;border-radius:6px;cursor:pointer;letter-spacing:normal;text-transform:none;}
   .copy-code-btn:active{background:rgba(255,255,255,.35);}
 
   .now-playing{
@@ -602,7 +601,7 @@
     <!-- SCREEN: ROOM -->
     <section class="screen" id="screen-room">
       <div class="room-hero">
-        <div class="code">Salon · <span id="roomCode">------</span> <span class="real-badge">RÉEL</span> <button class="copy-code-btn" onclick="copyRoomCode()" title="Copier le code du salon">📋 Copier</button></div>
+        <div class="code">Salon · <span id="roomCode">------</span> <button class="copy-code-btn" onclick="copyRoomCode()" title="Copier le code du salon">📋</button></div>
         <div class="name" id="roomModeName">🪩 Soirée</div>
         <div class="avatars-inline" id="roomAvatars"></div>
       </div>
@@ -721,7 +720,7 @@
          tous les participants du salon. -->
     <section class="screen" id="screen-game-lobby">
       <div class="room-hero">
-        <div class="code">Salon · <span id="gqRoomCode">------</span> <span class="real-badge">RÉEL</span> <button class="copy-code-btn" onclick="copyRoomCode()" title="Copier le code du salon">📋 Copier</button></div>
+        <div class="code">Salon · <span id="gqRoomCode">------</span> <button class="copy-code-btn" onclick="copyRoomCode()" title="Copier le code du salon">📋</button></div>
         <!-- Dynamique depuis le 22/07/2026 : cet écran est maintenant partagé
              avec "Qui a mis cette chanson ?" (voir enterRealRoom()). -->
         <div class="name" id="gqRoomModeName">❓ Le jeu des questions</div>
@@ -993,13 +992,20 @@
           <div id="gqFinishedSingleDevice" style="display:none;text-align:center;margin:20px 0;">
             <p style="font-size:13.5px;color:var(--text-dim);">Merci d'avoir joué ! Pas de classement pour cette partie sur un seul téléphone.</p>
           </div>
-          <div style="text-align:center;margin-top:20px;">
+          <!-- Réservé au créateur du salon (ajouté le 01/08/2026, retour de
+               testeurs) : que ce soit "Rejouer" ou "Changer de jeu", l'écran
+               qui suit (choix des questions/réglages) n'est de toute façon
+               pilotable que par isGameCreator() — inutile donc de proposer
+               ces boutons aux autres, qui se retrouveraient juste à attendre
+               le créateur sans rien pouvoir faire de plus qu'avant. -->
+          <div id="gqReplayControls" style="text-align:center;margin-top:20px;">
             <button class="btn-primary" style="width:auto;padding:12px 24px;" onclick="rejouerMemeSalon()">🔄 Rejouer dans ce salon</button>
             <p style="font-size:11px;color:var(--text-faint);margin-top:8px;">Retour au choix des questions, avec les mêmes amis, sans quitter le salon.</p>
             <!-- Ajouté le 31/07/2026, retour de testeurs : il fallait recréer un
                  salon de zéro pour jouer à autre chose — voir openChangeGameScreen(). -->
             <button class="btn-ghost" style="width:auto;padding:12px 24px;margin-top:10px;" onclick="openChangeGameScreen()">🔀 Changer de jeu</button>
           </div>
+          <p id="gqReplayWaitMsg" style="display:none;font-size:13px;color:var(--text-faint);text-align:center;margin-top:20px;">En attente que le créateur du salon relance une partie ou change de jeu...</p>
         </div>
       </div>
     </section>
@@ -1010,7 +1016,7 @@
          fixes), puis on les devine une par une en choix multiple. -->
     <section class="screen" id="screen-blindtest-lobby">
       <div class="room-hero">
-        <div class="code">Salon · <span id="btRoomCode">------</span> <span class="real-badge">RÉEL</span> <button class="copy-code-btn" onclick="copyRoomCode()" title="Copier le code du salon">📋 Copier</button></div>
+        <div class="code">Salon · <span id="btRoomCode">------</span> <button class="copy-code-btn" onclick="copyRoomCode()" title="Copier le code du salon">📋</button></div>
         <div class="name">🎧 Blindtest</div>
         <div class="avatars-inline" id="btRoomAvatars"></div>
       </div>
@@ -1171,13 +1177,17 @@
           <div id="btFinishedSingleDevice" style="display:none;text-align:center;margin:20px 0;">
             <p style="font-size:13.5px;color:var(--text-dim);">Merci d'avoir joué ! Pas de classement pour cette partie sur un seul téléphone.</p>
           </div>
-          <div style="text-align:center;margin-top:20px;">
+          <!-- Réservé au créateur du salon (ajouté le 01/08/2026, retour de
+               testeurs) : même raison que côté "Le jeu des questions" — voir
+               le commentaire sur gqReplayControls. -->
+          <div id="btReplayControls" style="text-align:center;margin-top:20px;">
             <button class="btn-primary" style="width:auto;padding:12px 24px;" onclick="rejouerBtMemeSalon()">🔄 Rejouer dans ce salon</button>
             <p style="font-size:11px;color:var(--text-faint);margin-top:8px;">Retour au choix des réglages, avec les mêmes amis, sans quitter le salon.</p>
             <!-- Ajouté le 31/07/2026, retour de testeurs : il fallait recréer un
                  salon de zéro pour jouer à autre chose — voir openChangeGameScreen(). -->
             <button class="btn-ghost" style="width:auto;padding:12px 24px;margin-top:10px;" onclick="openChangeGameScreen()">🔀 Changer de jeu</button>
           </div>
+          <p id="btReplayWaitMsg" style="display:none;font-size:13px;color:var(--text-faint);text-align:center;margin-top:20px;">En attente que le créateur du salon relance une partie ou change de jeu...</p>
         </div>
       </div>
     </section>
@@ -5726,6 +5736,11 @@ function renderGameScoreboard(){
 // reste du classement en liste juste en dessous.
 function renderGameFinished(){
   stopGamePlayer();
+  // "Rejouer"/"Changer de jeu" réservés au créateur (ajouté le 01/08/2026) —
+  // voir le commentaire HTML sur gqReplayControls.
+  const creator = isGameCreator();
+  document.getElementById("gqReplayControls").style.display = creator ? "block" : "none";
+  document.getElementById("gqReplayWaitMsg").style.display = creator ? "none" : "block";
   // Mode "un seul téléphone" : pas de vote, donc pas de score ni de podium —
   // juste un message de fin (ajouté le 24/07/2026).
   document.getElementById("gqFinishedScored").style.display = currentRoom.single_device ? "none" : "block";
@@ -6941,6 +6956,11 @@ function renderBtScoreboard(){
 function renderBtFinished(){
   stopBtPlayer();
   btSingleDeviceBroadcasting = false;
+  // "Rejouer"/"Changer de jeu" réservés au créateur (ajouté le 01/08/2026) —
+  // voir le commentaire HTML sur btReplayControls.
+  const creator = isGameCreator();
+  document.getElementById("btReplayControls").style.display = creator ? "block" : "none";
+  document.getElementById("btReplayWaitMsg").style.display = creator ? "none" : "block";
   // Mode "un seul téléphone" : pas de vote, donc pas de score ni de podium.
   document.getElementById("btFinishedScored").style.display = currentRoom.single_device ? "none" : "block";
   document.getElementById("btFinishedSingleDevice").style.display = currentRoom.single_device ? "block" : "none";
