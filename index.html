@@ -999,13 +999,17 @@
                qui suit (choix des questions/réglages) n'est de toute façon
                pilotable que par isGameCreator() — inutile donc de proposer
                ces boutons aux autres, qui se retrouveraient juste à attendre
-               le créateur sans rien pouvoir faire de plus qu'avant. -->
-          <div id="gqReplayControls" style="text-align:center;margin-top:20px;">
-            <button class="btn-primary" style="width:auto;padding:12px 24px;" onclick="rejouerMemeSalon()">🔄 Rejouer dans ce salon</button>
-            <p style="font-size:11px;color:var(--text-faint);margin-top:8px;">Retour au choix des questions, avec les mêmes amis, sans quitter le salon.</p>
-            <!-- Ajouté le 31/07/2026, retour de testeurs : il fallait recréer un
-                 salon de zéro pour jouer à autre chose — voir openChangeGameScreen(). -->
-            <button class="btn-ghost" style="width:auto;padding:12px 24px;margin-top:10px;" onclick="openChangeGameScreen()">🔀 Changer de jeu</button>
+               le créateur sans rien pouvoir faire de plus qu'avant.
+               Boutons côte à côte plutôt qu'empilés avec une légende chacun
+               (ajusté le 01/08/2026, retour de Rémi : "Changer de jeu" se
+               retrouvait trop bas sur l'écran de résultat, sous le podium et
+               le classement, et passait facilement inaperçu sans scroller). -->
+          <div id="gqReplayControls" style="margin-top:20px;">
+            <div style="display:flex;gap:10px;">
+              <button class="btn-primary" style="flex:1;padding:12px 8px;font-size:13.5px;" onclick="rejouerMemeSalon()">🔄 Rejouer</button>
+              <button class="btn-ghost" style="flex:1;padding:12px 8px;font-size:13.5px;" onclick="openChangeGameScreen()">🔀 Changer de jeu</button>
+            </div>
+            <p style="font-size:11px;color:var(--text-faint);text-align:center;margin-top:8px;">Sans quitter le salon, avec les mêmes amis.</p>
           </div>
           <p id="gqReplayWaitMsg" style="display:none;font-size:13px;color:var(--text-faint);text-align:center;margin-top:20px;">En attente que le créateur du salon relance une partie ou change de jeu...</p>
         </div>
@@ -1181,13 +1185,15 @@
           </div>
           <!-- Réservé au créateur du salon (ajouté le 01/08/2026, retour de
                testeurs) : même raison que côté "Le jeu des questions" — voir
-               le commentaire sur gqReplayControls. -->
-          <div id="btReplayControls" style="text-align:center;margin-top:20px;">
-            <button class="btn-primary" style="width:auto;padding:12px 24px;" onclick="rejouerBtMemeSalon()">🔄 Rejouer dans ce salon</button>
-            <p style="font-size:11px;color:var(--text-faint);margin-top:8px;">Retour au choix des réglages, avec les mêmes amis, sans quitter le salon.</p>
-            <!-- Ajouté le 31/07/2026, retour de testeurs : il fallait recréer un
-                 salon de zéro pour jouer à autre chose — voir openChangeGameScreen(). -->
-            <button class="btn-ghost" style="width:auto;padding:12px 24px;margin-top:10px;" onclick="openChangeGameScreen()">🔀 Changer de jeu</button>
+               le commentaire sur gqReplayControls. Boutons côte à côte plutôt
+               qu'empilés (même ajustement le 01/08/2026, "Changer de jeu"
+               passait inaperçu trop bas sur l'écran de résultat). -->
+          <div id="btReplayControls" style="margin-top:20px;">
+            <div style="display:flex;gap:10px;">
+              <button class="btn-primary" style="flex:1;padding:12px 8px;font-size:13.5px;" onclick="rejouerBtMemeSalon()">🔄 Rejouer</button>
+              <button class="btn-ghost" style="flex:1;padding:12px 8px;font-size:13.5px;" onclick="openChangeGameScreen()">🔀 Changer de jeu</button>
+            </div>
+            <p style="font-size:11px;color:var(--text-faint);text-align:center;margin-top:8px;">Sans quitter le salon, avec les mêmes amis.</p>
           </div>
           <p id="btReplayWaitMsg" style="display:none;font-size:13px;color:var(--text-faint);text-align:center;margin-top:20px;">En attente que le créateur du salon relance une partie ou change de jeu...</p>
         </div>
@@ -2432,7 +2438,10 @@ async function selectMode(mode, singleDevice){
   const code = generateRoomCode();
   const { data, error } = await sb.from("rooms").insert({ code, mode, created_by: currentUser.id, single_device: !!singleDevice }).select().single();
   if(error){ showToast("Erreur à la création du salon : " + error.message); return; }
-  await enterRealRoom(data, `Salon créé pour de vrai — code ${data.code}. Partage ce code à tes amis pour qu'ils te rejoignent !`);
+  // Pas de popup ici (retiré le 01/08/2026, retour de Rémi) : le code du
+  // salon reste de toute façon affiché en permanence dans l'en-tête de
+  // l'écran qui suit.
+  await enterRealRoom(data);
 }
 
 // Change le jeu du salon EN PLACE, même code, mêmes participants (ajouté le
@@ -2520,7 +2529,7 @@ async function joinRoom(){
   if(error){ showToast("Erreur de recherche du salon : " + error.message); return; }
   if(room){
     const d = MODE_DETAIL[room.mode] || MODE_DETAIL.soiree;
-    await enterRealRoom(room, `Tu as rejoint le salon ${room.code} — ${d.emoji} ${d.title} (vrai salon).`);
+    await enterRealRoom(room, `Tu as rejoint le salon ${room.code} — ${d.emoji} ${d.title}.`);
     return;
   }
 
@@ -2552,7 +2561,11 @@ async function routeToRoomScreen(room, toastMsg){
   document.getElementById("roomCode").textContent = room.code;
   updateModeUI();
   document.getElementById("tabbar").style.display = "flex";
-  showToast(toastMsg);
+  // toastMsg facultatif (ajouté le 01/08/2026) : la création d'un salon
+  // n'affiche plus de popup (retour de Rémi, "salon créé pour de vrai" était
+  // un reliquat de l'ancien mode démo — voir selectMode()) — pas de message
+  // à montrer dans ce cas.
+  if(toastMsg) showToast(toastMsg);
 
   // Le VRAI "jeu des questions" ET "Qui a mis cette chanson ?" (ajouté le
   // 22/07/2026) partagent le même écran (lobby + réponses/propositions), pas
