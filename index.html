@@ -1032,16 +1032,38 @@
            des questions) — pas de mode de sélection ici, pas de catalogue fixe. -->
       <div id="btPhaseLobby" style="display:none;">
         <div id="btLobbyCreatorFlow">
+          <!-- Choix de la source (ajouté le 01/08/2026, demande de Rémi) :
+               soit chacun propose ses chansons (flux historique), soit elles
+               viennent au hasard du pool communautaire — voir btSourceMode/
+               computeBtRandomRounds(). Dans ce 2e cas, personne n'est
+               "propriétaire" des chansons jouées, donc tout le monde devine
+               sur toutes les manches, y compris celui qui lance la partie. -->
+          <div id="btStepSource" class="card" style="margin-bottom:16px;">
+            <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">D'où viennent les chansons ?</p>
+            <button class="btn-ghost" style="margin-bottom:8px;" onclick="chooseBtSource('propose')">✍️ Chacun propose ses chansons</button>
+            <button class="btn-ghost" onclick="chooseBtSource('random')">🎲 Chansons aléatoires du pool</button>
+          </div>
           <!-- Curseur 1-20 (ajouté le 21/07/2026, remplace les boutons à choix
                fixe 2/3/4/5) : plus flexible pour un petit salon (1-2 chansons
                chacun) comme pour un grand groupe qui veut une longue partie. -->
-          <div id="btStepSongs" class="card" style="margin-bottom:16px;">
+          <div id="btStepSongs" class="card" style="display:none;margin-bottom:16px;">
             <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">Combien de chansons chacun propose-t-il ?</p>
             <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
               <input type="range" id="btSongsSlider" min="1" max="20" value="3" oninput="onBtSongsSliderInput(this.value)" style="flex:1;accent-color:var(--accent1);" />
               <span class="pill" id="btSongsSliderValue" style="min-width:32px;text-align:center;">3</span>
             </div>
             <button class="btn-primary" onclick="confirmBtSongsCount()">Valider</button>
+            <button class="btn-ghost" style="margin-top:10px;" onclick="backToBtSourceStep()">← Changer la source des chansons</button>
+          </div>
+          <!-- Compte TOTAL (pas "par personne", personne ne propose rien ici). -->
+          <div id="btStepRandomCount" class="card" style="display:none;margin-bottom:16px;">
+            <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">Combien de chansons au total ?</p>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+              <input type="range" id="btRandomCountSlider" min="3" max="30" value="10" oninput="onBtRandomCountSliderInput(this.value)" style="flex:1;accent-color:var(--accent1);" />
+              <span class="pill" id="btRandomCountSliderValue" style="min-width:32px;text-align:center;">10</span>
+            </div>
+            <button class="btn-primary" onclick="confirmBtRandomCount()">Valider</button>
+            <button class="btn-ghost" style="margin-top:10px;" onclick="backToBtSourceStep()">← Changer la source des chansons</button>
           </div>
           <!-- Pas de choix "vidéo visible" ici (contrairement au jeu des
                questions) : toujours audio seulement, voir confirmBtSettings()
@@ -1061,11 +1083,6 @@
       <!-- Phase 2 : chacun propose ses chansons -->
       <div id="btPhaseAnswering" style="display:none;">
         <h2 style="margin-top:0;">Tes propositions</h2>
-        <!-- "Chansons aléatoires" (ajouté le 01/08/2026, demande de Rémi) :
-             pioche automatiquement dans le pool communautaire pour ceux qui
-             ne veulent pas chercher eux-mêmes — même source que le Blindtest
-             solo, voir startBtSoloFromPool()/pickBtRandomSongs(). -->
-        <button class="btn-ghost" style="margin-bottom:12px;" onclick="pickBtRandomSongs()">🎲 Piocher au hasard dans le pool</button>
         <div id="btMyAnswers" class="stack" style="margin-bottom:24px;"></div>
 
         <h2>Qui a proposé ses chansons ?</h2>
@@ -1654,6 +1671,10 @@ let btGuesses = [];
 let btPickingSlot = null; // le "slot" ('bt1', 'bt2'...) pour lequel la fenêtre de proposition est ouverte
 let btSongsPerPersonTarget = null; // réglage du créateur : combien de chansons chacun doit proposer
 let btPlaybackStart = null; // 'start' | 'middle' | null — même principe que gamePlaybackStart
+// Source des chansons (ajouté le 01/08/2026) : 'propose' (chacun propose,
+// historique) | 'random' (piochées dans blindtest_pool) | null (pas encore choisi).
+let btSourceMode = null;
+let btRandomCount = null; // réglage du créateur en mode 'random' : nombre TOTAL de chansons (pas par personne)
 let btGuessSelectionRoundIdx = -1;
 let btMyGuess = null; // youtube_id choisi pour la manche en cours (un seul choix, pas un Set comme gameMyGuessSelection)
 let btGuessOptionsCache = []; // ordre mélangé des choix, figé pour la manche en cours (voir ensureBtGuessSelectionForRound)
@@ -2629,6 +2650,8 @@ async function routeToRoomScreen(room, toastMsg){
   if(room.mode === "blindtest"){
     document.getElementById("playerCard").style.display = "none";
     document.getElementById("btRoomCode").textContent = room.code;
+    btSourceMode = null;
+    btRandomCount = null;
     btSongsPerPersonTarget = null;
     btPlaybackStart = null;
     btGuessSelectionRoundIdx = -1;
@@ -6139,47 +6162,6 @@ async function pickGameAnswerFromMine(index){
   await saveGameAnswerTrack(track.title, track.artist, track.youtube_id, track.thumbnail);
 }
 
-// "🎲 Piocher au hasard dans le pool" (ajouté le 01/08/2026, demande de Rémi)
-// — même source que le Blindtest solo (blindtest_pool, statut "approved",
-// voir startBtSoloFromPool()) : pour ceux qui ne veulent pas chercher
-// eux-mêmes des titres. Ne remplit QUE les emplacements pas encore proposés
-// par cette personne (ne touche jamais une proposition déjà faite à la
-// main), et évite les chansons déjà proposées par n'importe qui d'autre dans
-// ce salon pour ne pas se retrouver avec deux fois la même manche.
-async function pickBtRandomSongs(){
-  if(!currentRoom) return;
-  const slots = currentRoom.game_question_ids || [];
-  const localPlayerName = (currentRoom.single_device && singleDeviceActivePlayer) ? singleDeviceActivePlayer : "";
-  const myAnswers = gameAnswers.filter(a => a.user_id === currentUser?.id && (a.local_player_name || "") === localPlayerName);
-  const emptySlots = slots.filter(slot => !myAnswers.find(a => a.question_id === slot));
-  if(!emptySlots.length){ showToast("Tu as déjà proposé toutes tes chansons !"); return; }
-
-  const { data, error } = await sb.from("blindtest_pool").select("*").eq("status", "approved").limit(300);
-  if(error){ showToast("Erreur de chargement du pool communautaire : " + error.message); return; }
-  const usedIds = new Set(gameAnswers.map(a => a.youtube_id).filter(Boolean));
-  const candidates = shuffleArray((data || []).filter(t => t.youtube_id && !usedIds.has(t.youtube_id)));
-  if(candidates.length < emptySlots.length){
-    showToast(`Pas assez de chansons différentes dans le pool communautaire (${candidates.length} disponible(s)) pour piocher automatiquement — complète le reste à la main.`);
-    return;
-  }
-
-  const rows = emptySlots.map((slot, i) => ({
-    room_id: currentRoom.id,
-    question_id: slot,
-    user_id: currentUser.id,
-    local_player_name: localPlayerName,
-    title: candidates[i].title,
-    artist: candidates[i].artist || "",
-    youtube_id: candidates[i].youtube_id,
-    thumbnail: candidates[i].thumbnail || "",
-  }));
-  const { error: upsertError } = await sb.from("game_answers").upsert(rows, { onConflict: "room_id,question_id,user_id,local_player_name" });
-  if(upsertError){ showToast("Erreur : " + upsertError.message); return; }
-  showToast(`🎲 ${rows.length} chanson(s) piochée(s) dans le pool !`);
-  await loadGameAnswers(currentRoom.id);
-  renderBlindtestLobby();
-}
-
 /* ============================================================
    "Qui a mis cette chanson ?" (VRAI salon multijoueur, ajouté le 22/07/2026)
    ============================================================
@@ -6340,28 +6322,53 @@ function renderBlindtestLobby(){
   else renderBtFinished();
 }
 
-/* ---- Phase 1 : le créateur choisit combien de chansons chacun propose, puis
-   les réglages d'écoute anti-spoiler (même principe que "Le jeu des
-   questions") — pas de "mode de sélection" ici, il n'y a pas de catalogue
-   fixe dans lequel piocher. ---- */
+/* ---- Phase 1 : le créateur choisit d'abord la source des chansons (ajouté
+   le 01/08/2026), puis combien de chansons (par personne, ou au total en
+   mode aléatoire), puis les réglages d'écoute anti-spoiler (même principe
+   que "Le jeu des questions") — pas de "mode de sélection" ici, il n'y a pas
+   de catalogue fixe dans lequel piocher. ---- */
 function renderBtSongCountPicker(){
   const creator = isGameCreator();
   document.getElementById("btLobbyCreatorFlow").style.display = creator ? "block" : "none";
   document.getElementById("btLobbyWaitMsg").style.display = creator ? "none" : "block";
   if(!creator) return;
 
-  if(!btSongsPerPersonTarget){
-    document.getElementById("btStepSongs").style.display = "block";
+  if(!btSourceMode){
+    document.getElementById("btStepSource").style.display = "block";
+    document.getElementById("btStepSongs").style.display = "none";
+    document.getElementById("btStepRandomCount").style.display = "none";
+    document.getElementById("btStepPlayback").style.display = "none";
+    return;
+  }
+  document.getElementById("btStepSource").style.display = "none";
+
+  const countChosen = btSourceMode === "random" ? !!btRandomCount : !!btSongsPerPersonTarget;
+  if(!countChosen){
+    document.getElementById("btStepSongs").style.display = btSourceMode === "propose" ? "block" : "none";
+    document.getElementById("btStepRandomCount").style.display = btSourceMode === "random" ? "block" : "none";
     document.getElementById("btStepPlayback").style.display = "none";
     return;
   }
   document.getElementById("btStepSongs").style.display = "none";
+  document.getElementById("btStepRandomCount").style.display = "none";
   document.getElementById("btStepPlayback").style.display = "block";
   document.querySelectorAll("#btPlaybackStartPicker button").forEach(btn => {
     const active = btn.dataset.start === btPlaybackStart;
     btn.style.borderColor = active ? "var(--accent1)" : "var(--border)";
     btn.style.color = active ? "var(--text)" : "var(--text-dim)";
   });
+}
+
+function chooseBtSource(mode){
+  btSourceMode = mode;
+  renderBtSongCountPicker();
+}
+
+function backToBtSourceStep(){
+  btSourceMode = null;
+  btSongsPerPersonTarget = null;
+  btRandomCount = null;
+  renderBtSongCountPicker();
 }
 
 // Affiche juste la valeur en direct pendant qu'on fait glisser le curseur —
@@ -6377,16 +6384,28 @@ function confirmBtSongsCount(){
   renderBtSongCountPicker();
 }
 
-function pickBtPlaybackStart(mode){
-  btPlaybackStart = mode;
+function onBtRandomCountSliderInput(value){
+  document.getElementById("btRandomCountSliderValue").textContent = value;
+}
+
+function confirmBtRandomCount(){
+  const value = Number(document.getElementById("btRandomCountSlider").value);
+  btRandomCount = value;
+  btPlaybackStart = null;
   renderBtSongCountPicker();
-  confirmBtSettings();
 }
 
 function backToBtSongsCountStep(){
   btSongsPerPersonTarget = null;
+  btRandomCount = null;
   btPlaybackStart = null;
   renderBtSongCountPicker();
+}
+
+function pickBtPlaybackStart(mode){
+  btPlaybackStart = mode;
+  renderBtSongCountPicker();
+  confirmBtSettings();
 }
 
 // Les "slots" ('bt1', 'bt2'...) jouent le même rôle que les vraies catégories
@@ -6402,6 +6421,44 @@ function backToBtSongsCountStep(){
 // "vidéo visible" n'a donc plus lieu d'être pour le Blindtest.
 async function confirmBtSettings(){
   if(!isGameCreator()) return;
+  // Mode "🎲 Chansons aléatoires du pool" (ajouté le 01/08/2026) : pas
+  // d'étape "chacun propose" du tout — on calcule les manches tout de suite
+  // et on part directement en phase "playing", comme le ferait
+  // launchBlindtest() ensuite pour le flux normal. Voir computeBtRandomRounds().
+  if(btSourceMode === "random"){
+    let rounds, available;
+    try {
+      ({ rounds, available } = await computeBtRandomRounds(btRandomCount));
+    } catch(e){
+      showToast("Erreur de chargement du pool communautaire : " + e.message);
+      return;
+    }
+    if(!rounds){
+      showToast(`Pas assez de chansons différentes dans le pool communautaire (${available} pour l'instant) pour ${btRandomCount} manche(s) — choisis un nombre plus petit, ou repasse en "Chacun propose ses chansons".`);
+      return;
+    }
+    const nowIso = new Date().toISOString();
+    const startSeconds = btPlaybackStart === "middle" ? 45 : 0;
+    const { data, error } = await sb.from("rooms").update({
+      game_question_ids: [],
+      game_phase: "playing",
+      game_display_mode: "audio",
+      game_playback_start: btPlaybackStart || "start",
+      game_rounds: rounds,
+      game_current_round: 0,
+      game_round_started_at: nowIso,
+      game_round_revealed: false,
+      playback_state: "playing",
+      playback_position: startSeconds,
+      playback_started_at: nowIso,
+    }).eq("id", currentRoom.id).select().single();
+    if(error){ showToast("Erreur au lancement de la partie : " + error.message); return; }
+    currentRoom = data;
+    logActivityEvent("game_started", currentRoom.id, currentRoom.mode);
+    showToast(`🚀 Partie lancée ! ${rounds.length} manche(s) piochée(s) dans le pool.`);
+    renderBlindtestLobby();
+    return;
+  }
   const slots = Array.from({ length: btSongsPerPersonTarget }, (_, i) => `bt${i + 1}`);
   const { data, error } = await sb.from("rooms").update({
     game_question_ids: slots,
@@ -6413,6 +6470,43 @@ async function confirmBtSettings(){
   currentRoom = data;
   showToast(`${btSongsPerPersonTarget} chanson(s) chacun — à vos propositions !`);
   renderBlindtestLobby();
+}
+
+// "🎲 Chansons aléatoires du pool" (ajouté le 01/08/2026, demande de Rémi) :
+// pioche directement N chansons dans blindtest_pool (statut "approved",
+// même source que le Blindtest solo — voir startBtSoloFromPool()) au lieu
+// d'attendre que chacun propose les siennes. owner_user_ids reste
+// VOLONTAIREMENT vide sur ces manches : personne n'est "propriétaire" d'une
+// chanson piochée, donc personne n'est exclu de deviner (voir iAmOwner dans
+// renderBtPlaying()) — tout le monde peut jouer sur toutes les manches, y
+// compris la personne qui a lancé la partie. Mêmes pièges (decoys), et même
+// exclusion des vraies réponses de la partie, que computeBtRounds().
+async function computeBtRandomRounds(count){
+  const { data, error } = await sb.from("blindtest_pool").select("youtube_id,title,artist,thumbnail").eq("status", "approved").limit(300);
+  if(error) throw error;
+  const pool = shuffleArray((data || []).filter(t => t.youtube_id));
+  if(pool.length < count + 3) return { rounds: null, available: pool.length };
+
+  const picked = pool.slice(0, count);
+  const rest = pool.slice(count);
+  const rounds = picked.map(track => {
+    const poolDecoys = shuffleArray(rest.filter(c => c.title !== track.title)).slice(0, 3);
+    const stillNeeded = 3 - poolDecoys.length;
+    const catalogDecoys = stillNeeded > 0
+      ? shuffleArray(CATALOG.filter(c => c.title !== track.title)).slice(0, stillNeeded)
+          .map(c => ({ youtube_id: c.youtubeId, title: c.title, artist: c.artist }))
+      : [];
+    return {
+      question_id: null,
+      youtube_id: track.youtube_id,
+      title: track.title,
+      artist: track.artist || "",
+      thumbnail: track.thumbnail || "",
+      owner_user_ids: [],
+      decoys: shuffleArray([...poolDecoys, ...catalogDecoys]),
+    };
+  });
+  return { rounds, available: pool.length };
 }
 
 /* ---- Phase 2 : chacun propose ses chansons, le créateur suit la progression ---- */
@@ -6982,13 +7076,20 @@ async function revealBtRound(){
 
 function renderBtReveal(round){
   const owners = round.owner_user_ids || [];
-  const ownerNames = owners.map(uid => getPseudoForUserId(uid)).join(", ");
+  // Manche piochée dans le pool ("🎲 Chansons aléatoires", ajouté le
+  // 01/08/2026) : owners est toujours vide, personne ne l'a proposée —
+  // ligne "Proposée par" remplacée par une mention neutre au lieu du
+  // trompeur "quelqu'un" (repli historique, prévu pour un cas normalement
+  // impossible : une vraie manche a toujours au moins 1 propriétaire).
+  const ownerLine = owners.length
+    ? `Proposée par : ${escapeHtml(owners.map(uid => getPseudoForUserId(uid)).join(", "))}`
+    : "🎲 Chanson piochée dans le pool communautaire";
   // Mode "un seul téléphone" : pas de vote donc pas de points à afficher.
   if(currentRoom.single_device){
     document.getElementById("btRevealBox").innerHTML = `
       <div class="card" style="text-align:center;">
         <div style="font-size:15px;font-weight:700;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
-        <div style="font-size:12.5px;color:var(--text-dim);margin-top:6px;">Proposée par : ${escapeHtml(ownerNames || "quelqu'un")}</div>
+        <div style="font-size:12.5px;color:var(--text-dim);margin-top:6px;">${ownerLine}</div>
       </div>
     `;
     return;
@@ -7005,7 +7106,7 @@ function renderBtReveal(round){
   document.getElementById("btRevealBox").innerHTML = `
     <div class="card" style="text-align:center;">
       <div style="font-size:15px;font-weight:700;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
-      <div style="font-size:12.5px;color:var(--text-dim);margin-top:6px;">Proposée par : ${escapeHtml(ownerNames || "quelqu'un")}</div>
+      <div style="font-size:12.5px;color:var(--text-dim);margin-top:6px;">${ownerLine}</div>
       ${myPoints > 0
         ? `<div style="margin-top:8px;color:var(--accent1);font-weight:700;">${lightning ? "⚡ " : ""}+${myPoints} point(s) pour toi !</div>`
         : (iAmOwner ? "" : `<div style="margin-top:8px;color:var(--text-faint);">0 point cette manche.</div>`)}
@@ -7253,6 +7354,8 @@ async function rejouerBtMemeSalon(){
   currentRoom = data;
   gameAnswers = [];
   btGuesses = [];
+  btSourceMode = null;
+  btRandomCount = null;
   btSongsPerPersonTarget = null;
   btPlaybackStart = null;
   btGuessSelectionRoundIdx = -1;
