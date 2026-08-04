@@ -1074,6 +1074,12 @@
               <button class="btn-ghost" style="width:auto;flex:1;padding:10px 8px;" data-start="start" onclick="pickBtPlaybackStart('start')">⏮ Depuis le début</button>
               <button class="btn-ghost" style="width:auto;flex:1;padding:10px 8px;" data-start="middle" onclick="pickBtPlaybackStart('middle')">⏭ Vers ~45 secondes</button>
             </div>
+            <!-- Ajouté le 01/08/2026, demande de Rémi : avant, choisir l'une
+                 des 2 options ci-dessus lançait tout de suite la partie
+                 (confirmBtSettings()), sans possibilité de vérifier son choix
+                 avant. Un vrai bouton "Lancer la partie" laisse le temps de
+                 changer d'avis entre les 2 options. -->
+            <button class="btn-primary" id="btLaunchGameBtn" style="display:none;margin-top:10px;" onclick="confirmBtSettings()">🚀 Lancer la partie</button>
             <button class="btn-ghost" style="margin-top:10px;" onclick="backToBtSongsCountStep()">← Changer le nombre de chansons</button>
           </div>
         </div>
@@ -5759,6 +5765,19 @@ function renderGameReveal(round){
 // clique voit l'effet tout de suite en local (en plus de l'écrire en base).
 async function nextGameRound(){
   if(!currentRoom) return;
+  // Relit l'état frais depuis la base juste avant d'écrire (ajouté le
+  // 01/08/2026, retour de bug : en enchaînant vite une nouvelle partie après
+  // la précédente [ex: "🔄 Rejouer"/"🔀 Changer de jeu"], un appareil pouvait
+  // encore avoir en mémoire les données de l'ANCIENNE partie [ex: 3 manches]
+  // au moment où son minuteur d'auto-révélation se déclenchait — et écraser
+  // la NOUVELLE partie en cours [ex: 10 manches] avec un calcul basé sur les
+  // anciennes valeurs, terminant la partie beaucoup trop tôt pour tout le
+  // monde. currentRoom seul (mis à jour par le temps réel/le sondage de
+  // secours de startQueuePolling()) n'était pas assez récent pour cette
+  // écriture précise, qui décide si la partie continue ou se termine.
+  const { data: freshRoom } = await sb.from("rooms").select("*").eq("id", currentRoom.id).maybeSingle();
+  if(!freshRoom || freshRoom.game_phase !== "playing") return;
+  currentRoom = freshRoom;
   const rounds = currentRoom.game_rounds || [];
   const next = (currentRoom.game_current_round || 0) + 1;
   let update;
@@ -6357,6 +6376,7 @@ function renderBtSongCountPicker(){
     btn.style.borderColor = active ? "var(--accent1)" : "var(--border)";
     btn.style.color = active ? "var(--text)" : "var(--text-dim)";
   });
+  document.getElementById("btLaunchGameBtn").style.display = btPlaybackStart ? "block" : "none";
 }
 
 function chooseBtSource(mode){
@@ -6405,7 +6425,6 @@ function backToBtSongsCountStep(){
 function pickBtPlaybackStart(mode){
   btPlaybackStart = mode;
   renderBtSongCountPicker();
-  confirmBtSettings();
 }
 
 // Les "slots" ('bt1', 'bt2'...) jouent le même rôle que les vraies catégories
@@ -7116,6 +7135,16 @@ function renderBtReveal(round){
 
 async function nextBtRound(){
   if(!currentRoom) return;
+  // Relit l'état frais depuis la base juste avant d'écrire — même correctif
+  // que nextGameRound() (voir son commentaire, ajouté le 01/08/2026) : c'est
+  // très probablement la cause du bug remonté par Rémi ("la partie de 10
+  // chansons s'est terminée après 3 manches, comme l'ancienne partie du même
+  // salon") et du désync entre appareils ("je suis passé à la manche 2,
+  // l'autre appareil non") — un appareil encore sur les anciennes données au
+  // moment d'avancer une manche pouvait écraser la partie fraîchement lancée.
+  const { data: freshRoom } = await sb.from("rooms").select("*").eq("id", currentRoom.id).maybeSingle();
+  if(!freshRoom || freshRoom.game_phase !== "playing") return;
+  currentRoom = freshRoom;
   const rounds = currentRoom.game_rounds || [];
   const next = (currentRoom.game_current_round || 0) + 1;
   let update;
