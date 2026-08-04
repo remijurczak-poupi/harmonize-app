@@ -5765,21 +5765,9 @@ function renderGameReveal(round){
 // clique voit l'effet tout de suite en local (en plus de l'écrire en base).
 async function nextGameRound(){
   if(!currentRoom) return;
-  // Relit l'état frais depuis la base juste avant d'écrire (ajouté le
-  // 01/08/2026, retour de bug : en enchaînant vite une nouvelle partie après
-  // la précédente [ex: "🔄 Rejouer"/"🔀 Changer de jeu"], un appareil pouvait
-  // encore avoir en mémoire les données de l'ANCIENNE partie [ex: 3 manches]
-  // au moment où son minuteur d'auto-révélation se déclenchait — et écraser
-  // la NOUVELLE partie en cours [ex: 10 manches] avec un calcul basé sur les
-  // anciennes valeurs, terminant la partie beaucoup trop tôt pour tout le
-  // monde. currentRoom seul (mis à jour par le temps réel/le sondage de
-  // secours de startQueuePolling()) n'était pas assez récent pour cette
-  // écriture précise, qui décide si la partie continue ou se termine.
-  const { data: freshRoom } = await sb.from("rooms").select("*").eq("id", currentRoom.id).maybeSingle();
-  if(!freshRoom || freshRoom.game_phase !== "playing") return;
-  currentRoom = freshRoom;
+  const fromRound = currentRoom.game_current_round || 0;
   const rounds = currentRoom.game_rounds || [];
-  const next = (currentRoom.game_current_round || 0) + 1;
+  const next = fromRound + 1;
   let update;
   if(next >= rounds.length){
     update = { game_phase: "finished", playback_state: "paused" };
@@ -5795,8 +5783,25 @@ async function nextGameRound(){
       playback_started_at: nowIso,
     };
   }
-  const { data, error } = await sb.from("rooms").update(update).eq("id", currentRoom.id).select().single();
+  // Écriture CONDITIONNELLE (ajouté le 01/08/2026, corrige un vrai bug
+  // remonté par Rémi) : le ".eq(game_current_round, fromRound)" fait que
+  // cette écriture ne s'applique QUE si le salon est encore exactement sur
+  // la manche qu'on pensait faire avancer — sinon 0 ligne n'est modifiée
+  // (data reste vide) et on ne fait rien de plus. Sans ça, 2 personnes qui
+  // cliquent "manche suivante" presque en même temps (pas de chef de salon,
+  // donc les 2 boutons sont actifs pour tout le monde) déclenchaient chacune
+  // leur propre calcul : le 2e clic, arrivé juste après que le 1er ait déjà
+  // écrit la manche suivante, relisait cet état déjà à jour et avançait ENCORE
+  // une fois — d'où le saut "manche 2 → manche 4" observé. Protège au passage
+  // contre le cas où un appareil enchaînerait ce calcul sur une partie déjà
+  // terminée/relancée entre-temps (ex: "🔄 Rejouer"/"🔀 Changer de jeu").
+  const { data, error } = await sb.from("rooms").update(update)
+    .eq("id", currentRoom.id)
+    .eq("game_phase", "playing")
+    .eq("game_current_round", fromRound)
+    .select().maybeSingle();
   if(error){ showToast("Erreur : " + error.message); return; }
+  if(!data) return; // quelqu'un d'autre a déjà fait avancer cette manche entre-temps
   currentRoom = data;
   gameGuessSelectionRoundIdx = -1;
   gameMyGuessSelection = new Set();
@@ -7135,18 +7140,9 @@ function renderBtReveal(round){
 
 async function nextBtRound(){
   if(!currentRoom) return;
-  // Relit l'état frais depuis la base juste avant d'écrire — même correctif
-  // que nextGameRound() (voir son commentaire, ajouté le 01/08/2026) : c'est
-  // très probablement la cause du bug remonté par Rémi ("la partie de 10
-  // chansons s'est terminée après 3 manches, comme l'ancienne partie du même
-  // salon") et du désync entre appareils ("je suis passé à la manche 2,
-  // l'autre appareil non") — un appareil encore sur les anciennes données au
-  // moment d'avancer une manche pouvait écraser la partie fraîchement lancée.
-  const { data: freshRoom } = await sb.from("rooms").select("*").eq("id", currentRoom.id).maybeSingle();
-  if(!freshRoom || freshRoom.game_phase !== "playing") return;
-  currentRoom = freshRoom;
+  const fromRound = currentRoom.game_current_round || 0;
   const rounds = currentRoom.game_rounds || [];
-  const next = (currentRoom.game_current_round || 0) + 1;
+  const next = fromRound + 1;
   let update;
   if(next >= rounds.length){
     update = { game_phase: "finished", playback_state: "paused" };
@@ -7162,8 +7158,18 @@ async function nextBtRound(){
       playback_started_at: nowIso,
     };
   }
-  const { data, error } = await sb.from("rooms").update(update).eq("id", currentRoom.id).select().single();
+  // Écriture CONDITIONNELLE — même correctif que nextGameRound() (voir son
+  // commentaire, ajouté le 01/08/2026) : protège à la fois contre 2
+  // personnes qui cliquent "chanson suivante" presque en même temps (d'où le
+  // saut "manche 2 → 4" observé par Rémi) et contre un appareil qui
+  // enchaînerait ce calcul sur une partie déjà terminée/relancée entre-temps.
+  const { data, error } = await sb.from("rooms").update(update)
+    .eq("id", currentRoom.id)
+    .eq("game_phase", "playing")
+    .eq("game_current_round", fromRound)
+    .select().maybeSingle();
   if(error){ showToast("Erreur : " + error.message); return; }
+  if(!data) return; // quelqu'un d'autre a déjà fait avancer cette manche entre-temps
   currentRoom = data;
   btGuessSelectionRoundIdx = -1;
   btMyGuess = null;
