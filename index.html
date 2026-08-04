@@ -1061,6 +1061,11 @@
       <!-- Phase 2 : chacun propose ses chansons -->
       <div id="btPhaseAnswering" style="display:none;">
         <h2 style="margin-top:0;">Tes propositions</h2>
+        <!-- "Chansons aléatoires" (ajouté le 01/08/2026, demande de Rémi) :
+             pioche automatiquement dans le pool communautaire pour ceux qui
+             ne veulent pas chercher eux-mêmes — même source que le Blindtest
+             solo, voir startBtSoloFromPool()/pickBtRandomSongs(). -->
+        <button class="btn-ghost" style="margin-bottom:12px;" onclick="pickBtRandomSongs()">🎲 Piocher au hasard dans le pool</button>
         <div id="btMyAnswers" class="stack" style="margin-bottom:24px;"></div>
 
         <h2>Qui a proposé ses chansons ?</h2>
@@ -6132,6 +6137,47 @@ async function pickGameAnswerFromMine(index){
   const track = myImportedTracks[index];
   if(!track) return;
   await saveGameAnswerTrack(track.title, track.artist, track.youtube_id, track.thumbnail);
+}
+
+// "🎲 Piocher au hasard dans le pool" (ajouté le 01/08/2026, demande de Rémi)
+// — même source que le Blindtest solo (blindtest_pool, statut "approved",
+// voir startBtSoloFromPool()) : pour ceux qui ne veulent pas chercher
+// eux-mêmes des titres. Ne remplit QUE les emplacements pas encore proposés
+// par cette personne (ne touche jamais une proposition déjà faite à la
+// main), et évite les chansons déjà proposées par n'importe qui d'autre dans
+// ce salon pour ne pas se retrouver avec deux fois la même manche.
+async function pickBtRandomSongs(){
+  if(!currentRoom) return;
+  const slots = currentRoom.game_question_ids || [];
+  const localPlayerName = (currentRoom.single_device && singleDeviceActivePlayer) ? singleDeviceActivePlayer : "";
+  const myAnswers = gameAnswers.filter(a => a.user_id === currentUser?.id && (a.local_player_name || "") === localPlayerName);
+  const emptySlots = slots.filter(slot => !myAnswers.find(a => a.question_id === slot));
+  if(!emptySlots.length){ showToast("Tu as déjà proposé toutes tes chansons !"); return; }
+
+  const { data, error } = await sb.from("blindtest_pool").select("*").eq("status", "approved").limit(300);
+  if(error){ showToast("Erreur de chargement du pool communautaire : " + error.message); return; }
+  const usedIds = new Set(gameAnswers.map(a => a.youtube_id).filter(Boolean));
+  const candidates = shuffleArray((data || []).filter(t => t.youtube_id && !usedIds.has(t.youtube_id)));
+  if(candidates.length < emptySlots.length){
+    showToast(`Pas assez de chansons différentes dans le pool communautaire (${candidates.length} disponible(s)) pour piocher automatiquement — complète le reste à la main.`);
+    return;
+  }
+
+  const rows = emptySlots.map((slot, i) => ({
+    room_id: currentRoom.id,
+    question_id: slot,
+    user_id: currentUser.id,
+    local_player_name: localPlayerName,
+    title: candidates[i].title,
+    artist: candidates[i].artist || "",
+    youtube_id: candidates[i].youtube_id,
+    thumbnail: candidates[i].thumbnail || "",
+  }));
+  const { error: upsertError } = await sb.from("game_answers").upsert(rows, { onConflict: "room_id,question_id,user_id,local_player_name" });
+  if(upsertError){ showToast("Erreur : " + upsertError.message); return; }
+  showToast(`🎲 ${rows.length} chanson(s) piochée(s) dans le pool !`);
+  await loadGameAnswers(currentRoom.id);
+  renderBlindtestLobby();
 }
 
 /* ============================================================
