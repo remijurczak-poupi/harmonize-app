@@ -1198,7 +1198,11 @@
               <span>C'est quelle chanson ?</span>
               <span class="pill" id="btVoteCountdown" style="font-size:12px;"></span>
             </h2>
-            <p style="font-size:12px;color:var(--text-faint);margin-top:-6px;margin-bottom:10px;">Clique sur UNE proposition — ça s'enregistre tout de suite, et ta réponse est ensuite définitive pour cette manche. Plus tu réponds vite, plus tu marques de points. Tu as 20 secondes pour deviner (la musique, elle, continue de jouer).</p>
+            <!-- Raccourci le 01/08/2026, retour de Rémi : "il faut scroller
+                 pour voir les réponses possibles" — ce texte prenait à lui
+                 seul 3-4 lignes, pour des infos déjà visibles ailleurs (le
+                 compte à rebours juste au-dessus). -->
+            <p style="font-size:12px;color:var(--text-faint);margin-top:-6px;margin-bottom:10px;">Un clic suffit — c'est définitif pour cette manche. Plus tu réponds vite, plus tu marques de points.</p>
             <div id="btGuessOptions"></div>
             <p id="btGuessTimeUpHint" style="display:none;font-size:12px;color:var(--text-faint);text-align:center;margin-top:12px;">⏰ Temps écoulé pour deviner sur cette manche — révélation dans un instant.</p>
           </div>
@@ -5744,7 +5748,23 @@ function renderGamePlaying(){
   // après révélation : c'est le seul moment où quelque chose (le vrai
   // lecteur, pour son bouton "Ignorer" natif) doit rester accessible ici.
   const playerBoxWrap = document.getElementById("gqPlayerBoxWrap");
-  if(playerBoxWrap) playerBoxWrap.style.display = (audioOnly && revealed && !gameAdSkipActive) ? "none" : "block";
+  if(playerBoxWrap){
+    if(audioOnly && revealed && !gameAdSkipActive){
+      playerBoxWrap.style.display = "none";
+    } else {
+      playerBoxWrap.style.display = "block";
+      // Réduit à ~100px pendant qu'on devine en mode audio seulement (ajouté
+      // le 01/08/2026, retour de Rémi : "il faut scroller pour voir les
+      // réponses possibles") : les 180px réservés ne servaient qu'à afficher
+      // le cache (icône + une phrase, voir gqAudioCover) à la même taille
+      // que la vraie vidéo — inutile, puisque le lecteur est de toute façon
+      // minuscule (1x1) tant qu'on n'a pas révélé. Redevient 180px en mode
+      // vidéo visible (la vraie vidéo en a besoin) ou pendant la fenêtre
+      // "Pub bloquée ?" (le vrai lecteur doit être assez grand pour taper
+      // sur son bouton "Ignorer", voir revealGameAdSkipButton()).
+      playerBoxWrap.style.minHeight = (audioOnly && !gameAdSkipActive) ? "100px" : "180px";
+    }
+  }
   // Couche de clic invisible : plus nécessaire en mode "vidéo visible" —
   // retirée le 22/07/2026 (retour de Rémi : voir le vrai bouton "Ignorer" de
   // YouTube sans pouvoir cliquer dessus ne s'expliquait à personne). Reste
@@ -6284,9 +6304,19 @@ async function nextGameRound(){
     // son lancement, un clic aussi rapproché du début de la manche est traité
     // comme un doublon (plusieurs personnes qui réagissent au même instant)
     // plutôt qu'une vraie 2e décision, et ignoré.
+    // EXCLU en mode "un seul téléphone" (ajouté le 01/08/2026, corrige un
+    // vrai bug remonté par Rémi : "le bouton Terminer la partie ne marche
+    // pas") : ce garde-fou n'a de sens que contre PLUSIEURS appareils
+    // différents qui se marchent dessus — en "un seul téléphone", il n'y a
+    // par définition qu'un seul appareil, donc aucune course possible. Sans
+    // cette exclusion, révéler puis appuyer sur "suivant"/"Terminer la
+    // partie" moins de 1,5s après le lancement de la manche (fréquent en
+    // mode "un seul téléphone", où la personne qui tient le téléphone peut
+    // révéler dès que le groupe a fini de deviner à voix haute) était
+    // silencieusement ignoré, sans le moindre message d'erreur.
     const ROUND_ADVANCE_DEBOUNCE_MS = 1500;
     const roundStartedAt = currentRoom.game_round_started_at ? new Date(currentRoom.game_round_started_at).getTime() : 0;
-    if(Date.now() - roundStartedAt < ROUND_ADVANCE_DEBOUNCE_MS) return;
+    if(!currentRoom.single_device && Date.now() - roundStartedAt < ROUND_ADVANCE_DEBOUNCE_MS) return;
     const fromRound = currentRoom.game_current_round || 0;
     const rounds = currentRoom.game_rounds || [];
     const next = fromRound + 1;
@@ -7351,7 +7381,19 @@ function renderBtPlaying(){
   // confirmBtSettings()), donc ce bloc vide apparaissait à CHAQUE révélation,
   // pas seulement de temps en temps.
   const playerBoxWrap = document.getElementById("btPlayerBoxWrap");
-  if(playerBoxWrap) playerBoxWrap.style.display = (audioOnly && revealed && !btAdSkipActive) ? "none" : "block";
+  if(playerBoxWrap){
+    if(audioOnly && revealed && !btAdSkipActive){
+      playerBoxWrap.style.display = "none";
+    } else {
+      playerBoxWrap.style.display = "block";
+      // Réduit à ~100px pendant qu'on devine (ajouté le 01/08/2026, retour
+      // de Rémi : "il faut scroller pour voir les réponses possibles") —
+      // même correctif que renderGamePlaying(), voir son commentaire. Le
+      // Blindtest étant TOUJOURS en audio seulement, cette réduction
+      // s'applique donc à CHAQUE manche (sauf pendant "Pub bloquée ?").
+      playerBoxWrap.style.minHeight = (audioOnly && !btAdSkipActive) ? "100px" : "180px";
+    }
+  }
   // Couche de clic invisible : plus nécessaire en mode "vidéo visible" (même
   // correctif que renderGamePlaying(), voir son commentaire pour le détail du
   // compromis accepté avec Rémi) — seul le mode audio en a besoin.
@@ -7793,10 +7835,15 @@ async function nextBtRound(){
     // sur suivant avec 3 appareils à la fois et ça a encore sauté une
     // chanson") : ignore un clic "suivant" trop rapproché du lancement de la
     // manche en cours (probablement 2+ personnes qui cliquent au même
-    // instant, pas 2 décisions distinctes).
+    // instant, pas 2 décisions distinctes). EXCLU en mode "un seul
+    // téléphone" (ajouté le 01/08/2026, corrige "le bouton Terminer la
+    // partie ne marche pas") : un seul appareil existe dans ce mode, donc
+    // aucune course entre plusieurs appareils n'est possible — sans cette
+    // exclusion, révéler puis appuyer sur "suivant" trop vite après le
+    // lancement de la manche était silencieusement ignoré.
     const ROUND_ADVANCE_DEBOUNCE_MS = 1500;
     const roundStartedAt = currentRoom.game_round_started_at ? new Date(currentRoom.game_round_started_at).getTime() : 0;
-    if(Date.now() - roundStartedAt < ROUND_ADVANCE_DEBOUNCE_MS) return;
+    if(!currentRoom.single_device && Date.now() - roundStartedAt < ROUND_ADVANCE_DEBOUNCE_MS) return;
     const fromRound = currentRoom.game_current_round || 0;
     const rounds = currentRoom.game_rounds || [];
     const next = fromRound + 1;
@@ -8059,8 +8106,15 @@ async function rejouerBtMemeSalon(){
   btMyGuess = null;
   singleDeviceRoundPoints = {};
   singleDeviceTotalScores = {};
-  singleDeviceKnownNames = [];
+  // singleDeviceKnownNames n'est PLUS effacé ici (ajouté le 01/08/2026,
+  // demande de Rémi : "en relance une [partie] il faudrait que ça conserve
+  // les noms pour pas avoir tous à les ré-entrer, avec la possibilité de
+  // faire des modifications") — l'étape "Qui va jouer ?" réapparaît quand
+  // même (btSingleDeviceNamesStepDone repasse à false, voir
+  // renderBtSongCountPicker()), mais pré-remplie avec les prénoms de la
+  // partie précédente : on peut les garder tels quels, ou en ajouter/retirer.
   btSingleDeviceNamesStepDone = false;
+  saveSingleDeviceScoringState();
   btAutoRevealRoundIdx = -1;
   btRoundIntroIdx = -1;
   showToast("🔄 Nouvelle partie ! Proposez de nouvelles chansons.");
