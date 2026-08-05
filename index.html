@@ -577,7 +577,7 @@
            détection automatique — voir backfillPoolLanguages(). Coût quota
            minime (~1 appel par lot de 50 chansons). -->
       <button class="btn-ghost" id="poolBackfillLangBtn" style="margin-bottom:16px;font-size:12.5px;" onclick="backfillPoolLanguages()">🌐 Détecter les langues manquantes</button>
-      <input type="text" id="poolAdminSearch" placeholder="Filtrer par titre ou artiste..." oninput="renderPoolAdminApprovedList()" style="margin-bottom:14px;display:none;" />
+      <input type="text" id="poolAdminSearch" placeholder="Filtrer par titre ou artiste..." oninput="onPoolAdminSearchInput()" style="margin-bottom:14px;display:none;" />
       <div id="poolAdminList"></div>
       <button class="btn-ghost" style="width:auto;padding:10px 16px;margin:12px auto 0;display:none;" id="poolAdminLoadMoreBtn" onclick="loadMorePoolAdminApproved()">Afficher plus</button>
       <button class="btn-ghost" style="margin-top:16px;" onclick="showScreen('screen-lobby')">← Retour</button>
@@ -912,6 +912,15 @@
                    choisie dans les premières secondes. Synchronisé pour tout
                    le monde comme le bouton pause — voir skipGameForward(). -->
               <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="skipGameForward()">⏩ Avancer de 45s</button>
+            </div>
+            <!-- Repliés sous un lien "Problème de lecture ?" (ajouté le
+                 01/08/2026, retour de Rémi : "il faut scroller pour voir les
+                 réponses possibles") : ces 2 boutons de dépannage n'ont
+                 besoin d'être visibles qu'en cas de souci, pas à chaque
+                 manche — les garder toujours affichés forçait une 2e rangée
+                 de boutons, rien que pour ça. -->
+            <button onclick="toggleTroubleshootRow('gqTroubleshootRow')" style="background:none;border:none;color:var(--text-faint);font-size:11.5px;text-decoration:underline;padding:8px 0 0;cursor:pointer;">Problème de lecture ?</button>
+            <div id="gqTroubleshootRow" style="display:none;gap:8px;margin-top:8px;flex-wrap:wrap;">
               <!-- Ajouté le 19/07/2026, même correctif que le Blindtest
                    (revealAdSkipButton()) : les 2 couches ci-dessus bloquent
                    aussi le bouton natif "Passer" d'une éventuelle pub. -->
@@ -1175,6 +1184,12 @@
                    besoin que côté "Le jeu des questions", voir
                    skipGameForward(). -->
               <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="skipBtForward()">⏩ Avancer de 45s</button>
+            </div>
+            <!-- Repliés sous un lien "Problème de lecture ?" — même
+                 correctif que "Le jeu des questions" (ajouté le 01/08/2026,
+                 voir son commentaire). -->
+            <button onclick="toggleTroubleshootRow('btTroubleshootRow')" style="background:none;border:none;color:var(--text-faint);font-size:11.5px;text-decoration:underline;padding:8px 0 0;cursor:pointer;">Problème de lecture ?</button>
+            <div id="btTroubleshootRow" style="display:none;gap:8px;margin-top:8px;flex-wrap:wrap;">
               <!-- Ajouté le 19/07/2026 : les 2 couches ci-dessus recouvrent
                    TOUTE la vidéo (y compris le bouton natif "Passer" d'une
                    éventuelle pub YouTube), les rendant impossibles à
@@ -2633,6 +2648,17 @@ function showScreen(id){
   document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
   const tabMap = {"screen-room":"tab-current","screen-game":"tab-current","screen-game-lobby":"tab-current","screen-blindtest-lobby":"tab-current","screen-lobby":"tab-lobby"};
   if(tabMap[id]) document.getElementById(tabMap[id]).classList.add("active");
+}
+
+// Replie les boutons de dépannage ("Pub bloquée ?"/"Pas de son ?") sous un
+// lien, pour ne pas forcer une 2e rangée de boutons à chaque manche (ajouté
+// le 01/08/2026, retour de Rémi : "il faut scroller pour voir les réponses
+// possibles"). Partagé par "Le jeu des questions"/"Qui a mis cette chanson ?"
+// (gqTroubleshootRow) et le Blindtest (btTroubleshootRow).
+function toggleTroubleshootRow(containerId){
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  el.style.display = el.style.display === "flex" ? "none" : "flex";
 }
 
 // Coupe/remet le son de CET appareil en passant par l'onglet "Accueil"
@@ -4628,7 +4654,10 @@ function renderLobbyImportedSummary(){
 let poolAdminView = "pending";
 let poolAdminPendingTracks = [];
 let poolAdminApprovedTracks = [];
-let poolAdminApprovedShown = 40;
+let poolAdminApprovedOffset = 0;
+let poolAdminApprovedHasMore = false;
+let poolAdminSearchResults = null;
+let poolAdminSearchDebounceTimer = null;
 const POOL_ADMIN_PAGE_SIZE = 40;
 
 async function goToPoolAdminScreen(){
@@ -4805,36 +4834,74 @@ async function reviewPoolTrack(id, status){
 }
 
 async function loadPoolAdminApproved(){
-  document.getElementById("poolAdminList").innerHTML = `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Chargement...</p>`;
-  // limit(2000) → limit(5000) (ajouté le 01/08/2026, corrige un vrai bug
-  // remonté par Rémi — "Tu kiffes le rock français" existe bien en base avec
-  // status='approved', vérifié par requête SQL directe, mais restait
-  // introuvable ici) : trié par titre, ".limit(2000)" coupait purement et
-  // simplement la liste après les 2000 premiers titres par ordre
-  // alphabétique — toute chanson dont le titre trie APRÈS ce point (ex:
-  // celles commençant par "T" et plus loin) n'était jamais chargée du tout,
-  // donc invisible à la recherche qui ne filtre QUE ce qui a été chargé. Le
-  // Round 86 avait déjà trouvé et corrigé ce même piège côté requêtes du
-  // jeu ; cet écran d'administration avait la même faille, pas encore vue.
-  const { data, error } = await sb.from("blindtest_pool").select("*").eq("status", "approved").order("title", { ascending: true }).limit(5000);
+  poolAdminApprovedTracks = [];
+  poolAdminApprovedOffset = 0;
+  poolAdminApprovedHasMore = false;
+  poolAdminSearchResults = null;
+  const searchInput = document.getElementById("poolAdminSearch");
+  if(searchInput) searchInput.value = "";
+  await fetchPoolAdminApprovedPage();
+}
+
+// Pagination réellement côté serveur (.range()), corrigée le 05/08/2026 :
+// l'ancien code chargeait "tout" via .limit(5000) puis paginait/filtrait
+// côté JS — mais Supabase (PostgREST) plafonne CHAQUE réponse à 1000 lignes
+// au maximum, quel que soit le .limit() demandé par le client (réglage
+// "Max Rows" du projet). Avec 1280 chansons approuvées triées par titre,
+// tout ce qui trie après la 1000e (par ex. "Tu kiffes le rock français...",
+// qui commence par "T") n'était donc JAMAIS chargé, et restait introuvable
+// à la recherche même après avoir remonté .limit(2000) → .limit(5000) (ce
+// correctif précédent ne changeait rien au plafond serveur). Charger par
+// pages de 40 via .range() contourne le problème : chaque page reste bien
+// sous la limite, et la recherche (voir searchPoolAdminApproved) interroge
+// directement la base au lieu de filtrer une liste tronquée.
+async function fetchPoolAdminApprovedPage(){
+  document.getElementById("poolAdminList").innerHTML = poolAdminApprovedTracks.length
+    ? document.getElementById("poolAdminList").innerHTML
+    : `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Chargement...</p>`;
+  const from = poolAdminApprovedOffset;
+  const to = from + POOL_ADMIN_PAGE_SIZE - 1;
+  const { data, error } = await sb.from("blindtest_pool").select("*").eq("status", "approved").order("title", { ascending: true }).range(from, to);
   if(error){
     document.getElementById("poolAdminList").innerHTML = `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Erreur de chargement : ${escapeHtml(error.message)}</p>`;
     return;
   }
-  poolAdminApprovedTracks = data || [];
-  poolAdminApprovedShown = POOL_ADMIN_PAGE_SIZE;
+  poolAdminApprovedTracks = poolAdminApprovedTracks.concat(data || []);
+  poolAdminApprovedOffset += (data || []).length;
+  poolAdminApprovedHasMore = (data || []).length === POOL_ADMIN_PAGE_SIZE;
   renderPoolAdminApprovedList();
 }
 
-// Recherche = affiche tous les résultats correspondants (généralement peu
-// nombreux) ; sans recherche, affichage par lots de 40 pour ne pas charger
-// des centaines d'éléments d'un coup (c'est ce qui bloquait le défilement).
+function onPoolAdminSearchInput(){
+  const query = (document.getElementById("poolAdminSearch")?.value || "").trim();
+  clearTimeout(poolAdminSearchDebounceTimer);
+  if(!query){
+    poolAdminSearchResults = null;
+    renderPoolAdminApprovedList();
+    return;
+  }
+  poolAdminSearchDebounceTimer = setTimeout(() => searchPoolAdminApproved(query), 300);
+}
+
+// Recherche interrogée directement en base (plutôt que de filtrer la liste
+// déjà chargée, forcément incomplète vu la pagination) : ainsi une chanson
+// approuvée est toujours trouvable, peu importe combien de pages ont été
+// parcourues manuellement avant de taper la recherche.
+async function searchPoolAdminApproved(query){
+  document.getElementById("poolAdminList").innerHTML = `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Recherche...</p>`;
+  const safe = query.replace(/[%,()]/g, "");
+  const { data, error } = await sb.from("blindtest_pool").select("*").eq("status", "approved").or(`title.ilike.%${safe}%,artist.ilike.%${safe}%`).order("title", { ascending: true }).limit(200);
+  if(error){
+    document.getElementById("poolAdminList").innerHTML = `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Erreur de recherche : ${escapeHtml(error.message)}</p>`;
+    return;
+  }
+  poolAdminSearchResults = data || [];
+  renderPoolAdminApprovedList();
+}
+
 function renderPoolAdminApprovedList(){
-  const query = (document.getElementById("poolAdminSearch")?.value || "").trim().toLowerCase();
-  const filtered = query
-    ? poolAdminApprovedTracks.filter(t => (t.title||"").toLowerCase().includes(query) || (t.artist||"").toLowerCase().includes(query))
-    : poolAdminApprovedTracks;
-  const visible = query ? filtered : filtered.slice(0, poolAdminApprovedShown);
+  const searching = poolAdminSearchResults !== null;
+  const visible = searching ? poolAdminSearchResults : poolAdminApprovedTracks;
   const el = document.getElementById("poolAdminList");
   el.innerHTML = visible.map(t => `
     <div class="queue-item">
@@ -4847,12 +4914,12 @@ function renderPoolAdminApprovedList(){
     </div>
   `).join("") || `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Aucun résultat.</p>`;
   const loadMoreBtn = document.getElementById("poolAdminLoadMoreBtn");
-  loadMoreBtn.style.display = (!query && filtered.length > poolAdminApprovedShown) ? "block" : "none";
+  loadMoreBtn.style.display = (!searching && poolAdminApprovedHasMore) ? "block" : "none";
 }
 
 function loadMorePoolAdminApproved(){
-  poolAdminApprovedShown += POOL_ADMIN_PAGE_SIZE;
-  renderPoolAdminApprovedList();
+  if(poolAdminSearchResults !== null) return;
+  fetchPoolAdminApprovedPage();
 }
 
 async function deletePoolTrack(id){
@@ -4862,6 +4929,7 @@ async function deletePoolTrack(id){
   if(error){ showToast("Suppression impossible : " + error.message); return; }
   if(!data || !data.length){ showToast("Suppression refusée : ton compte n'a pas les droits admin."); return; }
   poolAdminApprovedTracks = poolAdminApprovedTracks.filter(t => t.id !== id);
+  if(poolAdminSearchResults) poolAdminSearchResults = poolAdminSearchResults.filter(t => t.id !== id);
   renderPoolAdminApprovedList();
   showToast("Chanson retirée du pool.");
 }
