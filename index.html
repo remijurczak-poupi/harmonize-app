@@ -1319,11 +1319,20 @@
 
   <!-- Modifier son pseudo (ajouté le 24/07/2026, demande de Rémi) : en
        s'inscrivant via Google ou "Jouer sans compte", le pseudo par défaut
-       (nom Google, ou "AmiXXXX") ne pouvait jamais être changé ensuite. -->
+       (nom Google, ou "AmiXXXX") ne pouvait jamais être changé ensuite.
+       Photo de profil ajoutée le 01/08/2026 (voir uploadAvatar()) : input
+       fichier cachée, déclenchée par le clic sur l'avatar/le bouton texte —
+       plus simple qu'un vrai input file (moche par défaut) tout en restant
+       accessible (le vrai input reçoit bien le clic). -->
   <div class="modal-backdrop" id="editPseudoModal">
     <div class="modal">
       <div class="modal-handle"></div>
-      <h2>Modifier ton pseudo</h2>
+      <h2>Modifier ton profil</h2>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:16px;">
+        <div id="editAvatarPreview" onclick="document.getElementById('editAvatarFileInput').click()" style="cursor:pointer;"></div>
+        <button class="btn-ghost" style="width:auto;padding:6px 14px;font-size:12.5px;" onclick="document.getElementById('editAvatarFileInput').click()">📷 Changer la photo</button>
+        <input type="file" id="editAvatarFileInput" accept="image/*" style="display:none;" onchange="onAvatarFileSelected(this)" />
+      </div>
       <input type="text" id="editPseudoInput" placeholder="Ton pseudo" maxlength="30" />
       <button class="btn-primary" style="margin-top:12px;" onclick="saveEditedPseudo()">Enregistrer</button>
       <button class="btn-ghost" style="margin-top:10px;" onclick="closeEditPseudoModal()">Annuler</button>
@@ -1599,6 +1608,7 @@ const GAME_QUESTIONS = [
 
 let state = {
   user: null,
+  avatarUrl: null, // photo de profil (ajouté le 01/08/2026), voir uploadAvatar()
   mode: "soiree",
   category: "ecoute",
   realQueueItems: [],  // file d'attente RÉELLE (mode Soirée, depuis Supabase)
@@ -2135,7 +2145,7 @@ async function handleSignup(){
   currentUser = data.user;
   const profile = await ensureProfile(currentUser.id, pseudo);
   currentUserIsAdmin = !!profile?.is_admin;
-  await afterLogin(profile?.pseudo || pseudo);
+  await afterLogin(profile?.pseudo || pseudo, profile?.avatar_url);
 }
 
 async function handleLogin(){
@@ -2149,7 +2159,7 @@ async function handleLogin(){
   currentUser = data.user;
   const profile = await ensureProfile(currentUser.id, null);
   currentUserIsAdmin = !!profile?.is_admin;
-  await afterLogin(profile?.pseudo || "Toi");
+  await afterLogin(profile?.pseudo || "Toi", profile?.avatar_url);
 }
 
 // "Continuer avec Google" — connexion au COMPTE Harmonize (différent de la
@@ -2182,7 +2192,7 @@ async function handleGuestLogin(){
   currentUser = data.user;
   const profile = await ensureProfile(currentUser.id, pseudo || null);
   currentUserIsAdmin = !!profile?.is_admin;
-  await afterLogin(profile?.pseudo || pseudo || "Toi");
+  await afterLogin(profile?.pseudo || pseudo || "Toi", profile?.avatar_url);
 }
 
 async function handleSignOut(){
@@ -2205,10 +2215,12 @@ async function handleSignOut(){
   showScreen("screen-login");
 }
 
-async function afterLogin(pseudo){
+async function afterLogin(pseudo, avatarUrl){
   state.user = pseudo;
+  state.avatarUrl = avatarUrl || null;
   document.getElementById("userPill").textContent = "@" + pseudo.toLowerCase().replace(/\s+/g,"");
   document.getElementById("hiName").textContent = pseudo;
+  updateMyAvatarPreview();
   document.getElementById("poolAdminEntryCard").style.display = currentUserIsAdmin ? "block" : "none";
   loadMyImportedTracks(); // en tâche de fond, pour que le résumé de l'accueil soit prêt sans bloquer la connexion
   // Retiré le 23/07/2026 (retour de Rémi) : revenir automatiquement dans le
@@ -2236,6 +2248,7 @@ async function afterLogin(pseudo){
 // tapé dans pseudoInput avant de cliquer, sans retour possible en arrière).
 function openEditPseudoModal(){
   document.getElementById("editPseudoInput").value = state.user || "";
+  updateMyAvatarPreview();
   document.getElementById("editPseudoModal").classList.add("open");
 }
 function closeEditPseudoModal(){
@@ -2255,6 +2268,59 @@ async function saveEditedPseudo(){
   showToast("Pseudo mis à jour !");
 }
 
+// Photo de profil (ajouté le 01/08/2026, demande de Rémi). Affiche la photo
+// actuelle (ou le rond avec l'initiale si aucune) dans la fenêtre "Modifier
+// ton profil" — voir avatarHtml().
+function updateMyAvatarPreview(){
+  const el = document.getElementById("editAvatarPreview");
+  if(el) el.innerHTML = avatarHtml(state.avatarUrl, state.user, 72, 24);
+}
+
+function onAvatarFileSelected(input){
+  const file = input.files && input.files[0];
+  input.value = ""; // permet de reselectionner le même fichier ensuite si besoin
+  if(file) uploadAvatar(file);
+}
+
+const AVATAR_MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 Mo
+
+// Stockée dans un bucket Supabase Storage nommé "avatars" (à créer une fois
+// dans le tableau de bord Supabase, voir harmonize-schema.sql) — un seul
+// fichier par utilisateur, sous son propre dossier ("userId/avatar.ext") :
+// les policies de ce bucket n'autorisent chacun à écrire que dans SON PROPRE
+// dossier (auth.uid()), et "upsert" remplace toujours l'ancienne photo au
+// lieu d'en accumuler plusieurs.
+async function uploadAvatar(file){
+  if(!currentUser) return;
+  if(!file.type.startsWith("image/")){ showToast("Choisis une image."); return; }
+  if(file.size > AVATAR_MAX_SIZE_BYTES){ showToast("Image trop lourde (5 Mo max) — choisis-en une plus légère."); return; }
+  showToast("Envoi de la photo...");
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+  const path = `${currentUser.id}/avatar.${ext}`;
+  const { error: uploadError } = await sb.storage.from("avatars").upload(path, file, { upsert: true, cacheControl: "3600" });
+  if(uploadError){ showToast("Erreur d'envoi : " + uploadError.message); return; }
+  const { data: urlData } = sb.storage.from("avatars").getPublicUrl(path);
+  // "?t=" pour forcer le rechargement de l'image (ajouté le 01/08/2026) :
+  // sans ça, le navigateur (le sien ET celui des autres participants) pouvait
+  // garder l'ANCIENNE photo en cache, puisque l'URL publique elle-même ne
+  // change jamais pour un même utilisateur (upsert sur le même nom de
+  // fichier).
+  const avatarUrl = urlData.publicUrl + "?t=" + Date.now();
+  const { error: updateError } = await sb.from("profiles").update({ avatar_url: avatarUrl }).eq("id", currentUser.id);
+  if(updateError){ showToast("Erreur d'enregistrement : " + updateError.message); return; }
+  state.avatarUrl = avatarUrl;
+  updateMyAvatarPreview();
+  // Republie sa présence avec la nouvelle photo pour que les autres
+  // participants du salon la voient tout de suite (voir subscribeQueue()).
+  if(realtimeChannel){
+    try { await realtimeChannel.track({ pseudo: state.user || "Toi", userId: currentUser.id, avatarUrl }); } catch(e){}
+  }
+  renderRoomAvatars("gqRoomAvatars");
+  renderRoomAvatars("btRoomAvatars");
+  renderRoomAvatars();
+  showToast("Photo de profil mise à jour !");
+}
+
 // Si une session existe déjà (retour sur la page), on reconnecte automatiquement.
 // C'est aussi ce bloc qui termine la connexion "Continuer avec Google" : après le
 // redirect vers Google puis le retour sur le site, Supabase a déjà repéré la
@@ -2270,7 +2336,7 @@ async function saveEditedPseudo(){
     const googleName = session.user.user_metadata?.full_name || session.user.user_metadata?.name || null;
     const profile = await ensureProfile(currentUser.id, googleName);
     currentUserIsAdmin = !!profile?.is_admin;
-    await afterLogin(profile?.pseudo || googleName || "Toi");
+    await afterLogin(profile?.pseudo || googleName || "Toi", profile?.avatar_url);
   } else {
     // Ajouté le 23/07/2026 : jusque-là, screen-login était affiché par défaut
     // dans le HTML, donc un compte déjà connecté le voyait quand même
@@ -2450,6 +2516,16 @@ function goHome(){
   // retenu pour cet onglet (voir routeToRoomScreen()) — une actualisation
   // après avoir cliqué "Accueil" doit bien rester à l'accueil.
   sessionStorage.removeItem("harmonizeActiveRoomCode");
+  // Cache la barre du bas (ajouté le 01/08/2026, retour de Rémi : "les
+  // boutons Jeu/Accueil ne servent à rien") — vrai bug trouvé : routeToRoomScreen()
+  // affiche cette barre en entrant dans un salon, mais rien ne la cachait
+  // en la quittant. Elle restait donc affichée PARTOUT dans l'app une fois
+  // qu'on était entré dans un salon au moins une fois dans la session — et
+  // comme "Jeu" retombe sur l'accueil dès qu'il n'y a plus de salon en
+  // cours (voir goToCurrentScreen()), les 2 boutons semblaient identiques
+  // et inutiles. Elle ne réapparaît maintenant que si on entre vraiment
+  // dans un salon.
+  document.getElementById("tabbar").style.display = "none";
   showScreen("screen-lobby");
 }
 
@@ -2732,14 +2808,10 @@ function renderRoomAvatars(elId){
   if(!people.length){
     // Le temps que la présence se synchronise (juste après être entré dans le salon),
     // on s'affiche soi-même au minimum plutôt que de laisser la zone vide.
-    const initial = (state.user || "?")[0].toUpperCase();
-    el.innerHTML = `<div class="avatar" style="background:var(--accent1);width:28px;height:28px;font-size:11px;">${escapeHtml(initial)}</div>`;
+    el.innerHTML = avatarHtml(state.avatarUrl, state.user, 28, 11);
     return;
   }
-  el.innerHTML = people.map(p => {
-    const initial = (p.pseudo || "?")[0].toUpperCase();
-    return `<div class="avatar" style="background:var(--accent1);width:28px;height:28px;font-size:11px;" title="${escapeHtml(p.pseudo||"")}">${escapeHtml(initial)}</div>`;
-  }).join("");
+  el.innerHTML = people.map(p => avatarHtml(p.avatarUrl, p.pseudo, 28, 11, { title: p.pseudo || "" })).join("");
 }
 
 /* ---------- File d'attente : VRAIE (Supabase, mode Soirée) ----------
@@ -2749,7 +2821,7 @@ function renderRoomAvatars(elId){
 async function loadRealQueue(roomId){
   const { data, error } = await sb
     .from("queue_items")
-    .select("*, profiles(pseudo)")
+    .select("*, profiles(pseudo, avatar_url)")
     .eq("room_id", roomId)
     .eq("played", false)
     .order("position", { ascending:true, nullsFirst:false })
@@ -2820,7 +2892,10 @@ function subscribeQueue(roomId){
         // présent en ce moment dans le salon, pas juste afficher un pseudo —
         // pour comparer avec les réponses déjà données (game_answers.user_id)
         // et proposer au créateur d'exclure un participant AFK.
-        await realtimeChannel.track({ pseudo: state.user || "Toi", userId: currentUser?.id || null });
+        // "avatarUrl" ajouté le 01/08/2026 (voir uploadAvatar()) — même
+        // principe que "userId" ajouté le 12/07/2026 : diffusée en direct à
+        // tout le salon via la présence, pas besoin de la stocker ailleurs.
+        await realtimeChannel.track({ pseudo: state.user || "Toi", userId: currentUser?.id || null, avatarUrl: state.avatarUrl || null });
       }
     });
 
@@ -2871,17 +2946,17 @@ function startQueuePolling(roomId){
       const { data } = await sb.from("rooms").select("*").eq("id", roomId).maybeSingle();
       if(data){ currentRoom = data; applyDistancePlaybackState(); }
     }
-  // Passé de 4s à 2s puis à 1s (ajouté le 01/08/2026, retour de Rémi : sur un
-  // appareil où le temps réel met du temps à arriver, ce sondage de secours
-  // est le vrai mécanisme de rattrapage — jusqu'à 4s de retard pour voir une
-  // nouvelle manche à l'origine, pendant lesquels l'autre participant pouvait
-  // déjà avoir répondu. Rémi a demandé d'aller encore plus vite ("1s, voire
-  // moins ?") — 1s gardé comme plancher raisonnable : en dessous, le nombre
-  // de requêtes Supabase augmente vite pour un gain de plus en plus faible
-  // (la limite basse, c'est de toute façon le temps réel — normalement
-  // quasi instantané — qui devrait faire le gros du travail ; ce sondage
-  // n'est qu'un filet de secours).
-  }, 1000);
+  // Passé de 4s à 2s, puis 1s, puis 0,5s (ajouté le 01/08/2026, retour de
+  // Rémi : sur un appareil où le temps réel met du temps à arriver, ce
+  // sondage de secours est le vrai mécanisme de rattrapage — au-delà d'un
+  // simple confort, un écart ici veut dire qu'un participant entend la
+  // chanson avant l'autre en Blindtest, un vrai avantage déloyal pour
+  // deviner plus vite. 0,5s gardé comme plancher : en dessous, le nombre de
+  // requêtes Supabase augmente vite pour un gain de plus en plus faible (la
+  // limite basse, c'est de toute façon le temps réel — normalement quasi
+  // instantané — qui devrait faire le gros du travail ; ce sondage n'est
+  // qu'un filet de secours).
+  }, 500);
 }
 
 function stopQueuePolling(){
@@ -4654,7 +4729,7 @@ function isGameCreator(){
 async function loadGameAnswers(roomId){
   const { data, error } = await sb
     .from("game_answers")
-    .select("*, profiles(pseudo)")
+    .select("*, profiles(pseudo, avatar_url)")
     .eq("room_id", roomId);
   if(error){ showToast("Erreur de chargement des réponses : " + error.message); return; }
   gameAnswers = data || [];
@@ -4697,6 +4772,37 @@ function getPseudoForUserId(userId){
   const ans = gameAnswers.find(a => a.user_id === userId);
   if(ans?.profiles?.pseudo) return ans.profiles.pseudo;
   return "Quelqu'un";
+}
+
+// Même principe que getPseudoForUserId() (ajouté le 01/08/2026, voir
+// uploadAvatar()) — null si personne n'a de photo, auquel cas on retombe
+// sur le rond avec l'initiale (voir avatarHtml()).
+function getAvatarUrlForUserId(userId){
+  if(userId === currentUser?.id) return state.avatarUrl || null;
+  if(realtimeChannel){
+    const match = Object.values(realtimeChannel.presenceState()).flat().find(p => p.userId === userId);
+    if(match?.avatarUrl) return match.avatarUrl;
+  }
+  const ans = gameAnswers.find(a => a.user_id === userId);
+  if(ans?.profiles?.avatar_url) return ans.profiles.avatar_url;
+  return null;
+}
+
+// Construit le rond d'avatar : une vraie photo si on en connaît une (ajouté
+// le 01/08/2026, voir uploadAvatar()), sinon le rond avec l'initiale déjà
+// utilisé partout dans l'app — un seul endroit à changer pour les 2 cas.
+function avatarHtml(avatarUrl, pseudo, sizePx, fontSizePx, opts){
+  opts = opts || {};
+  const size = sizePx || 30;
+  const fontSize = fontSizePx || 12;
+  const bg = opts.background || "var(--accent1)";
+  const baseStyle = `width:${size}px;height:${size}px;font-size:${fontSize}px;${opts.style || ""}`;
+  const titleAttr = opts.title ? ` title="${escapeHtml(opts.title)}"` : "";
+  if(avatarUrl){
+    return `<div class="avatar" style="${baseStyle}padding:0;overflow:hidden;"${titleAttr}><img src="${escapeHtml(avatarUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;" /></div>`;
+  }
+  const initial = escapeHtml((pseudo || "?")[0].toUpperCase());
+  return `<div class="avatar" style="${baseStyle}background:${bg};"${titleAttr}>${initial}</div>`;
 }
 
 // Mélange une copie du tableau donné (Fisher-Yates) — utilisé pour l'ordre
@@ -5003,7 +5109,7 @@ function renderGameProgress(questionIds){
       : "";
     return `
       <div class="search-result">
-        <div class="avatar" style="width:30px;height:30px;background:var(--accent1);font-size:12px;">${escapeHtml((pseudo||"?")[0].toUpperCase())}</div>
+        ${avatarHtml(getAvatarUrlForUserId(uid), pseudo, 30, 12)}
         <div style="flex:1;min-width:0;">
           <div style="font-size:13px;font-weight:600;">${escapeHtml(pseudo)}${uid === currentUser?.id ? " (toi)" : ""}</div>
           <div style="font-size:11.5px;color:var(--text-faint);">${answered}/${total} réponse(s)${done ? " ✅" : ""}</div>
@@ -5015,7 +5121,7 @@ function renderGameProgress(questionIds){
 
   const excludedRows = allExcludedIds.map(uid => `
     <div class="search-result" style="opacity:.6;">
-      <div class="avatar" style="width:30px;height:30px;background:var(--text-faint);font-size:12px;">${escapeHtml((getPseudoForUserId(uid)||"?")[0].toUpperCase())}</div>
+      ${avatarHtml(getAvatarUrlForUserId(uid), getPseudoForUserId(uid), 30, 12, { background: "var(--text-faint)" })}
       <div style="flex:1;min-width:0;">
         <div style="font-size:13px;font-weight:600;">${escapeHtml(getPseudoForUserId(uid))} — exclu(e)</div>
       </div>
@@ -5104,7 +5210,7 @@ function renderSingleDeviceAnswering(){
     const done = total > 0 && count >= total;
     return `
       <div class="search-result">
-        <div class="avatar" style="width:30px;height:30px;background:var(--accent1);font-size:12px;">${escapeHtml((name||"?")[0].toUpperCase())}</div>
+        ${avatarHtml(null, name, 30, 12)}
         <div style="flex:1;min-width:0;">
           <div style="font-size:13px;font-weight:600;">${escapeHtml(name)}</div>
           <div style="font-size:11.5px;color:var(--text-faint);">${count}/${total} ${isOwnerMode ? "proposition(s)" : "réponse(s)"}${done ? " ✅" : ""}</div>
@@ -5975,12 +6081,11 @@ function renderGameFinished(){
   const visualOrder = [1, 0, 2].filter(i => podiumEntries[i]);
   document.getElementById("gqPodium").innerHTML = visualOrder.map(i => {
     const [uid, name, score] = podiumEntries[i];
-    const initial = escapeHtml((name || "?")[0].toUpperCase());
     const big = i === 0;
     return `
       <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:${big ? "96px" : "78px"};">
         <div style="font-size:${big ? "26px" : "20px"};">${medals[i]}</div>
-        <div class="avatar" style="width:${big ? "52px" : "42px"};height:${big ? "52px" : "42px"};font-size:${big ? "18px" : "15px"};background:var(--accent1);">${initial}</div>
+        ${avatarHtml(getAvatarUrlForUserId(uid), name, big ? 52 : 42, big ? 18 : 15)}
         <div style="font-size:12.5px;font-weight:700;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${escapeHtml(name)}${uid === currentUser?.id ? " (toi)" : ""}</div>
         <div style="font-size:11.5px;color:var(--text-faint);margin-bottom:4px;">${score} pts</div>
         <div style="width:100%;height:${heights[i]}px;border-radius:10px 10px 0 0;background:linear-gradient(160deg,var(--accent1),var(--accent2));opacity:${big ? "1" : ".7"};"></div>
@@ -6684,7 +6789,7 @@ function renderBtProgress(slots){
       : "";
     return `
       <div class="search-result">
-        <div class="avatar" style="width:30px;height:30px;background:var(--accent1);font-size:12px;">${escapeHtml((pseudo||"?")[0].toUpperCase())}</div>
+        ${avatarHtml(getAvatarUrlForUserId(uid), pseudo, 30, 12)}
         <div style="flex:1;min-width:0;">
           <div style="font-size:13px;font-weight:600;">${escapeHtml(pseudo)}${uid === currentUser?.id ? " (toi)" : ""}</div>
           <div style="font-size:11.5px;color:var(--text-faint);">${answered}/${total} chanson(s)${done ? " ✅" : ""}</div>
@@ -6696,7 +6801,7 @@ function renderBtProgress(slots){
 
   const excludedRows = [...excluded].map(uid => `
     <div class="search-result" style="opacity:.6;">
-      <div class="avatar" style="width:30px;height:30px;background:var(--text-faint);font-size:12px;">${escapeHtml((getPseudoForUserId(uid)||"?")[0].toUpperCase())}</div>
+      ${avatarHtml(getAvatarUrlForUserId(uid), getPseudoForUserId(uid), 30, 12, { background: "var(--text-faint)" })}
       <div style="flex:1;min-width:0;">
         <div style="font-size:13px;font-weight:600;">${escapeHtml(getPseudoForUserId(uid))} — exclu(e)</div>
       </div>
@@ -7165,11 +7270,23 @@ function updateBtVoteCountdown(){
 // mise à jour reçue en temps réel, y compris juste en votant soi-même).
 // Calculé UNE SEULE FOIS par manche ici, comme btMyGuess juste au-dessus.
 function ensureBtGuessSelectionForRound(idx){
-  if(btGuessSelectionRoundIdx === idx) return;
-  btGuessSelectionRoundIdx = idx;
+  const round = currentBtRound();
+  // Clé = index ET youtube_id de la manche (ajouté le 01/08/2026, retour de
+  // Rémi : la bonne réponse manquait parfois des choix après avoir relancé
+  // une partie "🎲 Chansons aléatoires" dans le même salon). Avant, la
+  // mémorisation se faisait juste sur l'INDEX de la manche — si jamais un
+  // reset de btGuessSelectionRoundIdx avait été oublié quelque part (ou
+  // qu'une manche à l'index 0 d'une NOUVELLE partie remplaçait la manche 0
+  // d'une partie précédente pendant qu'un appareil regardait encore
+  // l'ancien cache), les choix affichés pouvaient rester ceux de l'ANCIENNE
+  // manche à cet index, plus rien à voir avec la chanson réellement jouée
+  // maintenant. Inclure le youtube_id dans la clé force un recalcul dès que
+  // le contenu réel de la manche change, même à index égal.
+  const roundKey = idx + ":" + (round?.youtube_id || "");
+  if(btGuessSelectionRoundIdx === roundKey) return;
+  btGuessSelectionRoundIdx = roundKey;
   const mine = btGuesses.find(g => g.round_index === idx && g.guesser_user_id === currentUser?.id);
   btMyGuess = mine ? mine.guessed_youtube_id : null;
-  const round = currentBtRound();
   btGuessOptionsCache = round
     ? shuffleArray([{ youtube_id: round.youtube_id, title: round.title, artist: round.artist }, ...(round.decoys || [])])
     : [];
@@ -7398,12 +7515,11 @@ function renderBtFinished(){
   const visualOrder = [1, 0, 2].filter(i => podiumEntries[i]);
   document.getElementById("btPodium").innerHTML = visualOrder.map(i => {
     const [uid, name, score] = podiumEntries[i];
-    const initial = escapeHtml((name || "?")[0].toUpperCase());
     const big = i === 0;
     return `
       <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:${big ? "96px" : "78px"};">
         <div style="font-size:${big ? "26px" : "20px"};">${medals[i]}</div>
-        <div class="avatar" style="width:${big ? "52px" : "42px"};height:${big ? "52px" : "42px"};font-size:${big ? "18px" : "15px"};background:var(--accent1);">${initial}</div>
+        ${avatarHtml(getAvatarUrlForUserId(uid), name, big ? 52 : 42, big ? 18 : 15)}
         <div style="font-size:12.5px;font-weight:700;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${escapeHtml(name)}${uid === currentUser?.id ? " (toi)" : ""}</div>
         <div style="font-size:11.5px;color:var(--text-faint);margin-bottom:4px;">${score} pts</div>
         <div style="width:100%;height:${heights[i]}px;border-radius:10px 10px 0 0;background:linear-gradient(160deg,var(--accent1),var(--accent2));opacity:${big ? "1" : ".7"};"></div>
