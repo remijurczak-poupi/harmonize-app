@@ -2859,13 +2859,17 @@ function startQueuePolling(roomId){
       const { data } = await sb.from("rooms").select("*").eq("id", roomId).maybeSingle();
       if(data){ currentRoom = data; applyDistancePlaybackState(); }
     }
-  // Passé de 4s à 2s (ajouté le 01/08/2026, retour de Rémi : sur un appareil
-  // où le temps réel met du temps à arriver, ce sondage de secours était le
-  // vrai mécanisme de rattrapage — jusqu'à 4s de retard pour voir une
-  // nouvelle manche, pendant lesquels l'autre participant pouvait déjà avoir
-  // répondu. Réduire l'intervalle réduit ce pire cas, au prix d'un peu plus
-  // de requêtes Supabase — negligeable à l'échelle actuelle du projet).
-  }, 2000);
+  // Passé de 4s à 2s puis à 1s (ajouté le 01/08/2026, retour de Rémi : sur un
+  // appareil où le temps réel met du temps à arriver, ce sondage de secours
+  // est le vrai mécanisme de rattrapage — jusqu'à 4s de retard pour voir une
+  // nouvelle manche à l'origine, pendant lesquels l'autre participant pouvait
+  // déjà avoir répondu. Rémi a demandé d'aller encore plus vite ("1s, voire
+  // moins ?") — 1s gardé comme plancher raisonnable : en dessous, le nombre
+  // de requêtes Supabase augmente vite pour un gain de plus en plus faible
+  // (la limite basse, c'est de toute façon le temps réel — normalement
+  // quasi instantané — qui devrait faire le gros du travail ; ce sondage
+  // n'est qu'un filet de secours).
+  }, 1000);
 }
 
 function stopQueuePolling(){
@@ -5566,11 +5570,20 @@ function revealGameAdSkipButton(){
   gameAdSkipActive = true;
   gameAdSkipClickedAtRound = currentRoom?.game_current_round ?? null;
   gameAdSkipClickedAtTime = Date.now();
+  // Agrandit VRAIMENT le lecteur pendant la fenêtre de déblocage (ajouté le
+  // 01/08/2026, retour de Rémi) : en mode audio seulement, retirer le cache
+  // ne suffisait pas — le lecteur en dessous restait minuscule (1x1, voir
+  // ensureGamePlayer()), donc son bouton "Ignorer" natif restait impossible
+  // à taper. setSize() est une vraie méthode de l'API YouTube pour
+  // redimensionner un lecteur déjà créé, sans le recréer. Ne change rien en
+  // mode vidéo (déjà à cette taille).
+  try { gamePlayer?.setSize(320, 180); } catch(e){}
   renderGamePlaying(); // applique tout de suite (cover + blocker gérés par renderGamePlaying, voir plus haut)
   showToast("Tape directement sur le bouton \"Ignorer\" de la pub si tu le vois — ça revient à la normale dans 10 secondes. Ton chrono personnel repart de zéro, tu ne perds pas de temps sur le bonus de rapidité.");
   clearTimeout(gameAdSkipRestoreTimer);
   gameAdSkipRestoreTimer = setTimeout(() => {
     gameAdSkipActive = false;
+    if(currentRoom?.game_display_mode === "audio"){ try { gamePlayer?.setSize(1, 1); } catch(e){} }
     renderGamePlaying();
   }, 10000);
 }
@@ -5781,6 +5794,18 @@ function renderGameReveal(round){
 // clique voit l'effet tout de suite en local (en plus de l'écrire en base).
 async function nextGameRound(){
   if(!currentRoom) return;
+  // Relit l'état frais AVANT de décider (ajouté le 01/08/2026, 2e passe : la
+  // 1ère tentative de ce correctif avait retiré cette lecture fraîche en
+  // pensant que l'écriture conditionnelle plus bas suffisait à elle seule —
+  // mais celle-ci protège seulement CONTRE QUI A LE DROIT D'ÉCRIRE, pas la
+  // DÉCISION elle-même. Sans relire frais ici, "combien de manches au total"
+  // venait de currentRoom EN MÉMOIRE, qui pouvait être périmé [ex: encore le
+  // nombre de manches d'une partie précédente du même salon] même sans
+  // aucun double-clic en cause — d'où une partie de 10 manches qui se
+  // terminait quand même après 5.
+  const { data: freshRoom } = await sb.from("rooms").select("*").eq("id", currentRoom.id).maybeSingle();
+  if(!freshRoom || freshRoom.game_phase !== "playing") return;
+  currentRoom = freshRoom;
   const fromRound = currentRoom.game_current_round || 0;
   const rounds = currentRoom.game_rounds || [];
   const next = fromRound + 1;
@@ -5799,18 +5824,11 @@ async function nextGameRound(){
       playback_started_at: nowIso,
     };
   }
-  // Écriture CONDITIONNELLE (ajouté le 01/08/2026, corrige un vrai bug
-  // remonté par Rémi) : le ".eq(game_current_round, fromRound)" fait que
-  // cette écriture ne s'applique QUE si le salon est encore exactement sur
-  // la manche qu'on pensait faire avancer — sinon 0 ligne n'est modifiée
-  // (data reste vide) et on ne fait rien de plus. Sans ça, 2 personnes qui
-  // cliquent "manche suivante" presque en même temps (pas de chef de salon,
-  // donc les 2 boutons sont actifs pour tout le monde) déclenchaient chacune
-  // leur propre calcul : le 2e clic, arrivé juste après que le 1er ait déjà
-  // écrit la manche suivante, relisait cet état déjà à jour et avançait ENCORE
-  // une fois — d'où le saut "manche 2 → manche 4" observé. Protège au passage
-  // contre le cas où un appareil enchaînerait ce calcul sur une partie déjà
-  // terminée/relancée entre-temps (ex: "🔄 Rejouer"/"🔀 Changer de jeu").
+  // Écriture CONDITIONNELLE en plus de la lecture fraîche ci-dessus (protège
+  // contre 2 personnes qui cliqueraient "manche suivante" presque en même
+  // temps, JUSTE APRÈS cette lecture — voir Round 82) : ".eq(game_current_
+  // round, fromRound)" fait que l'écriture ne s'applique que si le salon est
+  // encore exactement sur la manche qu'on vient de lire.
   const { data, error } = await sb.from("rooms").update(update)
     .eq("id", currentRoom.id)
     .eq("game_phase", "playing")
@@ -6995,11 +7013,18 @@ function revealAdSkipButton(){
   btAdSkipActive = true;
   btAdSkipClickedAtRound = currentRoom?.game_current_round ?? null;
   btAdSkipClickedAtTime = Date.now();
+  // Agrandit VRAIMENT le lecteur pendant la fenêtre de déblocage — même
+  // correctif que revealGameAdSkipButton() (voir son commentaire, ajouté le
+  // 01/08/2026). Le Blindtest est TOUJOURS en audio seulement, donc ce
+  // bouton était encore plus systématiquement inutile qu'ailleurs avant ce
+  // correctif.
+  try { btPlayer?.setSize(320, 180); } catch(e){}
   renderBtPlaying(); // applique tout de suite (cover + blocker gérés par renderBtPlaying, voir plus haut)
   showToast("Tape directement sur le bouton \"Ignorer\" de la pub si tu le vois — ça revient à la normale dans 10 secondes. Ton chrono personnel repart de zéro, tu ne perds pas de temps sur le bonus de rapidité.");
   clearTimeout(adSkipRestoreTimer);
   adSkipRestoreTimer = setTimeout(() => {
     btAdSkipActive = false;
+    try { btPlayer?.setSize(1, 1); } catch(e){}
     renderBtPlaying();
   }, 10000);
 }
@@ -7162,6 +7187,14 @@ function renderBtReveal(round){
 
 async function nextBtRound(){
   if(!currentRoom) return;
+  // Relit l'état frais AVANT de décider — même correctif que nextGameRound()
+  // (voir son commentaire, ajouté le 01/08/2026, 2e passe) : sans ça,
+  // "combien de manches au total" venait de currentRoom EN MÉMOIRE, qui
+  // pouvait être périmé même sans double-clic — d'où la partie de 10
+  // chansons qui se terminait quand même après 5.
+  const { data: freshRoom } = await sb.from("rooms").select("*").eq("id", currentRoom.id).maybeSingle();
+  if(!freshRoom || freshRoom.game_phase !== "playing") return;
+  currentRoom = freshRoom;
   const fromRound = currentRoom.game_current_round || 0;
   const rounds = currentRoom.game_rounds || [];
   const next = fromRound + 1;
@@ -7180,11 +7213,10 @@ async function nextBtRound(){
       playback_started_at: nowIso,
     };
   }
-  // Écriture CONDITIONNELLE — même correctif que nextGameRound() (voir son
-  // commentaire, ajouté le 01/08/2026) : protège à la fois contre 2
-  // personnes qui cliquent "chanson suivante" presque en même temps (d'où le
-  // saut "manche 2 → 4" observé par Rémi) et contre un appareil qui
-  // enchaînerait ce calcul sur une partie déjà terminée/relancée entre-temps.
+  // Écriture CONDITIONNELLE en plus de la lecture fraîche ci-dessus — même
+  // correctif que nextGameRound() : protège contre 2 personnes qui
+  // cliqueraient "chanson suivante" presque en même temps, JUSTE APRÈS cette
+  // lecture (d'où le saut "manche 2 → 4" déjà observé par Rémi).
   const { data, error } = await sb.from("rooms").update(update)
     .eq("id", currentRoom.id)
     .eq("game_phase", "playing")
