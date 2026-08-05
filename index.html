@@ -1075,6 +1075,21 @@
             <button class="btn-primary" onclick="confirmBtRandomCount()">Valider</button>
             <button class="btn-ghost" style="margin-top:10px;" onclick="backToBtSourceStep()">← Changer la source des chansons</button>
           </div>
+          <!-- Étape "qui va jouer ?" (ajouté le 01/08/2026, demande de Rémi) :
+               en mode "un seul téléphone", renseigner les prénoms AVANT le
+               début de la partie plutôt qu'à la volée à chaque révélation
+               (moins pratique en jouant, retour de Rémi) — voir
+               singleDeviceKnownNames/renderSingleDeviceNamesSetupChips(). -->
+          <div id="btStepSingleDeviceNames" class="card" style="display:none;margin-bottom:16px;">
+            <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">Qui va jouer ? (pour pouvoir donner des points à chacun pendant la partie)</p>
+            <div id="btSingleDeviceNamesChips" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;"></div>
+            <div style="display:flex;gap:8px;margin-bottom:12px;">
+              <input type="text" id="btSingleDeviceSetupNameInput" placeholder="Prénom" style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault();addSingleDeviceSetupName();}" />
+              <button class="btn-ghost" style="width:auto;padding:8px 14px;" onclick="addSingleDeviceSetupName()">➕</button>
+            </div>
+            <button class="btn-primary" onclick="confirmSingleDeviceNamesStep()">Continuer</button>
+            <button class="btn-ghost" style="margin-top:10px;" onclick="backToBtSongsCountStep()">← Changer le nombre de chansons</button>
+          </div>
           <!-- Pas de choix "vidéo visible" ici (contrairement au jeu des
                questions) : toujours audio seulement, voir confirmBtSettings()
                dans index.html pour le pourquoi. -->
@@ -1678,6 +1693,7 @@ let singleDeviceActivePlayer = null;
 let singleDeviceRoundPoints = {}; // { prénom: points attribués CETTE manche, pas encore ajoutés au total }
 let singleDeviceTotalScores = {}; // { prénom: total cumulé sur la partie en cours }
 let singleDeviceKnownNames = []; // prénoms déjà tapés (Blindtest uniquement — le jeu des questions connaît déjà les siens, voir getSingleDeviceLocalNames())
+let btSingleDeviceNamesStepDone = false; // étape "qui va jouer ?" validée pour cette partie (Blindtest uniquement, voir renderBtSongCountPicker())
 
 function renderSingleDeviceScoreChips(containerId, names){
   const el = document.getElementById(containerId);
@@ -2738,25 +2754,19 @@ const SINGLE_DEVICE_HINT = {
 // détruire, et la musique repartait. enterRealRoom()/enterMockRoom()
 // faisaient déjà ce nettoyage en ENTRANT dans un salon (pour repartir d'une
 // base propre) ; il manquait le même nettoyage en sortant vers l'accueil.
+// Bascule vers l'onglet "Accueil" (revu le 01/08/2026, 2e passe — retour de
+// Rémi : "'Jeu' ne permet pas de retourner dans le salon en cours, il faut
+// régler ça"). Ce bouton "quittait" complètement le salon jusqu'ici (temps
+// réel coupé, salon oublié) — mais avec une barre à 2 onglets, l'attente
+// naturelle est de pouvoir faire l'aller-retour librement entre les deux,
+// comme changer d'onglet dans un navigateur ne ferme pas l'autre onglet.
+// Le salon reste donc actif en arrière-plan (temps réel, sondage de
+// secours, lecture en cours — rien de tout ça n'est coupé) : "Jeu"
+// (goToCurrentScreen()) y ramène directement puisque currentRoom n'est
+// plus jamais vidé ici. Rejoindre/créer un AUTRE salon continue de tout
+// nettoyer correctement au passage (voir enterRealRoom()) — donc rien n'est
+// perdu si on veut vraiment changer de salon.
 function goHome(){
-  if(realtimeChannel){ sb.removeChannel(realtimeChannel); realtimeChannel = null; }
-  stopQueuePolling();
-  stopAnyPlayback();
-  currentRoom = null;
-  // Sortie explicite du salon (ajouté le 01/08/2026) : on oublie le salon
-  // retenu pour cet onglet (voir routeToRoomScreen()) — une actualisation
-  // après avoir cliqué "Accueil" doit bien rester à l'accueil.
-  sessionStorage.removeItem("harmonizeActiveRoomCode");
-  // Cache la barre du bas (ajouté le 01/08/2026, retour de Rémi : "les
-  // boutons Jeu/Accueil ne servent à rien") — vrai bug trouvé : routeToRoomScreen()
-  // affiche cette barre en entrant dans un salon, mais rien ne la cachait
-  // en la quittant. Elle restait donc affichée PARTOUT dans l'app une fois
-  // qu'on était entré dans un salon au moins une fois dans la session — et
-  // comme "Jeu" retombe sur l'accueil dès qu'il n'y a plus de salon en
-  // cours (voir goToCurrentScreen()), les 2 boutons semblaient identiques
-  // et inutiles. Elle ne réapparaît maintenant que si on entre vraiment
-  // dans un salon.
-  document.getElementById("tabbar").style.display = "none";
   showScreen("screen-lobby");
 }
 
@@ -2986,6 +2996,7 @@ async function routeToRoomScreen(room, toastMsg){
     singleDeviceRoundPoints = {};
     singleDeviceTotalScores = {};
     singleDeviceKnownNames = [];
+    btSingleDeviceNamesStepDone = false;
     btAutoRevealRoundIdx = -1;
     btRoundIntroIdx = -1;
     btSingleDeviceBroadcasting = false;
@@ -6826,11 +6837,23 @@ function renderBtSongCountPicker(){
   if(!countChosen){
     document.getElementById("btStepSongs").style.display = btSourceMode === "propose" ? "block" : "none";
     document.getElementById("btStepRandomCount").style.display = btSourceMode === "random" ? "block" : "none";
+    document.getElementById("btStepSingleDeviceNames").style.display = "none";
     document.getElementById("btStepPlayback").style.display = "none";
     return;
   }
   document.getElementById("btStepSongs").style.display = "none";
   document.getElementById("btStepRandomCount").style.display = "none";
+
+  // Étape "qui va jouer ?" (ajouté le 01/08/2026) : uniquement en mode "un
+  // seul téléphone", et une seule fois par configuration de partie (voir
+  // btSingleDeviceNamesStepDone, remis à false à chaque nouvelle partie).
+  if(currentRoom.single_device && !btSingleDeviceNamesStepDone){
+    document.getElementById("btStepSingleDeviceNames").style.display = "block";
+    document.getElementById("btStepPlayback").style.display = "none";
+    renderSingleDeviceNamesSetupChips();
+    return;
+  }
+  document.getElementById("btStepSingleDeviceNames").style.display = "none";
   document.getElementById("btStepPlayback").style.display = "block";
   document.querySelectorAll("#btPlaybackStartPicker button").forEach(btn => {
     const active = btn.dataset.start === btPlaybackStart;
@@ -6838,6 +6861,35 @@ function renderBtSongCountPicker(){
     btn.style.color = active ? "var(--text)" : "var(--text-dim)";
   });
   document.getElementById("btLaunchGameBtn").style.display = btPlaybackStart ? "block" : "none";
+}
+
+function confirmSingleDeviceNamesStep(){
+  btSingleDeviceNamesStepDone = true;
+  renderBtSongCountPicker();
+}
+
+function renderSingleDeviceNamesSetupChips(){
+  const el = document.getElementById("btSingleDeviceNamesChips");
+  if(!el) return;
+  el.innerHTML = singleDeviceKnownNames.map(name => `
+    <span class="pill" style="display:inline-flex;align-items:center;gap:6px;">${escapeHtml(name)}
+      <button onclick="removeSingleDeviceSetupName('${escJs(name)}')" style="background:none;border:none;color:inherit;cursor:pointer;font-size:14px;line-height:1;padding:0;">×</button>
+    </span>
+  `).join("");
+}
+
+function addSingleDeviceSetupName(){
+  const input = document.getElementById("btSingleDeviceSetupNameInput");
+  const name = (input.value || "").trim();
+  if(!name) return;
+  if(!singleDeviceKnownNames.includes(name)) singleDeviceKnownNames.push(name);
+  input.value = "";
+  renderSingleDeviceNamesSetupChips();
+}
+
+function removeSingleDeviceSetupName(name){
+  singleDeviceKnownNames = singleDeviceKnownNames.filter(n => n !== name);
+  renderSingleDeviceNamesSetupChips();
 }
 
 function chooseBtSource(mode){
@@ -7955,6 +8007,7 @@ async function rejouerBtMemeSalon(){
   singleDeviceRoundPoints = {};
   singleDeviceTotalScores = {};
   singleDeviceKnownNames = [];
+  btSingleDeviceNamesStepDone = false;
   btAutoRevealRoundIdx = -1;
   btRoundIntroIdx = -1;
   btSingleDeviceBroadcasting = false;
