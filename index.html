@@ -1722,7 +1722,17 @@ async function startBtSoloFromPool(){
   if(!currentUser){ showToast("Connecte-toi d'abord."); showScreen("screen-login"); return; }
   const hint = document.getElementById("btSoloSourceHint");
   hint.textContent = "Chargement du pool communautaire...";
-  const { data, error } = await sb.from("blindtest_pool").select("*").eq("status", "approved").limit(300);
+  // limit(300) → limit(5000) (ajouté le 01/08/2026, retour de Rémi : "les
+  // mêmes chansons reviennent tout le temps" alors que le pool en contient
+  // beaucoup plus). Sans ORDER BY, Postgres ne renvoie PAS un échantillon
+  // aléatoire pour une requête limitée — il renvoie généralement les mêmes
+  // lignes à chaque fois (souvent proche de l'ordre d'insertion). Mélanger
+  // le résultat après coup (shuffleArray(), déjà fait) ne sert donc à rien
+  // si on ne pioche jamais que dans le même premier lot de 300 sur un pool
+  // qui en contient bien plus — remonter la limite à 5000 (largement au-delà
+  // de la taille actuelle du pool) fait qu'on récupère VRAIMENT tout, et que
+  // le mélange qui suit porte sur l'ensemble complet.
+  const { data, error } = await sb.from("blindtest_pool").select("*").eq("status", "approved").limit(5000);
   if(error){ hint.textContent = "Erreur de chargement : " + error.message; return; }
   const tracks = data || [];
   if(tracks.length < BT_SOLO_MIN_TRACKS){
@@ -1831,7 +1841,9 @@ async function startSerieFromPool(){
   if(!currentUser){ showToast("Connecte-toi d'abord."); showScreen("screen-login"); return; }
   document.getElementById("serieSourceHint").textContent = "Chargement du pool communautaire...";
   showScreen("screen-serie");
-  const { data, error } = await sb.from("blindtest_pool").select("*").eq("status", "approved").limit(300);
+  // limit(300) → limit(5000) : même correctif que startBtSoloFromPool() (voir
+  // son commentaire, ajouté le 01/08/2026).
+  const { data, error } = await sb.from("blindtest_pool").select("*").eq("status", "approved").limit(5000);
   if(error){ document.getElementById("serieSourceHint").textContent = "Erreur de chargement : " + error.message; return; }
   const tracks = data || [];
   if(tracks.length < SERIE_MIN_TRACKS){
@@ -5792,64 +5804,81 @@ function renderGameReveal(round){
 // Fait avancer la partie à la manche suivante (ou vers l'écran de fin si
 // c'était la dernière). Comme pour le mode À distance, tout le monde qui
 // clique voit l'effet tout de suite en local (en plus de l'écrire en base).
+// Verrou anti-double-clic (ajouté le 01/08/2026, retour de Rémi : un
+// double-clic rapide bien involontaire sur CE MÊME bouton, sur CE MÊME
+// appareil, sautait une manche — ex: 4 → 6). Différent du correctif du
+// Round 82/85 (qui protège contre 2 APPAREILS DIFFÉRENTS) : ici, les 2 clics
+// viennent du même appareil, souvent trop vite pour que le bouton ait eu le
+// temps de se redessiner "désactivé" entre les deux — chaque appel relit
+// bien l'état frais et avance correctement d'UNE manche à chaque fois, donc
+// ce n'était pas une écriture incohérente, juste 2 avances légitimes
+// déclenchées à la suite. Un simple verrou en mémoire ignore le 2e appel
+// tant que le 1er n'est pas terminé.
+let gameNextRoundInFlight = false;
 async function nextGameRound(){
-  if(!currentRoom) return;
-  // Relit l'état frais AVANT de décider (ajouté le 01/08/2026, 2e passe : la
-  // 1ère tentative de ce correctif avait retiré cette lecture fraîche en
-  // pensant que l'écriture conditionnelle plus bas suffisait à elle seule —
-  // mais celle-ci protège seulement CONTRE QUI A LE DROIT D'ÉCRIRE, pas la
-  // DÉCISION elle-même. Sans relire frais ici, "combien de manches au total"
-  // venait de currentRoom EN MÉMOIRE, qui pouvait être périmé [ex: encore le
-  // nombre de manches d'une partie précédente du même salon] même sans
-  // aucun double-clic en cause — d'où une partie de 10 manches qui se
-  // terminait quand même après 5.
-  const { data: freshRoom } = await sb.from("rooms").select("*").eq("id", currentRoom.id).maybeSingle();
-  if(!freshRoom || freshRoom.game_phase !== "playing") return;
-  currentRoom = freshRoom;
-  const fromRound = currentRoom.game_current_round || 0;
-  const rounds = currentRoom.game_rounds || [];
-  const next = fromRound + 1;
-  let update;
-  if(next >= rounds.length){
-    update = { game_phase: "finished", playback_state: "paused" };
-  } else {
-    const nowIso = new Date().toISOString();
-    const startSeconds = currentRoom.game_playback_start === "middle" ? 45 : 0;
-    update = {
-      game_current_round: next,
-      game_round_started_at: nowIso,
-      game_round_revealed: false,
-      playback_state: "playing",
-      playback_position: startSeconds,
-      playback_started_at: nowIso,
-    };
+  if(!currentRoom || gameNextRoundInFlight) return;
+  gameNextRoundInFlight = true;
+  try {
+    // Relit l'état frais AVANT de décider (ajouté le 01/08/2026, 2e passe :
+    // la 1ère tentative de ce correctif avait retiré cette lecture fraîche
+    // en pensant que l'écriture conditionnelle plus bas suffisait à elle
+    // seule — mais celle-ci protège seulement CONTRE QUI A LE DROIT
+    // D'ÉCRIRE, pas la DÉCISION elle-même. Sans relire frais ici, "combien
+    // de manches au total" venait de currentRoom EN MÉMOIRE, qui pouvait
+    // être périmé [ex: encore le nombre de manches d'une partie précédente
+    // du même salon] même sans aucun double-clic en cause — d'où une partie
+    // de 10 manches qui se terminait quand même après 5.
+    const { data: freshRoom } = await sb.from("rooms").select("*").eq("id", currentRoom.id).maybeSingle();
+    if(!freshRoom || freshRoom.game_phase !== "playing") return;
+    currentRoom = freshRoom;
+    const fromRound = currentRoom.game_current_round || 0;
+    const rounds = currentRoom.game_rounds || [];
+    const next = fromRound + 1;
+    let update;
+    if(next >= rounds.length){
+      update = { game_phase: "finished", playback_state: "paused" };
+    } else {
+      const nowIso = new Date().toISOString();
+      const startSeconds = currentRoom.game_playback_start === "middle" ? 45 : 0;
+      update = {
+        game_current_round: next,
+        game_round_started_at: nowIso,
+        game_round_revealed: false,
+        playback_state: "playing",
+        playback_position: startSeconds,
+        playback_started_at: nowIso,
+      };
+    }
+    // Écriture CONDITIONNELLE en plus de la lecture fraîche ci-dessus
+    // (protège contre 2 APPAREILS DIFFÉRENTS qui cliqueraient "manche
+    // suivante" presque en même temps, JUSTE APRÈS cette lecture — voir
+    // Round 82) : ".eq(game_current_round, fromRound)" fait que l'écriture
+    // ne s'applique que si le salon est encore exactement sur la manche
+    // qu'on vient de lire.
+    const { data, error } = await sb.from("rooms").update(update)
+      .eq("id", currentRoom.id)
+      .eq("game_phase", "playing")
+      .eq("game_current_round", fromRound)
+      .select().maybeSingle();
+    if(error){ showToast("Erreur : " + error.message); return; }
+    if(!data) return; // quelqu'un d'autre a déjà fait avancer cette manche entre-temps
+    currentRoom = data;
+    gameGuessSelectionRoundIdx = -1;
+    gameMyGuessSelection = new Set();
+    gameAdSkipClickedAtRound = null;
+    gameAdSkipClickedAtTime = null;
+    if(currentRoom.game_phase === "playing") applyGamePlaybackState();
+    // Nourrit aussi le pool communautaire depuis "Le jeu des questions"
+    // (ajouté le 22/07/2026, demande de Rémi) — même fonction que Blindtest,
+    // les manches ont exactement la même forme (youtube_id/title/artist).
+    if(currentRoom.game_phase === "finished"){
+      logActivityEvent("game_finished", currentRoom.id, currentRoom.mode);
+      await populateBtPool(rounds);
+    }
+    renderGameLobby();
+  } finally {
+    gameNextRoundInFlight = false;
   }
-  // Écriture CONDITIONNELLE en plus de la lecture fraîche ci-dessus (protège
-  // contre 2 personnes qui cliqueraient "manche suivante" presque en même
-  // temps, JUSTE APRÈS cette lecture — voir Round 82) : ".eq(game_current_
-  // round, fromRound)" fait que l'écriture ne s'applique que si le salon est
-  // encore exactement sur la manche qu'on vient de lire.
-  const { data, error } = await sb.from("rooms").update(update)
-    .eq("id", currentRoom.id)
-    .eq("game_phase", "playing")
-    .eq("game_current_round", fromRound)
-    .select().maybeSingle();
-  if(error){ showToast("Erreur : " + error.message); return; }
-  if(!data) return; // quelqu'un d'autre a déjà fait avancer cette manche entre-temps
-  currentRoom = data;
-  gameGuessSelectionRoundIdx = -1;
-  gameMyGuessSelection = new Set();
-  gameAdSkipClickedAtRound = null;
-  gameAdSkipClickedAtTime = null;
-  if(currentRoom.game_phase === "playing") applyGamePlaybackState();
-  // Nourrit aussi le pool communautaire depuis "Le jeu des questions"
-  // (ajouté le 22/07/2026, demande de Rémi) — même fonction que Blindtest,
-  // les manches ont exactement la même forme (youtube_id/title/artist).
-  if(currentRoom.game_phase === "finished"){
-    logActivityEvent("game_finished", currentRoom.id, currentRoom.mode);
-    await populateBtPool(rounds);
-  }
-  renderGameLobby();
 }
 
 /* ---- Score : calculé à la volée à partir des votes + manches déjà
@@ -6540,7 +6569,12 @@ async function confirmBtSettings(){
 // compris la personne qui a lancé la partie. Mêmes pièges (decoys), et même
 // exclusion des vraies réponses de la partie, que computeBtRounds().
 async function computeBtRandomRounds(count){
-  const { data, error } = await sb.from("blindtest_pool").select("youtube_id,title,artist,thumbnail").eq("status", "approved").limit(300);
+  // limit(300) → limit(5000) : même correctif que startBtSoloFromPool() (voir
+  // son commentaire, ajouté le 01/08/2026) — c'est très probablement LA cause
+  // du "les mêmes chansons reviennent tout le temps" remonté par Rémi en mode
+  // "🎲 Chansons aléatoires", puisque c'est ici que les VRAIES manches (pas
+  // seulement les pièges) sont piochées.
+  const { data, error } = await sb.from("blindtest_pool").select("youtube_id,title,artist,thumbnail").eq("status", "approved").limit(5000);
   if(error) throw error;
   const pool = shuffleArray((data || []).filter(t => t.youtube_id));
   if(pool.length < count + 3) return { rounds: null, available: pool.length };
@@ -6697,7 +6731,9 @@ async function computeBtRounds(){
 
   let poolCandidates = [];
   try {
-    const { data } = await sb.from("blindtest_pool").select("youtube_id,title,artist").eq("status", "approved").limit(300);
+    // limit(300) → limit(5000) : même correctif que startBtSoloFromPool()
+    // (voir son commentaire, ajouté le 01/08/2026).
+    const { data } = await sb.from("blindtest_pool").select("youtube_id,title,artist").eq("status", "approved").limit(5000);
     poolCandidates = (data || []).filter(t => !realAnswerIds.has(t.youtube_id));
   } catch(e){
     console.warn("[Harmonize] Pool communautaire indisponible, pièges tirés du catalogue de démo uniquement :", e);
@@ -7185,56 +7221,66 @@ function renderBtReveal(round){
   `;
 }
 
+// Verrou anti-double-clic — même correctif que nextGameRound() (voir son
+// commentaire, ajouté le 01/08/2026) : protège contre 2 clics rapides sur LE
+// MÊME appareil (ex: saut "manche 4 → 6"), différent du correctif du Round
+// 82/85 qui protège contre 2 appareils différents.
+let btNextRoundInFlight = false;
 async function nextBtRound(){
-  if(!currentRoom) return;
-  // Relit l'état frais AVANT de décider — même correctif que nextGameRound()
-  // (voir son commentaire, ajouté le 01/08/2026, 2e passe) : sans ça,
-  // "combien de manches au total" venait de currentRoom EN MÉMOIRE, qui
-  // pouvait être périmé même sans double-clic — d'où la partie de 10
-  // chansons qui se terminait quand même après 5.
-  const { data: freshRoom } = await sb.from("rooms").select("*").eq("id", currentRoom.id).maybeSingle();
-  if(!freshRoom || freshRoom.game_phase !== "playing") return;
-  currentRoom = freshRoom;
-  const fromRound = currentRoom.game_current_round || 0;
-  const rounds = currentRoom.game_rounds || [];
-  const next = fromRound + 1;
-  let update;
-  if(next >= rounds.length){
-    update = { game_phase: "finished", playback_state: "paused" };
-  } else {
-    const nowIso = new Date().toISOString();
-    const startSeconds = currentRoom.game_playback_start === "middle" ? 45 : 0;
-    update = {
-      game_current_round: next,
-      game_round_started_at: nowIso,
-      game_round_revealed: false,
-      playback_state: "playing",
-      playback_position: startSeconds,
-      playback_started_at: nowIso,
-    };
+  if(!currentRoom || btNextRoundInFlight) return;
+  btNextRoundInFlight = true;
+  try {
+    // Relit l'état frais AVANT de décider — même correctif que
+    // nextGameRound() (voir son commentaire, ajouté le 01/08/2026, 2e
+    // passe) : sans ça, "combien de manches au total" venait de currentRoom
+    // EN MÉMOIRE, qui pouvait être périmé même sans double-clic — d'où la
+    // partie de 10 chansons qui se terminait quand même après 5.
+    const { data: freshRoom } = await sb.from("rooms").select("*").eq("id", currentRoom.id).maybeSingle();
+    if(!freshRoom || freshRoom.game_phase !== "playing") return;
+    currentRoom = freshRoom;
+    const fromRound = currentRoom.game_current_round || 0;
+    const rounds = currentRoom.game_rounds || [];
+    const next = fromRound + 1;
+    let update;
+    if(next >= rounds.length){
+      update = { game_phase: "finished", playback_state: "paused" };
+    } else {
+      const nowIso = new Date().toISOString();
+      const startSeconds = currentRoom.game_playback_start === "middle" ? 45 : 0;
+      update = {
+        game_current_round: next,
+        game_round_started_at: nowIso,
+        game_round_revealed: false,
+        playback_state: "playing",
+        playback_position: startSeconds,
+        playback_started_at: nowIso,
+      };
+    }
+    // Écriture CONDITIONNELLE en plus de la lecture fraîche ci-dessus — même
+    // correctif que nextGameRound() : protège contre 2 APPAREILS DIFFÉRENTS
+    // qui cliqueraient "chanson suivante" presque en même temps, JUSTE APRÈS
+    // cette lecture (d'où le saut "manche 2 → 4" déjà observé par Rémi).
+    const { data, error } = await sb.from("rooms").update(update)
+      .eq("id", currentRoom.id)
+      .eq("game_phase", "playing")
+      .eq("game_current_round", fromRound)
+      .select().maybeSingle();
+    if(error){ showToast("Erreur : " + error.message); return; }
+    if(!data) return; // quelqu'un d'autre a déjà fait avancer cette manche entre-temps
+    currentRoom = data;
+    btGuessSelectionRoundIdx = -1;
+    btMyGuess = null;
+    btAdSkipClickedAtRound = null;
+    btAdSkipClickedAtTime = null;
+    if(currentRoom.game_phase === "playing") applyBtPlaybackState();
+    if(currentRoom.game_phase === "finished"){
+      logActivityEvent("game_finished", currentRoom.id, currentRoom.mode);
+      await populateBtPool(rounds);
+    }
+    renderBlindtestLobby();
+  } finally {
+    btNextRoundInFlight = false;
   }
-  // Écriture CONDITIONNELLE en plus de la lecture fraîche ci-dessus — même
-  // correctif que nextGameRound() : protège contre 2 personnes qui
-  // cliqueraient "chanson suivante" presque en même temps, JUSTE APRÈS cette
-  // lecture (d'où le saut "manche 2 → 4" déjà observé par Rémi).
-  const { data, error } = await sb.from("rooms").update(update)
-    .eq("id", currentRoom.id)
-    .eq("game_phase", "playing")
-    .eq("game_current_round", fromRound)
-    .select().maybeSingle();
-  if(error){ showToast("Erreur : " + error.message); return; }
-  if(!data) return; // quelqu'un d'autre a déjà fait avancer cette manche entre-temps
-  currentRoom = data;
-  btGuessSelectionRoundIdx = -1;
-  btMyGuess = null;
-  btAdSkipClickedAtRound = null;
-  btAdSkipClickedAtTime = null;
-  if(currentRoom.game_phase === "playing") applyBtPlaybackState();
-  if(currentRoom.game_phase === "finished"){
-    logActivityEvent("game_finished", currentRoom.id, currentRoom.mode);
-    await populateBtPool(rounds);
-  }
-  renderBlindtestLobby();
 }
 
 /* ---- Score : calculé à la volée, jamais stocké séparément. ---- */
