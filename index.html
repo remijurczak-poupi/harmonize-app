@@ -4377,7 +4377,10 @@ async function switchPoolAdminView(view){
 
 async function loadPoolAdminPending(){
   document.getElementById("poolAdminList").innerHTML = `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Chargement...</p>`;
-  const { data, error } = await sb.from("blindtest_pool").select("*").eq("status", "pending").order("added_at", { ascending: true }).limit(500);
+  // limit(500) → limit(5000) (ajouté le 01/08/2026) : même correctif que les
+  // requêtes du jeu (Round 86) — si le nombre réel de propositions en
+  // attente dépasse la limite, celles triées après coup restent invisibles.
+  const { data, error } = await sb.from("blindtest_pool").select("*").eq("status", "pending").order("added_at", { ascending: true }).limit(5000);
   if(error){
     document.getElementById("poolAdminList").innerHTML = `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Erreur de chargement : ${escapeHtml(error.message)}</p>`;
     return;
@@ -4420,7 +4423,17 @@ async function reviewPoolTrack(id, status){
 
 async function loadPoolAdminApproved(){
   document.getElementById("poolAdminList").innerHTML = `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Chargement...</p>`;
-  const { data, error } = await sb.from("blindtest_pool").select("*").eq("status", "approved").order("title", { ascending: true }).limit(2000);
+  // limit(2000) → limit(5000) (ajouté le 01/08/2026, corrige un vrai bug
+  // remonté par Rémi — "Tu kiffes le rock français" existe bien en base avec
+  // status='approved', vérifié par requête SQL directe, mais restait
+  // introuvable ici) : trié par titre, ".limit(2000)" coupait purement et
+  // simplement la liste après les 2000 premiers titres par ordre
+  // alphabétique — toute chanson dont le titre trie APRÈS ce point (ex:
+  // celles commençant par "T" et plus loin) n'était jamais chargée du tout,
+  // donc invisible à la recherche qui ne filtre QUE ce qui a été chargé. Le
+  // Round 86 avait déjà trouvé et corrigé ce même piège côté requêtes du
+  // jeu ; cet écran d'administration avait la même faille, pas encore vue.
+  const { data, error } = await sb.from("blindtest_pool").select("*").eq("status", "approved").order("title", { ascending: true }).limit(5000);
   if(error){
     document.getElementById("poolAdminList").innerHTML = `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Erreur de chargement : ${escapeHtml(error.message)}</p>`;
     return;
@@ -5831,6 +5844,24 @@ async function nextGameRound(){
     const { data: freshRoom } = await sb.from("rooms").select("*").eq("id", currentRoom.id).maybeSingle();
     if(!freshRoom || freshRoom.game_phase !== "playing") return;
     currentRoom = freshRoom;
+    // Garde-fou supplémentaire (ajouté le 01/08/2026, retour de Rémi : "j'ai
+    // appuyé sur suivant avec 3 appareils à la fois et ça a encore sauté une
+    // chanson") : le verrou anti-double-clic ci-dessus protège UN appareil,
+    // et l'écriture conditionnelle plus bas protège contre une écriture
+    // incohérente — mais avec 3 appareils différents qui cliquent tous
+    // "suivant" à quelques centaines de ms d'écart, chaque clic peut arriver
+    // APRÈS que le précédent ait déjà été validé en base : ce ne sont alors
+    // plus 3 clics en conflit, mais 3 avances CHACUNE parfaitement valide
+    // (aucun chef de salon, n'importe qui peut faire avancer la partie — ce
+    // n'est donc pas un bug d'écriture, plutôt 3 demandes légitimes qui
+    // s'additionnent). Comme il est très improbable que quelqu'un ait pu
+    // réellement écouter la manche et vouloir la passer moins de 1,5s après
+    // son lancement, un clic aussi rapproché du début de la manche est traité
+    // comme un doublon (plusieurs personnes qui réagissent au même instant)
+    // plutôt qu'une vraie 2e décision, et ignoré.
+    const ROUND_ADVANCE_DEBOUNCE_MS = 1500;
+    const roundStartedAt = currentRoom.game_round_started_at ? new Date(currentRoom.game_round_started_at).getTime() : 0;
+    if(Date.now() - roundStartedAt < ROUND_ADVANCE_DEBOUNCE_MS) return;
     const fromRound = currentRoom.game_current_round || 0;
     const rounds = currentRoom.game_rounds || [];
     const next = fromRound + 1;
@@ -6574,7 +6605,7 @@ async function computeBtRandomRounds(count){
   // du "les mêmes chansons reviennent tout le temps" remonté par Rémi en mode
   // "🎲 Chansons aléatoires", puisque c'est ici que les VRAIES manches (pas
   // seulement les pièges) sont piochées.
-  const { data, error } = await sb.from("blindtest_pool").select("youtube_id,title,artist,thumbnail").eq("status", "approved").limit(5000);
+  const { data, error } = await sb.from("blindtest_pool").select("youtube_id,title,artist,thumbnail,language").eq("status", "approved").limit(5000);
   if(error) throw error;
   const pool = shuffleArray((data || []).filter(t => t.youtube_id));
   if(pool.length < count + 3) return { rounds: null, available: pool.length };
@@ -6582,7 +6613,16 @@ async function computeBtRandomRounds(count){
   const picked = pool.slice(0, count);
   const rest = pool.slice(count);
   const rounds = picked.map(track => {
-    const poolDecoys = shuffleArray(rest.filter(c => c.title !== track.title)).slice(0, 3);
+    // Pièges dans la MÊME langue que la vraie réponse (ajouté le 01/08/2026,
+    // demande de Rémi) : sinon deviner la bonne langue suffit à deviner la
+    // bonne réponse, sans même reconnaître la chanson. Si la langue de cette
+    // chanson est inconnue (non détectée, voir backfillPoolLanguages()), ou
+    // s'il n'y a pas assez de pièges disponibles dans cette langue précise,
+    // on revient au tirage sans filtre plutôt que de risquer de n'avoir
+    // aucun piège du tout.
+    const sameLanguage = track.language ? rest.filter(c => c.language === track.language) : [];
+    const languagePool = sameLanguage.length >= 3 ? sameLanguage : rest;
+    const poolDecoys = shuffleArray(languagePool.filter(c => c.title !== track.title)).slice(0, 3);
     const stillNeeded = 3 - poolDecoys.length;
     const catalogDecoys = stillNeeded > 0
       ? shuffleArray(CATALOG.filter(c => c.title !== track.title)).slice(0, stillNeeded)
@@ -6730,17 +6770,30 @@ async function computeBtRounds(){
   const realAnswerIds = new Set(rounds.map(r => r.youtube_id).filter(Boolean));
 
   let poolCandidates = [];
+  let poolByYoutubeId = new Map();
   try {
     // limit(300) → limit(5000) : même correctif que startBtSoloFromPool()
     // (voir son commentaire, ajouté le 01/08/2026).
-    const { data } = await sb.from("blindtest_pool").select("youtube_id,title,artist").eq("status", "approved").limit(5000);
+    const { data } = await sb.from("blindtest_pool").select("youtube_id,title,artist,language").eq("status", "approved").limit(5000);
     poolCandidates = (data || []).filter(t => !realAnswerIds.has(t.youtube_id));
+    poolByYoutubeId = new Map((data || []).map(t => [t.youtube_id, t]));
   } catch(e){
     console.warn("[Harmonize] Pool communautaire indisponible, pièges tirés du catalogue de démo uniquement :", e);
   }
 
   return rounds.map(round => {
-    const poolChoices = shuffleArray(poolCandidates.filter(c => c.title !== round.title)).slice(0, 3);
+    // Pièges dans la MÊME langue que la vraie réponse quand on la connaît
+    // (ajouté le 01/08/2026, demande de Rémi — même correctif que
+    // computeBtRandomRounds()) : ici, la réponse vient d'une proposition
+    // manuelle (game_answers), qui ne connaît pas sa langue directement —
+    // on la retrouve UNIQUEMENT si cette même chanson existe déjà dans le
+    // pool communautaire (proposée lors d'une partie précédente). Sinon,
+    // pas de moyen fiable de connaître sa langue sans un appel API
+    // supplémentaire par manche : on revient au tirage sans filtre.
+    const roundLanguage = round.youtube_id ? poolByYoutubeId.get(round.youtube_id)?.language : null;
+    const sameLanguage = roundLanguage ? poolCandidates.filter(c => c.language === roundLanguage) : [];
+    const languageCandidates = sameLanguage.length >= 3 ? sameLanguage : poolCandidates;
+    const poolChoices = shuffleArray(languageCandidates.filter(c => c.title !== round.title)).slice(0, 3);
     const stillNeeded = 3 - poolChoices.length;
     const catalogChoices = stillNeeded > 0
       ? shuffleArray(CATALOG.filter(c => c.title !== round.title)).slice(0, stillNeeded)
@@ -7238,6 +7291,15 @@ async function nextBtRound(){
     const { data: freshRoom } = await sb.from("rooms").select("*").eq("id", currentRoom.id).maybeSingle();
     if(!freshRoom || freshRoom.game_phase !== "playing") return;
     currentRoom = freshRoom;
+    // Garde-fou supplémentaire — même correctif que nextGameRound() (voir
+    // son commentaire, ajouté le 01/08/2026, retour de Rémi : "j'ai appuyé
+    // sur suivant avec 3 appareils à la fois et ça a encore sauté une
+    // chanson") : ignore un clic "suivant" trop rapproché du lancement de la
+    // manche en cours (probablement 2+ personnes qui cliquent au même
+    // instant, pas 2 décisions distinctes).
+    const ROUND_ADVANCE_DEBOUNCE_MS = 1500;
+    const roundStartedAt = currentRoom.game_round_started_at ? new Date(currentRoom.game_round_started_at).getTime() : 0;
+    if(Date.now() - roundStartedAt < ROUND_ADVANCE_DEBOUNCE_MS) return;
     const fromRound = currentRoom.game_current_round || 0;
     const rounds = currentRoom.game_rounds || [];
     const next = fromRound + 1;
