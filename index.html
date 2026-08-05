@@ -1140,19 +1140,20 @@
             <span class="pill" id="btRoundCounter">Manche 1/5</span>
           </div>
 
-          <!-- Mode "un seul téléphone" (ajouté le 24/07/2026) : un seul
-               appareil gère vraiment la musique (comme "Diffuser ici" en
-               mode Soirée) — les autres ne créent pas leur propre lecteur, ce
-               qui évite une pub différente sur chaque téléphone. Purement
-               local (jamais synchronisé en base) : chacun choisit sur SON
-               appareil s'il diffuse ou non — voir toggleBtSingleDeviceBroadcast(). -->
+          <!-- Mode "un seul téléphone" (ajouté le 24/07/2026, simplifié le
+               01/08/2026, retour de Rémi : "forcément le créateur du salon
+               qui diffuse, vu qu'on est sur un seul téléphone" — un seul
+               appareil existe, pas la peine de proposer un choix) : seul
+               l'appareil du créateur du salon crée vraiment un lecteur — les
+               autres (qui restent connectés pour proposer leurs chansons)
+               ne créent pas leur propre lecteur, ce qui évite une pub
+               différente sur chaque téléphone. Plus de bouton "C'est cet
+               appareil qui diffuse" : voir isGameCreator() dans renderBtPlaying(). -->
           <div id="btSingleDeviceCard" class="card" style="display:none;text-align:center;margin-bottom:16px;">
-            <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">🔊 Écoute en cours sur l'appareil qui diffuse — pas de deuxième lecteur ici, pour éviter une pub en plus.</p>
-            <button class="btn-primary" onclick="toggleBtSingleDeviceBroadcast()">🔊 C'est cet appareil qui diffuse</button>
+            <p style="font-size:13px;color:var(--text-dim);">🔊 Écoute en cours sur l'appareil du créateur du salon — pas de deuxième lecteur ici, pour éviter une pub en plus.</p>
           </div>
 
           <div id="btPlayerCardWrap" class="card" style="margin-bottom:16px;">
-            <button class="btn-ghost" id="btStopBroadcastBtn" style="display:none;width:auto;padding:6px 12px;font-size:12px;margin-bottom:10px;" onclick="toggleBtSingleDeviceBroadcast()">🔇 Arrêter de diffuser ici</button>
             <div style="position:relative;min-height:180px;" id="btPlayerBoxWrap">
               <div id="btYtPlayer"></div>
               <div id="btAudioCover" onclick="toggleBtPlayPause()" style="display:none;position:absolute;inset:0;cursor:pointer;background:linear-gradient(160deg,var(--accent1),var(--accent2));align-items:center;justify-content:center;flex-direction:column;gap:6px;border-radius:12px;color:#fff;text-align:center;padding:12px;">
@@ -1695,33 +1696,35 @@ let singleDeviceTotalScores = {}; // { prénom: total cumulé sur la partie en c
 let singleDeviceKnownNames = []; // prénoms déjà tapés (Blindtest uniquement — le jeu des questions connaît déjà les siens, voir getSingleDeviceLocalNames())
 let btSingleDeviceNamesStepDone = false; // étape "qui va jouer ?" validée pour cette partie (Blindtest uniquement, voir renderBtSongCountPicker())
 
+// Une ligne par prénom, en colonne, avec le score total déjà acquis et 2
+// boutons -1/+1 pour les points de LA manche en cours (0 à 3 — ajusté le
+// 01/08/2026, demande de Rémi : "voir les scores au fur et à mesure" +
+// "mettre les noms en colonne avec +1/-1 à droite").
 function renderSingleDeviceScoreChips(containerId, names){
   const el = document.getElementById(containerId);
   if(!el) return;
   el.innerHTML = names.map(name => {
     const pts = singleDeviceRoundPoints[name] || 0;
-    const label = pts > 0 ? `${escapeHtml(name)} · ${pts} pt${pts > 1 ? "s" : ""}` : escapeHtml(name);
-    return `<button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:13px;border-color:${pts > 0 ? "var(--accent1)" : "var(--border)"};color:${pts > 0 ? "var(--text)" : "var(--text-dim)"};" onclick="cycleSingleDeviceScore('${escJs(containerId)}', '${escJs(name)}')">${label}</button>`;
+    const total = singleDeviceTotalScores[name] || 0;
+    return `
+      <div class="score-row">
+        <span>${escapeHtml(name)} <span style="color:var(--text-faint);font-size:11px;">(${total} pt${total > 1 ? "s" : ""} au total)</span></span>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <button class="btn-ghost" style="width:32px;height:32px;padding:0;font-size:16px;" onclick="adjustSingleDeviceScore('${escJs(containerId)}','${escJs(name)}',-1)" ${pts <= 0 ? "disabled" : ""}>−</button>
+          <strong style="min-width:16px;text-align:center;">${pts}</strong>
+          <button class="btn-ghost" style="width:32px;height:32px;padding:0;font-size:16px;" onclick="adjustSingleDeviceScore('${escJs(containerId)}','${escJs(name)}',1)" ${pts >= 3 ? "disabled" : ""}>+</button>
+        </div>
+      </div>
+    `;
   }).join("");
 }
 
-// Un tap = +1 point, jusqu'à 3, puis retour à 0 (ajouté le 01/08/2026).
-function cycleSingleDeviceScore(containerId, name){
-  singleDeviceRoundPoints[name] = ((singleDeviceRoundPoints[name] || 0) + 1) % 4;
+// +1/-1, borné entre 0 et 3 pour la manche en cours (ajouté le 01/08/2026).
+function adjustSingleDeviceScore(containerId, name, delta){
+  const current = singleDeviceRoundPoints[name] || 0;
+  singleDeviceRoundPoints[name] = Math.max(0, Math.min(3, current + delta));
   const names = containerId === "btSingleDeviceScoreChips" ? singleDeviceKnownNames : getSingleDeviceLocalNames();
   renderSingleDeviceScoreChips(containerId, names);
-}
-
-// Blindtest uniquement : aucun prénom connu à l'avance, on les tape à la
-// volée (ajouté le 01/08/2026) — mémorisés pour les manches suivantes de
-// cette même partie.
-function addSingleDeviceName(){
-  const input = document.getElementById("btSingleDeviceNameInput");
-  const name = (input.value || "").trim();
-  if(!name) return;
-  if(!singleDeviceKnownNames.includes(name)) singleDeviceKnownNames.push(name);
-  input.value = "";
-  renderSingleDeviceScoreChips("btSingleDeviceScoreChips", singleDeviceKnownNames);
 }
 
 // Ajoute les points de LA manche qui vient d'être révélée au total cumulé,
@@ -1733,6 +1736,35 @@ function commitSingleDeviceRoundPoints(){
     if(pts > 0) singleDeviceTotalScores[name] = (singleDeviceTotalScores[name] || 0) + pts;
   });
   singleDeviceRoundPoints = {};
+  saveSingleDeviceScoringState();
+}
+
+// Persistance légère (ajoutée le 01/08/2026, corrige un vrai bug remonté par
+// Rémi : actualiser la page pendant une partie "un seul téléphone" effaçait
+// les prénoms/scores déjà saisis). sessionStorage plutôt qu'une vraie
+// colonne en base : cette donnée n'a de sens que sur CET appareil précis
+// (un seul téléphone joue de toute façon, rien à synchroniser avec
+// personne d'autre) — clé par salon pour ne jamais mélanger 2 parties.
+function saveSingleDeviceScoringState(){
+  if(!currentRoom) return;
+  try {
+    sessionStorage.setItem("harmonizeSingleDeviceScoring_" + currentRoom.id, JSON.stringify({
+      knownNames: singleDeviceKnownNames,
+      totalScores: singleDeviceTotalScores,
+      namesStepDone: btSingleDeviceNamesStepDone,
+    }));
+  } catch(e){}
+}
+
+function loadSingleDeviceScoringState(roomId){
+  try {
+    const raw = sessionStorage.getItem("harmonizeSingleDeviceScoring_" + roomId);
+    if(!raw) return;
+    const data = JSON.parse(raw);
+    singleDeviceKnownNames = data.knownNames || [];
+    singleDeviceTotalScores = data.totalScores || {};
+    btSingleDeviceNamesStepDone = !!data.namesStepDone;
+  } catch(e){}
 }
 
 // Affiche un vrai classement à l'écran de fin SI des points ont été
@@ -1816,12 +1848,6 @@ let btRoundIntroIdx = -1;
 let btVoteTimerInterval = null;
 let btVoteTimerRoundIdx = -1;
 let btPlayer = null; // lecteur YouTube de CET appareil, distinct de gamePlayer (écran différent)
-// Mode "un seul téléphone" (ajouté le 24/07/2026) : contrairement à la
-// soumission (inchangée), un seul appareil crée vraiment un lecteur YouTube à
-// l'écoute — sinon chaque téléphone déclencherait sa propre pub. Purement
-// local à CET appareil (jamais synchronisé en base, même principe que
-// isBroadcasting en mode Soirée) — voir toggleBtSingleDeviceBroadcast().
-let btSingleDeviceBroadcasting = false;
 let btAnswerSearchResults = [];
 let btAnswerSearchDebounce = null;
 
@@ -2605,11 +2631,32 @@ function showScreen(id){
   if(tabMap[id]) document.getElementById(tabMap[id]).classList.add("active");
 }
 
+// Coupe/remet le son de CET appareil en passant par l'onglet "Accueil"
+// (ajouté le 01/08/2026, retour de Rémi) : sans couper la connexion au
+// salon (voir goHome()), la lecture continue en arrière-plan (position,
+// synchronisation avec les autres...) — seul le SON de CET appareil se tait
+// le temps qu'on regarde autre chose, remis en route en revenant via "Jeu".
+// Ne DÉTRUIT jamais le lecteur (contrairement à stopAnyPlayback()) : le
+// couper aurait forcé sa recréation au tout prochain sondage de secours
+// (0,5s), donc un son qui repart tout seul presque aussitôt.
+function muteAnyLocalPlayback(){
+  [ytPlayer, distancePlayer, gamePlayer, btPlayer, btSoloPlayer, seriePlayer].forEach(p => {
+    if(p) try { p.mute(); } catch(e){}
+  });
+}
+
+function unmuteAnyLocalPlayback(){
+  [ytPlayer, distancePlayer, gamePlayer, btPlayer, btSoloPlayer, seriePlayer].forEach(p => {
+    if(p) try { p.unMute(); } catch(e){}
+  });
+}
+
 // Retour à l'écran du salon courant depuis l'onglet du bas — différent selon
 // qu'on est dans un vrai salon "jeu des questions" (son propre écran, ajouté
 // le 12/07/2026), un vrai salon "blindtest" (le sien, ajouté le 19/07/2026),
 // un autre jeu encore en démo (screen-game), ou un mode d'écoute (screen-room).
 function goToCurrentScreen(){
+  unmuteAnyLocalPlayback();
   if(currentRoom && (currentRoom.mode === "questions" || currentRoom.mode === "owner")){ showScreen("screen-game-lobby"); return; }
   if(currentRoom && currentRoom.mode === "blindtest"){ showScreen("screen-blindtest-lobby"); return; }
   // Blindtest solo (state.mode, pas de vrai salon) reste le seul cas légitime
@@ -2766,7 +2813,12 @@ const SINGLE_DEVICE_HINT = {
 // plus jamais vidé ici. Rejoindre/créer un AUTRE salon continue de tout
 // nettoyer correctement au passage (voir enterRealRoom()) — donc rien n'est
 // perdu si on veut vraiment changer de salon.
+// Le SON de cet appareil se coupe quand même (ajouté le 01/08/2026, 3e
+// passe — retour de Rémi : "un seul téléphone" diffuse pour tout le groupe,
+// mais jeter un œil à l'accueil ne doit pas laisser la musique tourner en
+// fond sans qu'on s'en rende compte) — voir muteAnyLocalPlayback().
 function goHome(){
+  muteAnyLocalPlayback();
   showScreen("screen-lobby");
 }
 
@@ -2974,6 +3026,9 @@ async function routeToRoomScreen(room, toastMsg){
     singleDeviceActivePlayer = null;
     singleDeviceRoundPoints = {};
     singleDeviceTotalScores = {};
+    // Restaure les scores si une actualisation a eu lieu en cours de partie
+    // (ajouté le 01/08/2026) — voir loadSingleDeviceScoringState().
+    if(room.single_device) loadSingleDeviceScoringState(room.id);
     renderRoomAvatars("gqRoomAvatars");
     showScreen("screen-game-lobby");
     await loadGameAnswers(room.id);
@@ -2997,9 +3052,11 @@ async function routeToRoomScreen(room, toastMsg){
     singleDeviceTotalScores = {};
     singleDeviceKnownNames = [];
     btSingleDeviceNamesStepDone = false;
+    // Restaure les prénoms/scores si une actualisation a eu lieu en cours de
+    // partie (ajouté le 01/08/2026) — voir loadSingleDeviceScoringState().
+    if(room.single_device) loadSingleDeviceScoringState(room.id);
     btAutoRevealRoundIdx = -1;
     btRoundIntroIdx = -1;
-    btSingleDeviceBroadcasting = false;
     renderRoomAvatars("btRoomAvatars");
     showScreen("screen-blindtest-lobby");
     await loadGameAnswers(room.id);
@@ -6134,17 +6191,19 @@ function renderGameReveal(round){
     const noneLabel = isOwnerGameForLabel ? "Personne n'a proposé ça" : "Personne n'a choisi ça";
     // Points manuels (ajouté le 01/08/2026, demande de Rémi) : pas de vrai
     // vote électronique dans ce mode (on devine à voix haute), donc pas de
-    // moyen de savoir qui a bien deviné — ces boutons laissent la personne
-    // qui tient le téléphone attribuer des points après coup, jusqu'à 3 par
-    // manche et par personne (Rémi : certains groupes comptent artiste +
-    // titre + bonus feat/film séparément). Purement local à CET appareil,
-    // jamais écrit en base — voir singleDeviceRoundPoints/cycleSingleDeviceScore().
+    // moyen de savoir qui a bien deviné — ces boutons +1/-1 laissent la
+    // personne qui tient le téléphone attribuer des points après coup, de 0
+    // à 3 par manche et par personne (Rémi : certains groupes comptent
+    // artiste + titre + bonus feat/film séparément). Le score total déjà
+    // acquis reste visible à côté de chaque prénom (demande de Rémi : "voir
+    // les scores au fur et à mesure"). Purement local à CET appareil,
+    // jamais écrit en base — voir singleDeviceRoundPoints/adjustSingleDeviceScore().
     document.getElementById("gqRevealBox").innerHTML = `
       <div class="card" style="text-align:center;">
         <div style="font-size:13px;color:var(--text-dim);margin-bottom:6px;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
         <div style="font-size:15px;font-weight:700;">${names ? chosenLabel + escapeHtml(names) : noneLabel}</div>
-        <p style="font-size:11px;color:var(--text-faint);margin:10px 0 8px;">Tape sur un prénom pour lui donner des points (jusqu'à 3 : artiste, titre, bonus feat/film...).</p>
-        <div id="gqSingleDeviceScoreChips" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;"></div>
+        <p style="font-size:11px;color:var(--text-faint);margin:10px 0 8px;">Donne des points à qui a bien deviné (jusqu'à 3 : artiste, titre, bonus feat/film...).</p>
+        <div id="gqSingleDeviceScoreChips" class="stack" style="text-align:left;"></div>
       </div>
     `;
     renderSingleDeviceScoreChips("gqSingleDeviceScoreChips", getSingleDeviceLocalNames());
@@ -6864,7 +6923,12 @@ function renderBtSongCountPicker(){
 }
 
 function confirmSingleDeviceNamesStep(){
+  // Au moins 1 prénom obligatoire (ajouté le 01/08/2026) : plus de champ de
+  // secours à la volée pendant la partie (retiré à la demande de Rémi),
+  // donc sans prénom renseigné ici, aucun point ne serait attribuable du tout.
+  if(!singleDeviceKnownNames.length){ showToast("Ajoute au moins un prénom avant de continuer."); return; }
   btSingleDeviceNamesStepDone = true;
+  saveSingleDeviceScoringState();
   renderBtSongCountPicker();
 }
 
@@ -6885,11 +6949,13 @@ function addSingleDeviceSetupName(){
   if(!singleDeviceKnownNames.includes(name)) singleDeviceKnownNames.push(name);
   input.value = "";
   renderSingleDeviceNamesSetupChips();
+  saveSingleDeviceScoringState();
 }
 
 function removeSingleDeviceSetupName(name){
   singleDeviceKnownNames = singleDeviceKnownNames.filter(n => n !== name);
   renderSingleDeviceNamesSetupChips();
+  saveSingleDeviceScoringState();
 }
 
 function chooseBtSource(mode){
@@ -7252,13 +7318,6 @@ function currentBtRound(){
   return rounds[currentRoom?.game_current_round] || null;
 }
 
-// Mode "un seul téléphone" (ajouté le 24/07/2026) — voir btSingleDeviceBroadcasting.
-function toggleBtSingleDeviceBroadcast(){
-  btSingleDeviceBroadcasting = !btSingleDeviceBroadcasting;
-  if(!btSingleDeviceBroadcasting) stopBtPlayer();
-  renderBlindtestLobby();
-}
-
 function renderBtPlaying(){
   const rounds = currentRoom.game_rounds || [];
   const idx = currentRoom.game_current_round || 0;
@@ -7276,12 +7335,13 @@ function renderBtPlaying(){
   // clic par-dessus, même si ce rendu est déclenché par une mise à jour
   // reçue entre-temps (vote d'un autre participant, etc.).
   const singleDevice = !!currentRoom.single_device;
-  // Mode "un seul téléphone" : un seul appareil crée vraiment un lecteur —
-  // les autres voient juste un message (voir toggleBtSingleDeviceBroadcast()).
-  const isPlayerDevice = !singleDevice || btSingleDeviceBroadcasting;
-  document.getElementById("btSingleDeviceCard").style.display = (singleDevice && !btSingleDeviceBroadcasting) ? "block" : "none";
+  // Mode "un seul téléphone" (simplifié le 01/08/2026, retour de Rémi :
+  // forcément le créateur du salon qui diffuse, un seul appareil existe) :
+  // seul l'appareil du créateur crée vraiment un lecteur — les autres
+  // voient juste un message.
+  const isPlayerDevice = !singleDevice || isGameCreator();
+  document.getElementById("btSingleDeviceCard").style.display = (singleDevice && !isGameCreator()) ? "block" : "none";
   document.getElementById("btPlayerCardWrap").style.display = isPlayerDevice ? "block" : "none";
-  document.getElementById("btStopBroadcastBtn").style.display = (singleDevice && btSingleDeviceBroadcasting) ? "inline-block" : "none";
 
   const audioOnly = currentRoom.game_display_mode === "audio";
   const cover = document.getElementById("btAudioCover");
@@ -7485,7 +7545,6 @@ async function skipBtForward(){
 function stopBtPlayer(){
   if(btPlayer){ try { btPlayer.destroy(); } catch(e) {} btPlayer = null; }
   stopBtVoteTimer();
-  btSingleDeviceBroadcasting = false;
 }
 
 // Ajouté le 19/07/2026 : remonté par Rémi en testant sur téléphone — une pub
@@ -7672,23 +7731,18 @@ function renderBtReveal(round){
     : "🎲 Chanson piochée dans le pool communautaire";
   // Mode "un seul téléphone" : pas de vote électronique, on devine à voix
   // haute. Points manuels ajoutés le 01/08/2026 (demande de Rémi, même
-  // principe que renderGameReveal()) — mais ici, contrairement au jeu des
-  // questions, aucun prénom n'est connu à l'avance (le Blindtest en mode
-  // "un seul téléphone" ne concerne que la diffusion du son, chacun propose
-  // toujours depuis son propre compte) : un champ permet d'ajouter un
-  // prénom à la volée, mémorisé ensuite pour les manches suivantes (voir
-  // singleDeviceKnownNames).
+  // principe que renderGameReveal()) — les prénoms sont renseignés une fois
+  // pour toutes AVANT le lancement de la partie (voir l'étape "Qui va
+  // jouer ?", renderBtSongCountPicker()/confirmSingleDeviceNamesStep()) :
+  // plus de champ d'ajout à la volée ici, retiré le 01/08/2026 (retour de
+  // Rémi : peu pratique/ne marchait pas bien en jouant).
   if(currentRoom.single_device){
     document.getElementById("btRevealBox").innerHTML = `
       <div class="card" style="text-align:center;">
         <div style="font-size:15px;font-weight:700;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
         <div style="font-size:12.5px;color:var(--text-dim);margin-top:6px;">${ownerLine}</div>
-        <p style="font-size:11px;color:var(--text-faint);margin:10px 0 8px;">Tape sur un prénom pour lui donner des points (jusqu'à 3 : artiste, titre, bonus feat/film...).</p>
-        <div id="btSingleDeviceScoreChips" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:10px;"></div>
-        <div style="display:flex;gap:8px;">
-          <input type="text" id="btSingleDeviceNameInput" placeholder="Ajouter un prénom" style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault();addSingleDeviceName();}" />
-          <button class="btn-ghost" style="width:auto;padding:8px 14px;" onclick="addSingleDeviceName()">➕</button>
-        </div>
+        <p style="font-size:11px;color:var(--text-faint);margin:10px 0 8px;">Donne des points à qui a bien deviné (jusqu'à 3 : artiste, titre, bonus feat/film...).</p>
+        <div id="btSingleDeviceScoreChips" class="stack" style="text-align:left;"></div>
       </div>
     `;
     renderSingleDeviceScoreChips("btSingleDeviceScoreChips", singleDeviceKnownNames);
@@ -7819,7 +7873,6 @@ function renderBtScoreboard(){
 
 function renderBtFinished(){
   stopBtPlayer();
-  btSingleDeviceBroadcasting = false;
   // "Rejouer"/"Changer de jeu" réservés au créateur (ajouté le 01/08/2026) —
   // voir le commentaire HTML sur btReplayControls.
   const creator = isGameCreator();
@@ -8010,7 +8063,6 @@ async function rejouerBtMemeSalon(){
   btSingleDeviceNamesStepDone = false;
   btAutoRevealRoundIdx = -1;
   btRoundIntroIdx = -1;
-  btSingleDeviceBroadcasting = false;
   showToast("🔄 Nouvelle partie ! Proposez de nouvelles chansons.");
   renderBlindtestLobby();
 }
