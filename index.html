@@ -883,7 +883,7 @@
           </div>
           <div class="card" style="margin-bottom:16px;">
             <div style="font-size:11px;font-weight:700;color:var(--accent1);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;" id="gqRoundQuestion"></div>
-            <div style="position:relative;min-height:180px;">
+            <div style="position:relative;min-height:180px;" id="gqPlayerBoxWrap">
               <div id="gameYtPlayer"></div>
               <!-- Mode "audio seulement" (ajouté le 13/07/2026, à la demande de
                    Rémi, anti-spoiler) : la vidéo continue de jouer (donc le son
@@ -1128,7 +1128,7 @@
 
           <div id="btPlayerCardWrap" class="card" style="margin-bottom:16px;">
             <button class="btn-ghost" id="btStopBroadcastBtn" style="display:none;width:auto;padding:6px 12px;font-size:12px;margin-bottom:10px;" onclick="toggleBtSingleDeviceBroadcast()">🔇 Arrêter de diffuser ici</button>
-            <div style="position:relative;min-height:180px;">
+            <div style="position:relative;min-height:180px;" id="btPlayerBoxWrap">
               <div id="btYtPlayer"></div>
               <div id="btAudioCover" onclick="toggleBtPlayPause()" style="display:none;position:absolute;inset:0;cursor:pointer;background:linear-gradient(160deg,var(--accent1),var(--accent2));align-items:center;justify-content:center;flex-direction:column;gap:6px;border-radius:12px;color:#fff;text-align:center;padding:12px;">
                 <div style="font-size:28px;">🎧</div>
@@ -2859,7 +2859,13 @@ function startQueuePolling(roomId){
       const { data } = await sb.from("rooms").select("*").eq("id", roomId).maybeSingle();
       if(data){ currentRoom = data; applyDistancePlaybackState(); }
     }
-  }, 4000);
+  // Passé de 4s à 2s (ajouté le 01/08/2026, retour de Rémi : sur un appareil
+  // où le temps réel met du temps à arriver, ce sondage de secours était le
+  // vrai mécanisme de rattrapage — jusqu'à 4s de retard pour voir une
+  // nouvelle manche, pendant lesquels l'autre participant pouvait déjà avoir
+  // répondu. Réduire l'intervalle réduit ce pire cas, au prix d'un peu plus
+  // de requêtes Supabase — negligeable à l'échelle actuelle du projet).
+  }, 2000);
 }
 
 function stopQueuePolling(){
@@ -5290,6 +5296,16 @@ function renderGamePlaying(){
   const audioOnly = currentRoom.game_display_mode === "audio";
   const cover = document.getElementById("gqAudioCover");
   if(cover) cover.style.display = (audioOnly && !revealed && !gameAdSkipActive) ? "flex" : "none";
+  // Ajouté le 01/08/2026, retour de Rémi : une fois révélé en mode audio
+  // seulement, le cache ci-dessus disparaît mais le lecteur reste minuscule
+  // (1x1, voir ensureGamePlayer()) — il ne redevient PAS visible comme prévu
+  // à l'origine (13/07/2026, voir le commentaire au-dessus). Plutôt qu'un
+  // bloc de 180px vide et inutile, on replie carrément l'espace réservé.
+  // Reste ouvert pendant la fenêtre "Pub bloquée ?" (gameAdSkipActive), même
+  // après révélation : c'est le seul moment où quelque chose (le vrai
+  // lecteur, pour son bouton "Ignorer" natif) doit rester accessible ici.
+  const playerBoxWrap = document.getElementById("gqPlayerBoxWrap");
+  if(playerBoxWrap) playerBoxWrap.style.display = (audioOnly && revealed && !gameAdSkipActive) ? "none" : "block";
   // Couche de clic invisible : plus nécessaire en mode "vidéo visible" —
   // retirée le 22/07/2026 (retour de Rémi : voir le vrai bouton "Ignorer" de
   // YouTube sans pouvoir cliquer dessus ne s'expliquait à personne). Reste
@@ -6749,6 +6765,12 @@ function renderBtPlaying(){
   const audioOnly = currentRoom.game_display_mode === "audio";
   const cover = document.getElementById("btAudioCover");
   if(cover) cover.style.display = (audioOnly && !revealed && !btAdSkipActive) ? "flex" : "none";
+  // Même correctif que renderGamePlaying() (voir son commentaire, ajouté le
+  // 01/08/2026) : le Blindtest est TOUJOURS en mode audio seulement (voir
+  // confirmBtSettings()), donc ce bloc vide apparaissait à CHAQUE révélation,
+  // pas seulement de temps en temps.
+  const playerBoxWrap = document.getElementById("btPlayerBoxWrap");
+  if(playerBoxWrap) playerBoxWrap.style.display = (audioOnly && revealed && !btAdSkipActive) ? "none" : "block";
   // Couche de clic invisible : plus nécessaire en mode "vidéo visible" (même
   // correctif que renderGamePlaying(), voir son commentaire pour le détail du
   // compromis accepté avec Rémi) — seul le mode audio en a besoin.
