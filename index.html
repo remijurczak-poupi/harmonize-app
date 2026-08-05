@@ -992,7 +992,17 @@
             <div id="gqFinalScoreboard" class="stack"></div>
           </div>
           <div id="gqFinishedSingleDevice" style="display:none;text-align:center;margin:20px 0;">
-            <p style="font-size:13.5px;color:var(--text-dim);">Merci d'avoir joué ! Pas de classement pour cette partie sur un seul téléphone.</p>
+            <!-- Points manuels (ajouté le 01/08/2026, demande de Rémi) : pas
+                 de vrai vote dans ce mode, donc pas de classement calculable
+                 automatiquement — mais si des points ont été attribués à la
+                 volée pendant la partie (voir gqSingleDeviceScoreChips dans
+                 renderGameReveal()), on les affiche ici plutôt que le
+                 message générique. -->
+            <p id="gqSingleDeviceNoScoreMsg" style="font-size:13.5px;color:var(--text-dim);">Merci d'avoir joué ! Pas de classement pour cette partie sur un seul téléphone.</p>
+            <div id="gqSingleDeviceScoreboardWrap" style="display:none;">
+              <h2 style="margin-top:0;">Classement final</h2>
+              <div id="gqSingleDeviceScoreboard" class="stack"></div>
+            </div>
           </div>
           <!-- Réservé au créateur du salon (ajouté le 01/08/2026, retour de
                testeurs) : que ce soit "Rejouer" ou "Changer de jeu", l'écran
@@ -1209,7 +1219,13 @@
             <div id="btFinalScoreboard" class="stack"></div>
           </div>
           <div id="btFinishedSingleDevice" style="display:none;text-align:center;margin:20px 0;">
-            <p style="font-size:13.5px;color:var(--text-dim);">Merci d'avoir joué ! Pas de classement pour cette partie sur un seul téléphone.</p>
+            <!-- Points manuels (ajouté le 01/08/2026) : voir le commentaire
+                 jumeau sur gqSingleDeviceNoScoreMsg. -->
+            <p id="btSingleDeviceNoScoreMsg" style="font-size:13.5px;color:var(--text-dim);">Merci d'avoir joué ! Pas de classement pour cette partie sur un seul téléphone.</p>
+            <div id="btSingleDeviceScoreboardWrap" style="display:none;">
+              <h2 style="margin-top:0;">Classement final</h2>
+              <div id="btSingleDeviceScoreboard" class="stack"></div>
+            </div>
           </div>
           <!-- Réservé au créateur du salon (ajouté le 01/08/2026, retour de
                testeurs) : même raison que côté "Le jeu des questions" — voir
@@ -1336,6 +1352,25 @@
       <input type="text" id="editPseudoInput" placeholder="Ton pseudo" maxlength="30" />
       <button class="btn-primary" style="margin-top:12px;" onclick="saveEditedPseudo()">Enregistrer</button>
       <button class="btn-ghost" style="margin-top:10px;" onclick="closeEditPseudoModal()">Annuler</button>
+    </div>
+  </div>
+
+  <!-- Recadrage de la photo de profil (ajouté le 01/08/2026, demande de
+       Rémi) : avant d'envoyer une photo, on choisit la partie visible (le
+       rond final) en la déplaçant/zoomant. Pas de bibliothèque externe —
+       juste un <canvas> pour extraire la zone visible au moment de valider
+       (voir confirmAvatarCrop()). -->
+  <div class="modal-backdrop" id="avatarCropModal">
+    <div class="modal" style="align-items:center;">
+      <div class="modal-handle"></div>
+      <h2>Recadrer la photo</h2>
+      <div id="cropViewport" style="width:240px;height:240px;border-radius:50%;overflow:hidden;position:relative;margin:0 auto 16px;background:#000;touch-action:none;">
+        <img id="cropImage" draggable="false" style="position:absolute;user-select:none;-webkit-user-drag:none;" />
+      </div>
+      <input type="range" id="cropZoomSlider" min="100" max="300" value="100" oninput="onCropZoomInput(this.value)" style="width:100%;accent-color:var(--accent1);margin-bottom:6px;" />
+      <p style="font-size:11.5px;color:var(--text-faint);text-align:center;margin:0 0 16px;">Glisse la photo pour la repositionner, utilise le curseur pour zoomer.</p>
+      <button class="btn-primary" onclick="confirmAvatarCrop()">Valider</button>
+      <button class="btn-ghost" style="margin-top:10px;" onclick="closeAvatarCropModal()">Annuler</button>
     </div>
   </div>
 
@@ -1631,6 +1666,72 @@ let gameSelectedQuestionIds = []; // sélection en cours de construction par le 
 // CET appareil (jamais en base) : singleDeviceActivePlayer est le prénom en
 // cours de réponse (ou null si on est sur l'écran "qui commence son tour").
 let singleDeviceActivePlayer = null;
+
+// Points manuels en mode "un seul téléphone" (ajouté le 01/08/2026, demande
+// de Rémi) : pas de vote électronique dans ce mode (on devine à voix
+// haute), donc pas de moyen de savoir automatiquement qui a bien deviné —
+// la personne qui tient le téléphone attribue les points elle-même après
+// chaque révélation, jusqu'à 3 par manche et par personne (artiste + titre
+// + bonus feat/film, comptés séparément par certains groupes). Purement
+// local à CET appareil, jamais écrit en base (un seul téléphone joue de
+// toute façon, rien à synchroniser).
+let singleDeviceRoundPoints = {}; // { prénom: points attribués CETTE manche, pas encore ajoutés au total }
+let singleDeviceTotalScores = {}; // { prénom: total cumulé sur la partie en cours }
+let singleDeviceKnownNames = []; // prénoms déjà tapés (Blindtest uniquement — le jeu des questions connaît déjà les siens, voir getSingleDeviceLocalNames())
+
+function renderSingleDeviceScoreChips(containerId, names){
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  el.innerHTML = names.map(name => {
+    const pts = singleDeviceRoundPoints[name] || 0;
+    const label = pts > 0 ? `${escapeHtml(name)} · ${pts} pt${pts > 1 ? "s" : ""}` : escapeHtml(name);
+    return `<button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:13px;border-color:${pts > 0 ? "var(--accent1)" : "var(--border)"};color:${pts > 0 ? "var(--text)" : "var(--text-dim)"};" onclick="cycleSingleDeviceScore('${escJs(containerId)}', '${escJs(name)}')">${label}</button>`;
+  }).join("");
+}
+
+// Un tap = +1 point, jusqu'à 3, puis retour à 0 (ajouté le 01/08/2026).
+function cycleSingleDeviceScore(containerId, name){
+  singleDeviceRoundPoints[name] = ((singleDeviceRoundPoints[name] || 0) + 1) % 4;
+  const names = containerId === "btSingleDeviceScoreChips" ? singleDeviceKnownNames : getSingleDeviceLocalNames();
+  renderSingleDeviceScoreChips(containerId, names);
+}
+
+// Blindtest uniquement : aucun prénom connu à l'avance, on les tape à la
+// volée (ajouté le 01/08/2026) — mémorisés pour les manches suivantes de
+// cette même partie.
+function addSingleDeviceName(){
+  const input = document.getElementById("btSingleDeviceNameInput");
+  const name = (input.value || "").trim();
+  if(!name) return;
+  if(!singleDeviceKnownNames.includes(name)) singleDeviceKnownNames.push(name);
+  input.value = "";
+  renderSingleDeviceScoreChips("btSingleDeviceScoreChips", singleDeviceKnownNames);
+}
+
+// Ajoute les points de LA manche qui vient d'être révélée au total cumulé,
+// avant de passer à la suivante (ajouté le 01/08/2026) — appelée par
+// nextGameRound()/nextBtRound() uniquement en mode single_device.
+function commitSingleDeviceRoundPoints(){
+  Object.keys(singleDeviceRoundPoints).forEach(name => {
+    const pts = singleDeviceRoundPoints[name];
+    if(pts > 0) singleDeviceTotalScores[name] = (singleDeviceTotalScores[name] || 0) + pts;
+  });
+  singleDeviceRoundPoints = {};
+}
+
+// Affiche un vrai classement à l'écran de fin SI des points ont été
+// attribués pendant la partie (ajouté le 01/08/2026) — sinon garde le
+// message générique existant (un groupe qui ne s'en sert pas ne doit pas
+// voir un classement vide et bizarre).
+function renderSingleDeviceFinalScoreboard(noMsgId, wrapId, listId){
+  const entries = Object.entries(singleDeviceTotalScores).filter(([, pts]) => pts > 0).sort((a, b) => b[1] - a[1]);
+  document.getElementById(noMsgId).style.display = entries.length ? "none" : "block";
+  document.getElementById(wrapId).style.display = entries.length ? "block" : "none";
+  if(!entries.length) return;
+  document.getElementById(listId).innerHTML = entries.map(([name, pts], i) => `
+    <div class="score-row"><span>${i + 1}. ${escapeHtml(name)}</span><strong>${pts} pt${pts > 1 ? "s" : ""}</strong></div>
+  `).join("");
+}
 
 // Étapes du lobby (ajouté le 12/07/2026) : le créateur choisit d'abord un
 // nombre de manches, puis un mode de sélection des questions (à la main, ou
@@ -2276,28 +2377,158 @@ function updateMyAvatarPreview(){
   if(el) el.innerHTML = avatarHtml(state.avatarUrl, state.user, 72, 24);
 }
 
+// Ouvre la fenêtre de recadrage au lieu d'envoyer directement le fichier
+// choisi (ajouté le 01/08/2026, demande de Rémi). FileReader plutôt qu'une
+// URL temporaire (URL.createObjectURL) : évite d'avoir à penser à la
+// libérer ensuite, et la fenêtre de recadrage n'a besoin de l'image qu'un
+// court instant.
 function onAvatarFileSelected(input){
   const file = input.files && input.files[0];
   input.value = ""; // permet de reselectionner le même fichier ensuite si besoin
-  if(file) uploadAvatar(file);
+  if(!file) return;
+  if(!file.type.startsWith("image/")){ showToast("Choisis une image."); return; }
+  const reader = new FileReader();
+  reader.onload = () => openAvatarCropModal(reader.result);
+  reader.readAsDataURL(file);
+}
+
+/* ---- Recadrage (déplacer/zoomer avant d'envoyer) ---- */
+const CROP_VIEWPORT_SIZE = 240; // doit correspondre à la taille CSS de #cropViewport
+const CROP_OUTPUT_SIZE = 400;   // résolution de la photo réellement envoyée
+let cropImageEl = null;
+let cropNaturalW = 0, cropNaturalH = 0;
+let cropBaseScale = 1;  // échelle minimale pour que la photo recouvre tout le cadre rond
+let cropZoom = 1;       // multiplicateur au-dessus de cropBaseScale (1 = tout juste ajustée)
+let cropOffsetX = 0, cropOffsetY = 0; // décalage en pixels affichés depuis le centre
+let cropDragBound = false;
+
+function openAvatarCropModal(dataUrl){
+  cropImageEl = document.getElementById("cropImage");
+  cropOffsetX = 0;
+  cropOffsetY = 0;
+  cropZoom = 1;
+  document.getElementById("cropZoomSlider").value = 100;
+  cropImageEl.onload = () => {
+    cropNaturalW = cropImageEl.naturalWidth;
+    cropNaturalH = cropImageEl.naturalHeight;
+    cropBaseScale = Math.max(CROP_VIEWPORT_SIZE / cropNaturalW, CROP_VIEWPORT_SIZE / cropNaturalH);
+    updateCropTransform();
+  };
+  cropImageEl.src = dataUrl;
+  setupCropDragHandlers();
+  document.getElementById("avatarCropModal").classList.add("open");
+}
+
+function closeAvatarCropModal(){
+  document.getElementById("avatarCropModal").classList.remove("open");
+}
+
+// Repositionne/redimensionne l'image via left/top/width/height plutôt qu'un
+// transform CSS combiné (translate + scale) : plus simple à raisonner, et
+// cropOffsetX/Y restent directement en pixels AFFICHÉS (donc directement
+// utilisables tels quels par le glisser — voir setupCropDragHandlers()).
+function updateCropTransform(){
+  const scale = cropBaseScale * cropZoom;
+  const w = cropNaturalW * scale;
+  const h = cropNaturalH * scale;
+  cropImageEl.style.width = w + "px";
+  cropImageEl.style.height = h + "px";
+  cropImageEl.style.left = ((CROP_VIEWPORT_SIZE - w) / 2 + cropOffsetX) + "px";
+  cropImageEl.style.top = ((CROP_VIEWPORT_SIZE - h) / 2 + cropOffsetY) + "px";
+}
+
+// Empêche de déplacer/dézoomer la photo au point de laisser un bord vide
+// (transparent) dans le cadre rond — la photo doit toujours le recouvrir
+// entièrement.
+function clampCropOffset(){
+  const scale = cropBaseScale * cropZoom;
+  const maxOffsetX = Math.max(0, (cropNaturalW * scale - CROP_VIEWPORT_SIZE) / 2);
+  const maxOffsetY = Math.max(0, (cropNaturalH * scale - CROP_VIEWPORT_SIZE) / 2);
+  cropOffsetX = Math.max(-maxOffsetX, Math.min(maxOffsetX, cropOffsetX));
+  cropOffsetY = Math.max(-maxOffsetY, Math.min(maxOffsetY, cropOffsetY));
+}
+
+function onCropZoomInput(value){
+  cropZoom = Number(value) / 100;
+  clampCropOffset();
+  updateCropTransform();
+}
+
+// Pointer Events (ajouté le 01/08/2026, même choix que setupCodeLongPress()) :
+// un seul jeu d'écouteurs couvre souris ET tactile pour glisser la photo.
+// Les écouteurs ne sont attachés qu'une seule fois (cropDragBound), la
+// fenêtre pouvant se rouvrir plusieurs fois dans la même session.
+function setupCropDragHandlers(){
+  if(cropDragBound) return;
+  cropDragBound = true;
+  const viewport = document.getElementById("cropViewport");
+  let dragging = false;
+  let startX = 0, startY = 0, startOffsetX = 0, startOffsetY = 0;
+  viewport.addEventListener("pointerdown", (e) => {
+    dragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    startOffsetX = cropOffsetX;
+    startOffsetY = cropOffsetY;
+    viewport.setPointerCapture(e.pointerId);
+  });
+  viewport.addEventListener("pointermove", (e) => {
+    if(!dragging) return;
+    cropOffsetX = startOffsetX + (e.clientX - startX);
+    cropOffsetY = startOffsetY + (e.clientY - startY);
+    clampCropOffset();
+    updateCropTransform();
+  });
+  const stopDrag = () => { dragging = false; };
+  viewport.addEventListener("pointerup", stopDrag);
+  viewport.addEventListener("pointercancel", stopDrag);
+}
+
+// Extrait la zone actuellement visible dans le cadre rond, à pleine
+// résolution (CROP_OUTPUT_SIZE), via un <canvas> — jamais affiché à
+// l'écran, juste utilisé comme "presse-papiers" d'image le temps de
+// produire le fichier final.
+function confirmAvatarCrop(){
+  const scale = cropBaseScale * cropZoom;
+  const w = cropNaturalW * scale;
+  const h = cropNaturalH * scale;
+  const left = (CROP_VIEWPORT_SIZE - w) / 2 + cropOffsetX;
+  const top = (CROP_VIEWPORT_SIZE - h) / 2 + cropOffsetY;
+  // Zone visible du cadre, convertie en coordonnées de la photo ORIGINALE
+  // (avant mise à l'échelle) pour extraire à pleine résolution plutôt qu'à
+  // la résolution d'affichage du cadre (240px).
+  const sourceX = -left / scale;
+  const sourceY = -top / scale;
+  const sourceSize = CROP_VIEWPORT_SIZE / scale;
+  const canvas = document.createElement("canvas");
+  canvas.width = CROP_OUTPUT_SIZE;
+  canvas.height = CROP_OUTPUT_SIZE;
+  canvas.getContext("2d").drawImage(cropImageEl, sourceX, sourceY, sourceSize, sourceSize, 0, 0, CROP_OUTPUT_SIZE, CROP_OUTPUT_SIZE);
+  canvas.toBlob(blob => {
+    if(!blob){ showToast("Erreur de recadrage."); return; }
+    closeAvatarCropModal();
+    uploadAvatar(blob);
+  }, "image/jpeg", 0.9);
 }
 
 const AVATAR_MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 Mo
 
 // Stockée dans un bucket Supabase Storage nommé "avatars" (à créer une fois
 // dans le tableau de bord Supabase, voir harmonize-schema.sql) — un seul
-// fichier par utilisateur, sous son propre dossier ("userId/avatar.ext") :
+// fichier par utilisateur, sous son propre dossier ("userId/avatar.jpg") :
 // les policies de ce bucket n'autorisent chacun à écrire que dans SON PROPRE
 // dossier (auth.uid()), et "upsert" remplace toujours l'ancienne photo au
-// lieu d'en accumuler plusieurs.
-async function uploadAvatar(file){
+// lieu d'en accumuler plusieurs. Toujours en .jpg (ajouté le 01/08/2026) :
+// depuis le recadrage (voir confirmAvatarCrop()), la photo passe toujours
+// par un <canvas> exporté en JPEG — un Blob de canvas n'a de toute façon pas
+// de nom de fichier dont deviner l'extension.
+async function uploadAvatar(fileOrBlob){
   if(!currentUser) return;
-  if(!file.type.startsWith("image/")){ showToast("Choisis une image."); return; }
-  if(file.size > AVATAR_MAX_SIZE_BYTES){ showToast("Image trop lourde (5 Mo max) — choisis-en une plus légère."); return; }
+  if(!fileOrBlob.type || !fileOrBlob.type.startsWith("image/")){ showToast("Choisis une image."); return; }
+  if(fileOrBlob.size > AVATAR_MAX_SIZE_BYTES){ showToast("Image trop lourde (5 Mo max) — choisis-en une plus légère."); return; }
   showToast("Envoi de la photo...");
-  const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
-  const path = `${currentUser.id}/avatar.${ext}`;
-  const { error: uploadError } = await sb.storage.from("avatars").upload(path, file, { upsert: true, cacheControl: "3600" });
+  const path = `${currentUser.id}/avatar.jpg`;
+  const { error: uploadError } = await sb.storage.from("avatars").upload(path, fileOrBlob, { upsert: true, cacheControl: "3600", contentType: "image/jpeg" });
   if(uploadError){ showToast("Erreur d'envoi : " + uploadError.message); return; }
   const { data: urlData } = sb.storage.from("avatars").getPublicUrl(path);
   // "?t=" pour forcer le rechargement de l'image (ajouté le 01/08/2026) :
@@ -2731,6 +2962,8 @@ async function routeToRoomScreen(room, toastMsg){
     gameAutoRevealRoundIdx = -1;
     gameQuestionIntroRoundIdx = -1;
     singleDeviceActivePlayer = null;
+    singleDeviceRoundPoints = {};
+    singleDeviceTotalScores = {};
     renderRoomAvatars("gqRoomAvatars");
     showScreen("screen-game-lobby");
     await loadGameAnswers(room.id);
@@ -2750,6 +2983,9 @@ async function routeToRoomScreen(room, toastMsg){
     btPlaybackStart = null;
     btGuessSelectionRoundIdx = -1;
     btMyGuess = null;
+    singleDeviceRoundPoints = {};
+    singleDeviceTotalScores = {};
+    singleDeviceKnownNames = [];
     btAutoRevealRoundIdx = -1;
     btRoundIntroIdx = -1;
     btSingleDeviceBroadcasting = false;
@@ -5885,12 +6121,22 @@ function renderGameReveal(round){
     const names = (round.owner_local_names || []).join(", ");
     const chosenLabel = isOwnerGameForLabel ? "Proposé par : " : "Choisi par : ";
     const noneLabel = isOwnerGameForLabel ? "Personne n'a proposé ça" : "Personne n'a choisi ça";
+    // Points manuels (ajouté le 01/08/2026, demande de Rémi) : pas de vrai
+    // vote électronique dans ce mode (on devine à voix haute), donc pas de
+    // moyen de savoir qui a bien deviné — ces boutons laissent la personne
+    // qui tient le téléphone attribuer des points après coup, jusqu'à 3 par
+    // manche et par personne (Rémi : certains groupes comptent artiste +
+    // titre + bonus feat/film séparément). Purement local à CET appareil,
+    // jamais écrit en base — voir singleDeviceRoundPoints/cycleSingleDeviceScore().
     document.getElementById("gqRevealBox").innerHTML = `
       <div class="card" style="text-align:center;">
         <div style="font-size:13px;color:var(--text-dim);margin-bottom:6px;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
         <div style="font-size:15px;font-weight:700;">${names ? chosenLabel + escapeHtml(names) : noneLabel}</div>
+        <p style="font-size:11px;color:var(--text-faint);margin:10px 0 8px;">Tape sur un prénom pour lui donner des points (jusqu'à 3 : artiste, titre, bonus feat/film...).</p>
+        <div id="gqSingleDeviceScoreChips" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;"></div>
       </div>
     `;
+    renderSingleDeviceScoreChips("gqSingleDeviceScoreChips", getSingleDeviceLocalNames());
     return;
   }
   const owners = round.owner_user_ids || [];
@@ -5950,6 +6196,9 @@ async function nextGameRound(){
     const { data: freshRoom } = await sb.from("rooms").select("*").eq("id", currentRoom.id).maybeSingle();
     if(!freshRoom || freshRoom.game_phase !== "playing") return;
     currentRoom = freshRoom;
+    // Ajoute les points manuels de la manche qu'on quitte au total cumulé
+    // (ajouté le 01/08/2026) — voir commitSingleDeviceRoundPoints().
+    if(currentRoom.single_device) commitSingleDeviceRoundPoints();
     // Garde-fou supplémentaire (ajouté le 01/08/2026, retour de Rémi : "j'ai
     // appuyé sur suivant avec 3 appareils à la fois et ça a encore sauté une
     // chanson") : le verrou anti-double-clic ci-dessus protège UN appareil,
@@ -6062,11 +6311,17 @@ function renderGameFinished(){
   const creator = isGameCreator();
   document.getElementById("gqReplayControls").style.display = creator ? "block" : "none";
   document.getElementById("gqReplayWaitMsg").style.display = creator ? "none" : "block";
-  // Mode "un seul téléphone" : pas de vote, donc pas de score ni de podium —
-  // juste un message de fin (ajouté le 24/07/2026).
+  // Mode "un seul téléphone" : pas de vote électronique, donc pas de
+  // classement calculé automatiquement (ajouté le 24/07/2026) — mais un
+  // classement manuel s'affiche quand même si des points ont été attribués
+  // à la volée pendant la partie (ajouté le 01/08/2026, voir
+  // renderSingleDeviceFinalScoreboard()).
   document.getElementById("gqFinishedScored").style.display = currentRoom.single_device ? "none" : "block";
   document.getElementById("gqFinishedSingleDevice").style.display = currentRoom.single_device ? "block" : "none";
-  if(currentRoom.single_device) return;
+  if(currentRoom.single_device){
+    renderSingleDeviceFinalScoreboard("gqSingleDeviceNoScoreMsg", "gqSingleDeviceScoreboardWrap", "gqSingleDeviceScoreboard");
+    return;
+  }
   const scores = computeGameScores();
   const entries = getGameParticipantIds()
     .map(uid => [uid, getPseudoForUserId(uid), scores[uid] || 0])
@@ -6140,6 +6395,8 @@ async function rejouerMemeSalon(){
   gameAutoRevealRoundIdx = -1;
   gameQuestionIntroRoundIdx = -1;
   singleDeviceActivePlayer = null;
+  singleDeviceRoundPoints = {};
+  singleDeviceTotalScores = {};
   showToast(currentRoom.mode === "owner" ? "🔄 Nouvelle partie ! Proposez de nouvelles chansons." : "🔄 Nouvelle partie ! Choisissez de nouvelles questions.");
   renderGameLobby();
 }
@@ -7361,14 +7618,28 @@ function renderBtReveal(round){
   const ownerLine = owners.length
     ? `Proposée par : ${escapeHtml(owners.map(uid => getPseudoForUserId(uid)).join(", "))}`
     : "🎲 Chanson piochée dans le pool communautaire";
-  // Mode "un seul téléphone" : pas de vote donc pas de points à afficher.
+  // Mode "un seul téléphone" : pas de vote électronique, on devine à voix
+  // haute. Points manuels ajoutés le 01/08/2026 (demande de Rémi, même
+  // principe que renderGameReveal()) — mais ici, contrairement au jeu des
+  // questions, aucun prénom n'est connu à l'avance (le Blindtest en mode
+  // "un seul téléphone" ne concerne que la diffusion du son, chacun propose
+  // toujours depuis son propre compte) : un champ permet d'ajouter un
+  // prénom à la volée, mémorisé ensuite pour les manches suivantes (voir
+  // singleDeviceKnownNames).
   if(currentRoom.single_device){
     document.getElementById("btRevealBox").innerHTML = `
       <div class="card" style="text-align:center;">
         <div style="font-size:15px;font-weight:700;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
         <div style="font-size:12.5px;color:var(--text-dim);margin-top:6px;">${ownerLine}</div>
+        <p style="font-size:11px;color:var(--text-faint);margin:10px 0 8px;">Tape sur un prénom pour lui donner des points (jusqu'à 3 : artiste, titre, bonus feat/film...).</p>
+        <div id="btSingleDeviceScoreChips" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:10px;"></div>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="btSingleDeviceNameInput" placeholder="Ajouter un prénom" style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault();addSingleDeviceName();}" />
+          <button class="btn-ghost" style="width:auto;padding:8px 14px;" onclick="addSingleDeviceName()">➕</button>
+        </div>
       </div>
     `;
+    renderSingleDeviceScoreChips("btSingleDeviceScoreChips", singleDeviceKnownNames);
     return;
   }
   const myGuess = btGuesses.find(g => g.round_index === currentRoom.game_current_round && g.guesser_user_id === currentUser?.id);
@@ -7408,6 +7679,9 @@ async function nextBtRound(){
     const { data: freshRoom } = await sb.from("rooms").select("*").eq("id", currentRoom.id).maybeSingle();
     if(!freshRoom || freshRoom.game_phase !== "playing") return;
     currentRoom = freshRoom;
+    // Ajoute les points manuels de la manche qu'on quitte au total cumulé
+    // (ajouté le 01/08/2026) — voir commitSingleDeviceRoundPoints().
+    if(currentRoom.single_device) commitSingleDeviceRoundPoints();
     // Garde-fou supplémentaire — même correctif que nextGameRound() (voir
     // son commentaire, ajouté le 01/08/2026, retour de Rémi : "j'ai appuyé
     // sur suivant avec 3 appareils à la fois et ça a encore sauté une
@@ -7499,10 +7773,15 @@ function renderBtFinished(){
   const creator = isGameCreator();
   document.getElementById("btReplayControls").style.display = creator ? "block" : "none";
   document.getElementById("btReplayWaitMsg").style.display = creator ? "none" : "block";
-  // Mode "un seul téléphone" : pas de vote, donc pas de score ni de podium.
+  // Mode "un seul téléphone" : pas de vote électronique, mais un classement
+  // manuel s'affiche quand même si des points ont été attribués à la volée
+  // (ajouté le 01/08/2026, voir renderSingleDeviceFinalScoreboard()).
   document.getElementById("btFinishedScored").style.display = currentRoom.single_device ? "none" : "block";
   document.getElementById("btFinishedSingleDevice").style.display = currentRoom.single_device ? "block" : "none";
-  if(currentRoom.single_device) return;
+  if(currentRoom.single_device){
+    renderSingleDeviceFinalScoreboard("btSingleDeviceNoScoreMsg", "btSingleDeviceScoreboardWrap", "btSingleDeviceScoreboard");
+    return;
+  }
   const scores = computeBtScores();
   const entries = getGameParticipantIds()
     .map(uid => [uid, getPseudoForUserId(uid), scores[uid] || 0])
@@ -7673,6 +7952,9 @@ async function rejouerBtMemeSalon(){
   btPlaybackStart = null;
   btGuessSelectionRoundIdx = -1;
   btMyGuess = null;
+  singleDeviceRoundPoints = {};
+  singleDeviceTotalScores = {};
+  singleDeviceKnownNames = [];
   btAutoRevealRoundIdx = -1;
   btRoundIntroIdx = -1;
   btSingleDeviceBroadcasting = false;
