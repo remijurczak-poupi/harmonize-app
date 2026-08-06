@@ -148,6 +148,17 @@
     background:transparent;color:var(--text-dim);border:1px solid var(--border);
     font-size:14px;padding:12px;border-radius:var(--radius-sm);width:100%;font-weight:500;
   }
+  /* Distinct du dégradé de .btn-primary — utilisé pour les actions qui
+     terminent une étape (ex: "Lancer la partie" en mode "un seul
+     téléphone"), pour ne pas se confondre visuellement avec le bouton juste
+     au-dessus qui sert à ajouter/continuer (retour de Rémi le 06/08/2026:
+     les deux boutons bleus l'un sous l'autre prêtaient à confusion). */
+  .btn-success{
+    background:var(--success);color:white;font-weight:600;font-size:15px;
+    padding:14px;border-radius:var(--radius-sm);width:100%;
+  }
+  .btn-success:active{transform:scale(0.98);}
+  .btn-success:disabled{opacity:.55;}
   .btn-icon{
     background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);
     width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;
@@ -849,8 +860,14 @@
           <div id="sdPlayersList" class="stack" style="margin-bottom:16px;"></div>
           <input type="text" id="sdNewPlayerName" placeholder="Prénom de la personne suivante" maxlength="24" style="margin-bottom:10px;" />
           <button class="btn-primary" onclick="startSingleDeviceTurn()">▶️ Commencer le tour</button>
-          <div style="text-align:center;margin-top:22px;">
-            <button class="btn-primary" id="sdLaunchBtn" onclick="launchGame()" disabled>🚀 Lancer la partie</button>
+          <!-- Séparé visuellement (bordure + bouton vert au lieu du même
+               bleu que "Commencer le tour" juste au-dessus) — retour de
+               Rémi le 06/08/2026 : les 2 boutons se confondaient, avec le
+               risque de lancer la partie avant que tout le monde ait
+               répondu. Confirmation ajoutée dans confirmLaunchSingleDeviceGame(). -->
+          <div style="text-align:center;margin-top:22px;padding-top:20px;border-top:1px solid var(--border);">
+            <p style="font-size:12px;color:var(--text-faint);margin:0 0 10px;">Une fois que tout le monde a joué :</p>
+            <button class="btn-success" id="sdLaunchBtn" onclick="confirmLaunchSingleDeviceGame()" disabled>🚀 Lancer la partie</button>
             <p id="sdLaunchHint" style="font-size:12px;color:var(--text-faint);margin-top:8px;"></p>
           </div>
         </div>
@@ -5720,6 +5737,20 @@ async function logActivityEvent(eventType, roomId, mode){
   } catch(e){ console.warn("[Harmonize] Échec du journal d'activité :", e.message); }
 }
 
+// Ajouté le 06/08/2026 (retour de Rémi : le bouton "Lancer la partie" était
+// trop proche visuellement de "Commencer le tour", avec le risque de lancer
+// la partie avant que tout le monde ait répondu — personne ne s'en aperçoit
+// puisque les manches sans réponse sont juste silencieusement ignorées, voir
+// computeGameRounds()). Utilisé uniquement par sdLaunchBtn (mode "un seul
+// téléphone") — le bouton de lancement normal (gqLaunchBtn, un salon par
+// personne) n'a pas ce risque, donc launchGame() lui-même reste inchangé.
+function confirmLaunchSingleDeviceGame(){
+  const names = getSingleDeviceLocalNames();
+  const list = names.length ? names.join(", ") : "personne";
+  if(!confirm(`Lancer la partie avec : ${list} ?\n\nSi quelqu'un n'a pas encore répondu, appuie sur Annuler et fais-le d'abord — une fois la partie lancée, il ne pourra plus répondre à ce tour de questions.`)) return;
+  launchGame();
+}
+
 async function launchGame(){
   if(!isGameCreator()) return;
   // Recharge les réponses fraîches depuis Supabase juste avant de calculer les
@@ -7025,6 +7056,11 @@ function confirmSingleDeviceNamesStep(){
   // secours à la volée pendant la partie (retiré à la demande de Rémi),
   // donc sans prénom renseigné ici, aucun point ne serait attribuable du tout.
   if(!singleDeviceKnownNames.length){ showToast("Ajoute au moins un prénom avant de continuer."); return; }
+  // Confirmation ajoutée le 06/08/2026 (même retour de Rémi que
+  // confirmLaunchSingleDeviceGame()) : la liste ne peut plus être complétée
+  // une fois la partie commencée (pas de champ de secours à la volée), donc
+  // oublier quelqu'un ici l'exclut silencieusement de tout le classement.
+  if(!confirm(`Ces personnes vont pouvoir marquer des points pendant la partie : ${singleDeviceKnownNames.join(", ")}.\n\nTu ne pourras plus en ajouter une fois la partie commencée. Continuer ?`)) return;
   btSingleDeviceNamesStepDone = true;
   saveSingleDeviceScoringState();
   renderBtSongCountPicker();
