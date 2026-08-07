@@ -649,7 +649,7 @@
              peut garder le titre du moment dans SES PROPRES playlists
              YouTube. Caché en mode démo (pas de vraie playlist à proposer) et
              tant qu'aucun titre n'est encore en cours. -->
-        <button class="add-btn" id="npSaveBtn" onclick="openYtSaveForNowPlaying()" title="Ajouter ce titre à une de tes playlists YouTube" style="display:none;margin-left:0;">📌</button>
+        <button class="add-btn" id="npSaveBtn" onclick="openYtSaveForNowPlaying()" title="Ajouter ce titre à une de tes playlists YouTube" style="display:none;margin-left:0;">❤️</button>
       </div>
 
       <!-- Lecteur réel : uniquement dans un vrai salon (mode Soirée OU À
@@ -4631,6 +4631,35 @@ function openYtSaveForTrack(track){
   }
 }
 
+// Même bouton "❤️" que le titre en cours en mode Soirée/À distance, mais
+// pour la manche RÉVÉLÉE d'un jeu (ajouté le 07/08/2026, demande de Rémi :
+// "qu'on pourrait discrètement le mettre sur les jeux aussi"). Placé
+// UNIQUEMENT sur l'écran de révélation, jamais pendant qu'on devine : le
+// titre n'est montré nulle part avant la révélation (voir renderGameReveal()/
+// renderBtReveal()), donc afficher ce bouton plus tôt donnerait indirectement
+// la réponse via la fenêtre "❤️" elle-même (qui affiche le titre/artiste).
+// Lit currentGameRound()/currentBtRound() directement au clic plutôt que de
+// recevoir le titre en paramètre — évite d'avoir à échapper apostrophes/
+// guillemets dans un onclick inline (même principe que openYtSaveForNowPlaying()).
+function openYtSaveForCurrentGameRound(){
+  const round = currentGameRound();
+  if(!round || !round.youtube_id){ showToast("Ce titre n'a pas d'identifiant YouTube connu."); return; }
+  openYtSaveForTrack({ title: round.title, artist: round.artist, youtubeId: round.youtube_id, thumbnail: round.thumbnail || "" });
+}
+function openYtSaveForCurrentBtRound(){
+  const round = currentBtRound();
+  if(!round || !round.youtube_id){ showToast("Ce titre n'a pas d'identifiant YouTube connu."); return; }
+  openYtSaveForTrack({ title: round.title, artist: round.artist, youtubeId: round.youtube_id, thumbnail: round.thumbnail || "" });
+}
+
+// Petit bouton "❤️" réutilisé dans les 4 écrans de révélation (jeu des
+// questions/Qui a mis cette chanson x Blindtest, chacun x mode "un seul
+// téléphone"/normal) — voir openYtSaveForCurrentGameRound()/
+// openYtSaveForCurrentBtRound() pour le pourquoi de son emplacement.
+function ytSaveHeartBtn(onclickFn){
+  return `<button class="add-btn" style="width:26px;height:26px;font-size:13px;margin-left:6px;vertical-align:middle;" onclick="${onclickFn}()" title="Ajouter à une de tes playlists YouTube">❤️</button>`;
+}
+
 function closeYtSaveModal(){
   document.getElementById("ytSaveModal").classList.remove("open");
   ytSaveTrack = null;
@@ -6572,7 +6601,7 @@ function renderGameReveal(round){
     // jamais écrit en base — voir singleDeviceRoundPoints/adjustSingleDeviceScore().
     document.getElementById("gqRevealBox").innerHTML = `
       <div class="card" style="text-align:center;">
-        <div style="font-size:13px;color:var(--text-dim);margin-bottom:6px;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
+        <div style="font-size:13px;color:var(--text-dim);margin-bottom:6px;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}${round.youtube_id ? ytSaveHeartBtn("openYtSaveForCurrentGameRound") : ""}</div>
         <div style="font-size:15px;font-weight:700;">${names ? chosenLabel + escapeHtml(names) : noneLabel}</div>
         <p style="font-size:11px;color:var(--text-faint);margin:10px 0 8px;">Donne des points à qui a bien deviné (jusqu'à 3 : artiste, titre, bonus feat/film...).</p>
         <div id="gqSingleDeviceScoreChips" class="stack" style="text-align:left;"></div>
@@ -6588,7 +6617,7 @@ function renderGameReveal(round){
   const noneLabel = isOwnerGame ? "Personne n'a proposé ça" : "Personne n'a répondu ça";
   document.getElementById("gqRevealBox").innerHTML = `
     <div class="card" style="text-align:center;">
-      <div style="font-size:13px;color:var(--text-dim);margin-bottom:6px;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
+      <div style="font-size:13px;color:var(--text-dim);margin-bottom:6px;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}${round.youtube_id ? ytSaveHeartBtn("openYtSaveForCurrentGameRound") : ""}</div>
       <div style="font-size:15px;font-weight:700;">${owners.length ? chosenLabel + escapeHtml(ownerNames) : noneLabel}</div>
     </div>
     <div style="margin-top:12px;text-align:left;">${renderRoundPointsRows(computeGameRoundPoints(round, currentRoom.game_current_round))}</div>
@@ -8217,7 +8246,7 @@ function renderBtReveal(round){
   if(currentRoom.single_device){
     document.getElementById("btRevealBox").innerHTML = `
       <div class="card" style="text-align:center;">
-        <div style="font-size:15px;font-weight:700;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
+        <div style="font-size:15px;font-weight:700;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}${round.youtube_id ? ytSaveHeartBtn("openYtSaveForCurrentBtRound") : ""}</div>
         <div style="font-size:12.5px;color:var(--text-dim);margin-top:6px;">${ownerLine}</div>
         <p style="font-size:11px;color:var(--text-faint);margin:10px 0 8px;">Donne des points à qui a bien deviné (jusqu'à 3 : artiste, titre, bonus feat/film...).</p>
         <div id="btSingleDeviceScoreChips" class="stack" style="text-align:left;"></div>
@@ -8228,7 +8257,7 @@ function renderBtReveal(round){
   }
   document.getElementById("btRevealBox").innerHTML = `
     <div class="card" style="text-align:center;">
-      <div style="font-size:15px;font-weight:700;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
+      <div style="font-size:15px;font-weight:700;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}${round.youtube_id ? ytSaveHeartBtn("openYtSaveForCurrentBtRound") : ""}</div>
       <div style="font-size:12.5px;color:var(--text-dim);margin-top:6px;">${ownerLine}</div>
     </div>
     <div style="margin-top:12px;text-align:left;">${renderRoundPointsRows(computeBtRoundPoints(round, currentRoom.game_current_round))}</div>
