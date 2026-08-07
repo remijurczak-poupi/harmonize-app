@@ -6359,12 +6359,16 @@ function ensureGuessSelectionForRound(idx){
 // hauteur du lecteur et l'intitulé n'aient pas suffi sur tous les
 // téléphones. "end" aligne le BAS de la grille sur le bas de l'écran visible
 // plutôt que son haut : si tout ne rentre toujours pas, ce qui disparaît est
-// le haut de la page, jamais une réponse. instant (pas smooth) pour ne pas
-// laisser voir le petit trajet de scroll pendant l'intro plein écran qui
-// masque tout au même moment (voir showGameQuestionIntro()/showBtRoundIntro()).
+// le haut de la page, jamais une réponse. behavior:"auto" (saut immédiat,
+// pas "smooth") pour ne pas laisser voir le petit trajet de scroll pendant
+// l'intro plein écran qui masque tout au même moment (voir
+// showGameQuestionIntro()/showBtRoundIntro()) — "instant" utilisé au 1er
+// essai n'est PAS une valeur valide de l'API (seules "auto"/"smooth"
+// existent), silencieusement ignorée sur certains navigateurs seulement :
+// c'est ce qui a empêché le scroll de fonctionner chez le frère de Rémi.
 function scrollToRevealAnswers(gridId){
   const el = document.getElementById(gridId);
-  if(el && el.children.length) el.scrollIntoView({ block: "end", behavior: "instant" });
+  if(el && el.children.length) el.scrollIntoView({ block: "end", behavior: "auto" });
 }
 
 function renderGameGuessOptions(round){
