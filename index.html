@@ -1155,7 +1155,14 @@
                  sens qu'en mode "un seul téléphone" (affiché/masqué dans
                  renderBtSongCountPicker()). -->
             <button class="btn-ghost" id="btBackToNamesBtn" style="display:none;margin-top:10px;" onclick="backToBtSingleDeviceNamesStep()">← Modifier les prénoms</button>
-            <button class="btn-ghost" style="margin-top:10px;" onclick="backToBtSongsCountStep()">← Changer le nombre de chansons</button>
+            <!-- Masqué en mode "un seul téléphone" (retour de Rémi le
+                 07/08/2026 : redondant avec "← Modifier les prénoms" juste
+                 au-dessus, 2 boutons retour l'un sous l'autre). Le chemin
+                 reste accessible via cet écran des prénoms (bouton identique
+                 juste au-dessus, ligne ~1134) — rien n'est perdu, juste 1 clic
+                 de plus. Reste affiché tel quel en mode normal (plusieurs
+                 salons), seul chemin retour disponible là-bas. -->
+            <button class="btn-ghost" id="btBackToCountBtn" style="margin-top:10px;" onclick="backToBtSongsCountStep()">← Changer le nombre de chansons</button>
           </div>
         </div>
         <p id="btLobbyWaitMsg" style="display:none;font-size:13px;color:var(--text-faint);text-align:center;margin-top:14px;">En attente que le créateur du salon choisisse les réglages...</p>
@@ -7110,6 +7117,9 @@ function renderBtSongCountPicker(){
   });
   document.getElementById("btLaunchGameBtn").style.display = btPlaybackStart ? "block" : "none";
   document.getElementById("btBackToNamesBtn").style.display = currentRoom.single_device ? "block" : "none";
+  // Masqué en mode "un seul téléphone" (redondant avec btBackToNamesBtn
+  // ci-dessus) ; seul bouton retour dispo en mode normal, donc gardé là.
+  document.getElementById("btBackToCountBtn").style.display = currentRoom.single_device ? "none" : "block";
 }
 
 // Ajouté le 06/08/2026 : seul chemin de retour vers l'étape "Qui va jouer ?"
@@ -7131,7 +7141,7 @@ async function confirmSingleDeviceNamesStep(){
   // confirmLaunchSingleDeviceGame()) : la liste ne peut plus être complétée
   // une fois la partie commencée (pas de champ de secours à la volée), donc
   // oublier quelqu'un ici l'exclut silencieusement de tout le classement.
-  if(!(await customConfirm(`Ces personnes vont pouvoir marquer des points pendant la partie : ${singleDeviceKnownNames.join(", ")}.\n\nTu ne pourras plus en ajouter une fois la partie commencée.`, "Continuer"))) return;
+  if(!(await customConfirm(`Joueurs inscrits : ${singleDeviceKnownNames.join(", ")}.\n\nTu n'as oublié personne ? Tu ne pourras plus en ajouter une fois la partie commencée.`, "Continuer"))) return;
   btSingleDeviceNamesStepDone = true;
   saveSingleDeviceScoringState();
   renderBtSongCountPicker();
