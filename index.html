@@ -1131,6 +1131,13 @@
                  avant. Un vrai bouton "Lancer la partie" laisse le temps de
                  changer d'avis entre les 2 options. -->
             <button class="btn-primary" id="btLaunchGameBtn" style="display:none;margin-top:10px;" onclick="confirmBtSettings()">🚀 Lancer la partie</button>
+            <!-- Ajouté le 06/08/2026 (retour de Rémi : après avoir validé les
+                 prénoms, "← Changer le nombre de chansons" ramène 2 écrans en
+                 arrière mais SAUTE l'étape des prénoms au retour — impossible
+                 de corriger un prénom oublié sans recréer le salon). N'a de
+                 sens qu'en mode "un seul téléphone" (affiché/masqué dans
+                 renderBtSongCountPicker()). -->
+            <button class="btn-ghost" id="btBackToNamesBtn" style="display:none;margin-top:10px;" onclick="backToBtSingleDeviceNamesStep()">← Modifier les prénoms</button>
             <button class="btn-ghost" style="margin-top:10px;" onclick="backToBtSongsCountStep()">← Changer le nombre de chansons</button>
           </div>
         </div>
@@ -7049,6 +7056,17 @@ function renderBtSongCountPicker(){
     btn.style.color = active ? "var(--text)" : "var(--text-dim)";
   });
   document.getElementById("btLaunchGameBtn").style.display = btPlaybackStart ? "block" : "none";
+  document.getElementById("btBackToNamesBtn").style.display = currentRoom.single_device ? "block" : "none";
+}
+
+// Ajouté le 06/08/2026 : seul chemin de retour vers l'étape "Qui va jouer ?"
+// une fois qu'elle a été validée — garde les prénoms déjà tapés
+// (singleDeviceKnownNames n'est pas touché ici), pour ajouter/corriger sans
+// tout retaper. Voir le commentaire sur btBackToNamesBtn pour le bug corrigé.
+function backToBtSingleDeviceNamesStep(){
+  btSingleDeviceNamesStepDone = false;
+  saveSingleDeviceScoringState();
+  renderBtSongCountPicker();
 }
 
 function confirmSingleDeviceNamesStep(){
