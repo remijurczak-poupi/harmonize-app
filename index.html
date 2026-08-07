@@ -241,6 +241,12 @@
      (le glisser-déposer HTML natif ne fonctionne pas sur téléphone). */
   .queue-drag-handle{cursor:grab;touch-action:none;padding:4px 8px;color:var(--text-faint);font-size:18px;flex-shrink:0;user-select:none;}
   .queue-item.dragging{opacity:.5;}
+  /* Retirer un titre de la file (ajouté le 07/08/2026, demande de Rémi) —
+     ouvert à tout le monde, pas seulement à qui l'a proposé : même principe
+     que le réordonnancement par glisser-déposer ci-dessus, déjà ouvert à
+     tous les participants sans notion de "chef de salon". */
+  .queue-remove-btn{background:none;border:none;color:var(--text-faint);font-size:20px;line-height:1;padding:4px 6px;flex-shrink:0;cursor:pointer;}
+  .queue-remove-btn:active{color:var(--accent2);}
 
   .fab-row{display:flex;gap:10px;margin-top:14px;}
   .tabbar{
@@ -1376,7 +1382,7 @@
   <div class="modal-backdrop" id="ytSaveModal">
     <div class="modal">
       <div class="modal-handle"></div>
-      <h2>📌 Ajouter à une playlist YouTube</h2>
+      <h2>❤️ Ajouter à une playlist YouTube</h2>
       <p id="ytSaveTrackLabel" style="font-size:13px;color:var(--text-dim);margin:-4px 0 14px;"></p>
       <div class="modal-scroll"><div id="ytSaveContent"></div></div>
       <button class="btn-ghost" style="margin-top:10px;flex-shrink:0;" onclick="closeYtSaveModal()">Fermer</button>
@@ -1603,6 +1609,52 @@ function decodeHtmlEntities(str){
   if(!htmlEntityDecoder) htmlEntityDecoder = document.createElement("textarea");
   htmlEntityDecoder.innerHTML = str;
   return htmlEntityDecoder.value;
+}
+
+// Découpe "Artiste - Titre" à partir du VRAI titre YouTube brut plutôt que
+// du nom de chaîne (ajouté le 07/08/2026, retour de Rémi : trouvé le même
+// bug — champ "artist" = nom BRUT de la chaîne genre "OasisVEVO" au lieu
+// d'un vrai nom d'artiste — dans searchYouTube() ET fetchPlaylistTracks(),
+// pas seulement dans les scripts d'import ponctuels. Utilisées PARTOUT où
+// l'app appelle l'API YouTube pour une NOUVELLE chanson : corrigé ICI, à la
+// source, pour que toute recherche/import à partir de maintenant soit déjà
+// propre — voir docs/idees.md Round 117/118 pour l'historique complet
+// (script séparé pour nettoyer rétroactivement ce qui existait déjà).
+const TITLE_QUALIFIER_RE = /\s*[\(\[]\s*(official\s*(music\s*)?(video|audio)|lyrics?\s*video|official\s*hd\s*video|official\s*visualizer|visualizer|hd|4k|hq|remaster(ed|is[ée]e?)?(\s*\d{4})?|audio|video|explicit|clean|mv|vid[ée]o\s*officielle|clip\s*officiel|audio\s*officiel(le)?|vid[ée]o\s*officielle\s*remasteris[ée]e?(\s*en\s*hd)?)\s*[\)\]]\s*$/i;
+
+function cleanTitleSuffix(title){
+  let t = (title || "").trim();
+  let prev = null;
+  while(prev !== t){
+    prev = t;
+    t = t.replace(TITLE_QUALIFIER_RE, "").trim();
+  }
+  return t;
+}
+
+function parseArtistTitle(rawTitle, channel){
+  rawTitle = (rawTitle || "").trim();
+  channel = (channel || "").trim();
+
+  // Chaîne "... - Topic" (générée automatiquement par YouTube pour l'audio
+  // officiel) : le titre est déjà le nom de la chanson seul, l'artiste vient
+  // du nom de chaîne sans le suffixe.
+  const topicMatch = channel.match(/^(.*)\s*-\s*topic$/i);
+  if(topicMatch){
+    return { artist: topicMatch[1].trim(), title: cleanTitleSuffix(rawTitle) };
+  }
+
+  // "Artiste - Titre" dans le TITRE (convention quasi universelle des
+  // uploads officiels/VEVO) — plus fiable que le nom de chaîne, souvent
+  // collé sans espace/casse (ex: "MotleyCrueVEVO" ne redonne pas "Mötley Crüe").
+  const dashMatch = rawTitle.match(/^(.+?)\s+-\s+(.+)$/);
+  if(dashMatch){
+    return { artist: dashMatch[1].trim(), title: cleanTitleSuffix(dashMatch[2].trim()) };
+  }
+
+  // Repli : pas de " - " dans le titre — déduit l'artiste du nom de chaîne
+  // en retirant juste le suffixe VEVO (moins fiable, dernier recours).
+  return { artist: channel.replace(/vevo$/i, "").trim(), title: cleanTitleSuffix(rawTitle) };
 }
 
 // Bascule un champ de texte en majuscules AU FUR ET À MESURE qu'on tape
@@ -3909,6 +3961,18 @@ async function voteReal(itemId, currentVotes){
   if(currentRoom) await loadRealQueue(currentRoom.id);
 }
 
+// Retirer un titre de la file (ajouté le 07/08/2026, demande de Rémi).
+// Ouvert à tout participant, pas seulement à qui l'a proposé — même
+// principe que le vote et le réordonnancement par glisser-déposer
+// juste au-dessus, aucun des deux n'est réservé au créateur du salon.
+async function removeFromQueue(itemId, title){
+  if(!(await customConfirm(`Retirer "${title}" de la file d'attente ?`, "Retirer"))) return;
+  const { error } = await sb.from("queue_items").delete().eq("id", itemId);
+  if(error){ showToast("Erreur de suppression : " + error.message); return; }
+  showToast(`"${title}" retiré de la file`);
+  if(currentRoom) await loadRealQueue(currentRoom.id);
+}
+
 function renderRealQueueUI(){
   const items = state.realQueueItems || [];
   const el = document.getElementById("queueList");
@@ -3924,6 +3988,7 @@ function renderRealQueueUI(){
       <button class="vote-btn" onclick="voteReal('${item.id}', ${item.votes})">
         <span>▲</span><span>${item.votes}</span>
       </button>
+      <button class="queue-remove-btn" onclick="removeFromQueue('${item.id}', '${escJs(item.title)}')" title="Retirer de la file">×</button>
     </div>
   `).join("") || `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">File vide — sois le premier à proposer un titre !</p>`;
 }
@@ -4057,7 +4122,7 @@ async function renderSearchResults(q){
         <div style="font-size:12px;color:var(--text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(r.artist)}</div>
       </div>
       <span class="badge ${badgeClass.youtube}">${badgeLabel.youtube}</span>
-      <button class="add-btn" onclick="openYtSavePicker(${i})" title="Ajouter à une de tes playlists YouTube" style="margin-right:4px;">📌</button>
+      <button class="add-btn" onclick="openYtSavePicker(${i})" title="Ajouter à une de tes playlists YouTube" style="margin-right:4px;">❤️</button>
       <button class="add-btn" onclick="addTrackToQueue(${i})" title="Ajouter à la file du salon">+</button>
     </div>
   `).join("");
@@ -4117,12 +4182,15 @@ async function searchYouTube(q){
       const res = await fetch(url);
       const data = await res.json();
       if(res.ok){
-        const results = (data.items || []).map(item => ({
-          title: decodeHtmlEntities(item.snippet.title),
-          artist: decodeHtmlEntities(item.snippet.channelTitle),
-          youtubeId: item.id.videoId,
-          thumbnail: item.snippet.thumbnails?.default?.url || item.snippet.thumbnails?.medium?.url || "",
-        }));
+        const results = (data.items || []).map(item => {
+          const parsed = parseArtistTitle(decodeHtmlEntities(item.snippet.title), decodeHtmlEntities(item.snippet.channelTitle));
+          return {
+            title: parsed.title,
+            artist: parsed.artist,
+            youtubeId: item.id.videoId,
+            thumbnail: item.snippet.thumbnails?.default?.url || item.snippet.thumbnails?.medium?.url || "",
+          };
+        });
         // Alimente le cache partagé (best-effort : une panne ici ne doit pas
         // faire échouer la recherche, le résultat est de toute façon déjà
         // renvoyé à la personne qui cherche).
@@ -4343,16 +4411,20 @@ async function fetchPlaylistTracks(playlist){
   if(!res.ok){ throw new Error(data?.error?.message || ("erreur " + res.status)); }
   const rows = (data.items || [])
     .filter(it => it.snippet?.resourceId?.videoId) // ignore les vidéos supprimées/privées, sans identifiant exploitable
-    .map(it => ({
-      user_id: currentUser.id,
-      platform: "youtube",
-      playlist_title: decodeHtmlEntities(playlist.snippet.title),
-      youtube_playlist_id: playlist.id, // gardé pour pouvoir actualiser cette playlist plus tard sans se tromper si son nom change
-      title: decodeHtmlEntities(it.snippet.title),
-      artist: decodeHtmlEntities(it.snippet.videoOwnerChannelTitle || it.snippet.channelTitle || ""),
-      youtube_id: it.snippet.resourceId.videoId,
-      thumbnail: it.snippet.thumbnails?.default?.url || "",
-    }));
+    .map(it => {
+      const rawChannel = it.snippet.videoOwnerChannelTitle || it.snippet.channelTitle || "";
+      const parsed = parseArtistTitle(decodeHtmlEntities(it.snippet.title), decodeHtmlEntities(rawChannel));
+      return {
+        user_id: currentUser.id,
+        platform: "youtube",
+        playlist_title: decodeHtmlEntities(playlist.snippet.title),
+        youtube_playlist_id: playlist.id, // gardé pour pouvoir actualiser cette playlist plus tard sans se tromper si son nom change
+        title: parsed.title,
+        artist: parsed.artist,
+        youtube_id: it.snippet.resourceId.videoId,
+        thumbnail: it.snippet.thumbnails?.default?.url || "",
+      };
+    });
   // Un même titre peut apparaître deux fois dans une seule playlist YouTube
   // (doublon fait par la personne elle-même en constituant sa playlist) — on
   // ne garde que la première occurrence, sinon Postgres refuse d'enregistrer
@@ -4652,12 +4724,20 @@ function openYtSaveForCurrentBtRound(){
   openYtSaveForTrack({ title: round.title, artist: round.artist, youtubeId: round.youtube_id, thumbnail: round.thumbnail || "" });
 }
 
-// Petit bouton "❤️" réutilisé dans les 4 écrans de révélation (jeu des
-// questions/Qui a mis cette chanson x Blindtest, chacun x mode "un seul
-// téléphone"/normal) — voir openYtSaveForCurrentGameRound()/
+// Petit bouton "❤️ Ajouter à ma playlist" réutilisé dans les 4 écrans de
+// révélation (jeu des questions/Qui a mis cette chanson x Blindtest, chacun
+// x mode "un seul téléphone"/normal) — voir openYtSaveForCurrentGameRound()/
 // openYtSaveForCurrentBtRound() pour le pourquoi de son emplacement.
+// Redessiné le 07/08/2026 (retour de Rémi : "ne rend pas bien") : un simple
+// emoji seul, en ligne juste après le titre/artiste (texte à 13px), créait
+// un vrai déséquilibre visuel — l'emoji ❤️ s'affiche bien plus gros que le
+// texte autour, façon "gros cœur qui flotte tout seul" en bout de ligne
+// (visible sur un vrai rendu, pas juste supposé). Devient un vrai petit
+// bouton avec libellé, sur SA PROPRE ligne (voir les 4 points d'appel) —
+// mieux équilibré, et l'intention ("ajouter à une playlist") est explicite
+// au lieu de reposer sur la seule reconnaissance de l'icône.
 function ytSaveHeartBtn(onclickFn){
-  return `<button class="add-btn" style="width:26px;height:26px;font-size:13px;margin-left:6px;vertical-align:middle;" onclick="${onclickFn}()" title="Ajouter à une de tes playlists YouTube">❤️</button>`;
+  return `<button class="btn-ghost" style="width:auto;padding:5px 12px;font-size:11.5px;margin-top:8px;" onclick="${onclickFn}()">❤️ Ajouter à ma playlist</button>`;
 }
 
 function closeYtSaveModal(){
@@ -5209,7 +5289,7 @@ function renderMineFlatList(tracks, showBackButton, emptyMessage){
   const bulkAddBtns = showBackButton
     ? `<div style="display:flex;gap:8px;margin-bottom:10px;">
         <button class="btn-ghost" style="width:auto;flex:1;padding:8px;font-size:12.5px;" onclick="addPlaylistToQueue('${escJs(minePlaylistFilter)}', false)">➕ Tout ajouter</button>
-        <button class="btn-ghost" style="width:auto;flex:1;padding:8px;font-size:12.5px;" onclick="addPlaylistToQueue('${escJs(minePlaylistFilter)}', true)">🔀 Ajouter mélangé</button>
+        <button class="btn-ghost" style="width:auto;flex:1;padding:8px;font-size:12.5px;" onclick="addPlaylistToQueue('${escJs(minePlaylistFilter)}', true)">🔀 Jouer la playlist au hasard</button>
       </div>`
     : "";
   if(!tracks.length){
@@ -6601,8 +6681,9 @@ function renderGameReveal(round){
     // jamais écrit en base — voir singleDeviceRoundPoints/adjustSingleDeviceScore().
     document.getElementById("gqRevealBox").innerHTML = `
       <div class="card" style="text-align:center;">
-        <div style="font-size:13px;color:var(--text-dim);margin-bottom:6px;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}${round.youtube_id ? ytSaveHeartBtn("openYtSaveForCurrentGameRound") : ""}</div>
-        <div style="font-size:15px;font-weight:700;">${names ? chosenLabel + escapeHtml(names) : noneLabel}</div>
+        <div style="font-size:13px;color:var(--text-dim);margin-bottom:6px;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
+        ${round.youtube_id ? ytSaveHeartBtn("openYtSaveForCurrentGameRound") : ""}
+        <div style="font-size:15px;font-weight:700;margin-top:8px;">${names ? chosenLabel + escapeHtml(names) : noneLabel}</div>
         <p style="font-size:11px;color:var(--text-faint);margin:10px 0 8px;">Donne des points à qui a bien deviné (jusqu'à 3 : artiste, titre, bonus feat/film...).</p>
         <div id="gqSingleDeviceScoreChips" class="stack" style="text-align:left;"></div>
       </div>
@@ -6617,8 +6698,9 @@ function renderGameReveal(round){
   const noneLabel = isOwnerGame ? "Personne n'a proposé ça" : "Personne n'a répondu ça";
   document.getElementById("gqRevealBox").innerHTML = `
     <div class="card" style="text-align:center;">
-      <div style="font-size:13px;color:var(--text-dim);margin-bottom:6px;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}${round.youtube_id ? ytSaveHeartBtn("openYtSaveForCurrentGameRound") : ""}</div>
-      <div style="font-size:15px;font-weight:700;">${owners.length ? chosenLabel + escapeHtml(ownerNames) : noneLabel}</div>
+      <div style="font-size:13px;color:var(--text-dim);margin-bottom:6px;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
+      ${round.youtube_id ? ytSaveHeartBtn("openYtSaveForCurrentGameRound") : ""}
+      <div style="font-size:15px;font-weight:700;margin-top:8px;">${owners.length ? chosenLabel + escapeHtml(ownerNames) : noneLabel}</div>
     </div>
     <div style="margin-top:12px;text-align:left;">${renderRoundPointsRows(computeGameRoundPoints(round, currentRoom.game_current_round))}</div>
   `;
@@ -8246,7 +8328,8 @@ function renderBtReveal(round){
   if(currentRoom.single_device){
     document.getElementById("btRevealBox").innerHTML = `
       <div class="card" style="text-align:center;">
-        <div style="font-size:15px;font-weight:700;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}${round.youtube_id ? ytSaveHeartBtn("openYtSaveForCurrentBtRound") : ""}</div>
+        <div style="font-size:15px;font-weight:700;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
+        ${round.youtube_id ? ytSaveHeartBtn("openYtSaveForCurrentBtRound") : ""}
         <div style="font-size:12.5px;color:var(--text-dim);margin-top:6px;">${ownerLine}</div>
         <p style="font-size:11px;color:var(--text-faint);margin:10px 0 8px;">Donne des points à qui a bien deviné (jusqu'à 3 : artiste, titre, bonus feat/film...).</p>
         <div id="btSingleDeviceScoreChips" class="stack" style="text-align:left;"></div>
@@ -8257,7 +8340,8 @@ function renderBtReveal(round){
   }
   document.getElementById("btRevealBox").innerHTML = `
     <div class="card" style="text-align:center;">
-      <div style="font-size:15px;font-weight:700;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}${round.youtube_id ? ytSaveHeartBtn("openYtSaveForCurrentBtRound") : ""}</div>
+      <div style="font-size:15px;font-weight:700;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
+      ${round.youtube_id ? ytSaveHeartBtn("openYtSaveForCurrentBtRound") : ""}
       <div style="font-size:12.5px;color:var(--text-dim);margin-top:6px;">${ownerLine}</div>
     </div>
     <div style="margin-top:12px;text-align:left;">${renderRoundPointsRows(computeBtRoundPoints(round, currentRoom.game_current_round))}</div>
