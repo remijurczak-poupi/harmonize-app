@@ -910,7 +910,7 @@
           </div>
           <div class="card" style="margin-bottom:16px;">
             <div style="font-size:11px;font-weight:700;color:var(--accent1);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;" id="gqRoundQuestion"></div>
-            <div style="position:relative;min-height:180px;" id="gqPlayerBoxWrap">
+            <div style="position:relative;min-height:180px;overflow:hidden;" id="gqPlayerBoxWrap">
               <div id="gameYtPlayer"></div>
               <!-- Mode "audio seulement" (ajouté le 13/07/2026, à la demande de
                    Rémi, anti-spoiler) : la vidéo continue de jouer (donc le son
@@ -1211,7 +1211,7 @@
           </div>
 
           <div id="btPlayerCardWrap" class="card" style="margin-bottom:16px;">
-            <div style="position:relative;min-height:180px;" id="btPlayerBoxWrap">
+            <div style="position:relative;min-height:180px;overflow:hidden;" id="btPlayerBoxWrap">
               <div id="btYtPlayer"></div>
               <div id="btAudioCover" onclick="toggleBtPlayPause()" style="display:none;position:absolute;inset:0;cursor:pointer;background:linear-gradient(160deg,var(--accent1),var(--accent2));align-items:center;justify-content:center;flex-direction:column;gap:6px;border-radius:12px;color:#fff;text-align:center;padding:12px;">
                 <div style="font-size:28px;">🎧</div>
@@ -5941,7 +5941,19 @@ function renderGamePlaying(){
       // vidéo visible (la vraie vidéo en a besoin) ou pendant la fenêtre
       // "Pub bloquée ?" (le vrai lecteur doit être assez grand pour taper
       // sur son bouton "Ignorer", voir revealGameAdSkipButton()).
-      playerBoxWrap.style.minHeight = (audioOnly && !gameAdSkipActive) ? "100px" : "180px";
+      // maxHeight ajouté le 07/08/2026 (retour de Rémi : sur la toute 1ère
+      // manche, seule où le lecteur YouTube est réellement CRÉÉ — les
+      // manches suivantes réutilisent le même lecteur, voir ensureGamePlayer
+      // — la moitié basse de la grille de réponses passait sous le bas de
+      // l'écran). minHeight seul ne posait qu'un PLANCHER : si l'iframe
+      // YouTube mettait un instant à respecter sa taille 1x1 demandée, la
+      // boîte pouvait grandir au-delà et pousser tout le reste vers le bas.
+      // maxHeight + overflow:hidden (voir le style de gqPlayerBoxWrap)
+      // verrouille une vraie hauteur fixe : plus aucun débordement possible,
+      // quoi que fasse l'iframe le temps de se stabiliser.
+      const h = (audioOnly && !gameAdSkipActive) ? "100px" : "180px";
+      playerBoxWrap.style.minHeight = h;
+      playerBoxWrap.style.maxHeight = h;
     }
   }
   // Couche de clic invisible : plus nécessaire en mode "vidéo visible" —
@@ -7638,7 +7650,13 @@ function renderBtPlaying(){
       // même correctif que renderGamePlaying(), voir son commentaire. Le
       // Blindtest étant TOUJOURS en audio seulement, cette réduction
       // s'applique donc à CHAQUE manche (sauf pendant "Pub bloquée ?").
-      playerBoxWrap.style.minHeight = (audioOnly && !btAdSkipActive) ? "100px" : "180px";
+      // maxHeight ajouté le 07/08/2026, même correctif que gqPlayerBoxWrap —
+      // voir son commentaire (retour de Rémi : la 2e ligne de réponses
+      // passait sous le bas de l'écran UNIQUEMENT à la 1ère manche, la seule
+      // où le lecteur YouTube est réellement créé).
+      const h = (audioOnly && !btAdSkipActive) ? "100px" : "180px";
+      playerBoxWrap.style.minHeight = h;
+      playerBoxWrap.style.maxHeight = h;
     }
   }
   // Couche de clic invisible : plus nécessaire en mode "vidéo visible" (même
