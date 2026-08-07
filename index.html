@@ -1266,7 +1266,7 @@
                  seul 3-4 lignes, pour des infos déjà visibles ailleurs (le
                  compte à rebours juste au-dessus). -->
             <p style="font-size:12px;color:var(--text-faint);margin-top:-6px;margin-bottom:10px;">Un clic suffit — c'est définitif pour cette manche. Plus tu réponds vite, plus tu marques de points.</p>
-            <div id="btGuessOptions"></div>
+            <div class="guess-grid" id="btGuessOptions"></div>
             <p id="btGuessTimeUpHint" style="display:none;font-size:12px;color:var(--text-faint);text-align:center;margin-top:12px;">⏰ Temps écoulé pour deviner sur cette manche — révélation dans un instant.</p>
           </div>
 
@@ -1899,6 +1899,14 @@ let gameAutoRevealRoundIdx = -1;
 // dernière manche pour laquelle CET appareil a déjà joué l'animation, pour ne
 // la jouer qu'une seule fois par manche.
 let gameQuestionIntroRoundIdx = -1;
+// Timestamp (Date.now()) auquel l'intro plein écran de la manche
+// gameQuestionIntroRoundIdx a disparu — donc le moment où les options de
+// réponse sont enfin VISIBLES sur CET appareil (ajouté le 07/08/2026, retour
+// de Rémi : le chrono de points partait de game_round_started_at, soit le
+// tout début de la manche/musique, alors que l'intro de 2.2s cache et bloque
+// les options — les 1000 pts max devenaient donc impossibles à atteindre.
+// Voir submitGameGuess()). 0 tant que l'intro n'a pas fini au moins une fois.
+let gameRoundOptionsVisibleAt = 0;
 let gameMyGuessSelection = new Set();
 let gameGuessSelectionRoundIdx = -1; // dernière manche pour laquelle gameMyGuessSelection a été initialisée depuis la base
 let gamePlayer = null; // lecteur YouTube de CET appareil pour la manche en cours
@@ -1926,6 +1934,9 @@ let btMyGuess = null; // youtube_id choisi pour la manche en cours (un seul choi
 let btGuessOptionsCache = []; // ordre mélangé des choix, figé pour la manche en cours (voir ensureBtGuessSelectionForRound)
 let btAutoRevealRoundIdx = -1;
 let btRoundIntroIdx = -1;
+// Même principe que gameRoundOptionsVisibleAt ci-dessus, pour le Blindtest
+// multijoueur — voir submitBtGuess().
+let btRoundOptionsVisibleAt = 0;
 let btVoteTimerInterval = null;
 let btVoteTimerRoundIdx = -1;
 let btPlayer = null; // lecteur YouTube de CET appareil, distinct de gamePlayer (écran différent)
@@ -3137,6 +3148,7 @@ async function routeToRoomScreen(room, toastMsg){
     gameMyGuessSelection = new Set();
     gameAutoRevealRoundIdx = -1;
     gameQuestionIntroRoundIdx = -1;
+    gameRoundOptionsVisibleAt = 0;
     singleDeviceActivePlayer = null;
     singleDeviceRoundPoints = {};
     singleDeviceTotalScores = {};
@@ -3171,6 +3183,7 @@ async function routeToRoomScreen(room, toastMsg){
     if(room.single_device) loadSingleDeviceScoringState(room.id);
     btAutoRevealRoundIdx = -1;
     btRoundIntroIdx = -1;
+    btRoundOptionsVisibleAt = 0;
     renderRoomAvatars("btRoomAvatars");
     showScreen("screen-blindtest-lobby");
     await loadGameAnswers(room.id);
@@ -6035,7 +6048,11 @@ function showGameQuestionIntro(idx, total, label){
   el.classList.remove("gq-anim");
   void el.offsetWidth; // force le navigateur à "oublier" l'animation précédente pour pouvoir la rejouer
   el.classList.add("gq-anim");
-  setTimeout(() => { el.style.display = "none"; el.classList.remove("gq-anim"); }, 2200);
+  setTimeout(() => {
+    el.style.display = "none";
+    el.classList.remove("gq-anim");
+    gameRoundOptionsVisibleAt = Date.now(); // voir la déclaration de la variable pour le pourquoi
+  }, 2200);
 }
 
 /* ---- Lecteur synchronisé de la manche en cours (même principe que le mode
@@ -6333,9 +6350,19 @@ async function submitGameGuess(){
   // Chrono personnel remis à zéro par "Pub bloquée ?" (voir revealGameAdSkipButton()) :
   // si CETTE personne l'a cliqué pour CETTE manche, son temps repart de ce
   // clic plutôt que du vrai début de manche — n'affecte que son propre score.
+  // Sinon, chrono basé sur gameRoundOptionsVisibleAt (moment où l'intro de la
+  // manche a disparu sur CET appareil, voir showGameQuestionIntro) plutôt que
+  // game_round_started_at (ajouté le 07/08/2026, retour de Rémi : les 1000
+  // pts max étaient impossibles, l'intro de 2.2s cachant déjà les options
+  // avant même le premier clic possible). Repli sur game_round_started_at si
+  // l'intro n'a pas encore joué pour cette manche sur cet appareil (ne
+  // devrait pas arriver en pratique, l'intro bloque les clics tant qu'elle
+  // est affichée — filet de sécurité uniquement).
   const elapsed = (gameAdSkipClickedAtRound === roundIndex && gameAdSkipClickedAtTime)
     ? Math.max(0, (Date.now() - gameAdSkipClickedAtTime) / 1000)
-    : (currentRoom.game_round_started_at ? Math.max(0, (Date.now() - new Date(currentRoom.game_round_started_at).getTime()) / 1000) : 0);
+    : (gameQuestionIntroRoundIdx === roundIndex && gameRoundOptionsVisibleAt)
+      ? Math.max(0, (Date.now() - gameRoundOptionsVisibleAt) / 1000)
+      : (currentRoom.game_round_started_at ? Math.max(0, (Date.now() - new Date(currentRoom.game_round_started_at).getTime()) / 1000) : 0);
   const rows = [...gameMyGuessSelection].map(uid => ({
     room_id: currentRoom.id,
     round_index: roundIndex,
@@ -6364,6 +6391,28 @@ async function revealGameRound(){
   currentRoom = data;
   await loadGameGuesses(currentRoom.id);
   renderGameLobby();
+}
+
+// Points gagnés par CHAQUE joueur sur LA manche donnée uniquement (ajouté le
+// 07/08/2026, demande de Rémi : la révélation ne montrait que ton propre
+// score, pas celui des autres). Même logique d'accumulation que la boucle
+// interne de computeGameScores() (un joueur peut avoir plusieurs guesses
+// valides sur la même manche via gameMyGuessSelection — un Set — donc on
+// ADDITIONNE, on ne garde pas juste la meilleure), mais limitée à ce
+// roundIndex et en gardant aussi elapsed/lightning pour savoir qui a
+// répondu juste le plus vite.
+function computeGameRoundPoints(round, roundIndex){
+  const owners = new Set(round.owner_user_ids || []);
+  const result = {};
+  gameGuesses.filter(g => g.round_index === roundIndex).forEach(g => {
+    if(!owners.has(g.guessed_user_id)) return;
+    const elapsed = Number(g.elapsed_seconds) || 0;
+    const { total, lightning } = computePoints(elapsed);
+    if(!result[g.guesser_user_id]) result[g.guesser_user_id] = { total: 0, lightning: false, elapsed };
+    result[g.guesser_user_id].total += total;
+    if(lightning) result[g.guesser_user_id].lightning = true;
+  });
+  return result;
 }
 
 function renderGameReveal(round){
@@ -6397,17 +6446,6 @@ function renderGameReveal(round){
   }
   const owners = round.owner_user_ids || [];
   const ownerNames = owners.map(uid => getPseudoForUserId(uid)).join(", ");
-  const myGuesses = gameGuesses.filter(g => g.round_index === currentRoom.game_current_round && g.guesser_user_id === currentUser?.id);
-  let myPoints = 0;
-  let lightning = false;
-  myGuesses.forEach(g => {
-    if(owners.includes(g.guessed_user_id)){
-      const pts = computePoints(Number(g.elapsed_seconds) || 0);
-      myPoints += pts.total;
-      if(pts.lightning) lightning = true;
-    }
-  });
-  const iAmOwner = owners.includes(currentUser?.id);
   const isOwnerGame = currentRoom.mode === "owner";
   const chosenLabel = isOwnerGame ? "Proposé par : " : "Choisi par : ";
   const noneLabel = isOwnerGame ? "Personne n'a proposé ça" : "Personne n'a répondu ça";
@@ -6415,11 +6453,34 @@ function renderGameReveal(round){
     <div class="card" style="text-align:center;">
       <div style="font-size:13px;color:var(--text-dim);margin-bottom:6px;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
       <div style="font-size:15px;font-weight:700;">${owners.length ? chosenLabel + escapeHtml(ownerNames) : noneLabel}</div>
-      ${myPoints > 0
-        ? `<div style="margin-top:8px;color:var(--accent1);font-weight:700;">${lightning ? "⚡ " : ""}+${myPoints} point(s) pour toi !</div>`
-        : (iAmOwner ? "" : `<div style="margin-top:8px;color:var(--text-faint);">0 point cette manche.</div>`)}
     </div>
+    <div style="margin-top:12px;text-align:left;">${renderRoundPointsRows(computeGameRoundPoints(round, currentRoom.game_current_round))}</div>
   `;
+}
+
+// Liste "qui a marqué combien sur CETTE manche" — réutilisée par
+// renderGameReveal() et renderBtReveal() (ajouté le 07/08/2026, demande de
+// Rémi). Le style .score-row existant (scoreboard final) est repris pour
+// rester cohérent visuellement. Ta propre ligne ressort avec une bordure
+// accent (remplace l'ancien "+X points pour toi !" séparé) ; la personne la
+// plus rapide À AVOIR MARQUÉ (elapsed le plus bas parmi total > 0) reçoit un
+// ⚡ devant son nom.
+function renderRoundPointsRows(roundPoints){
+  const fastestUid = Object.entries(roundPoints)
+    .filter(([, v]) => v.total > 0)
+    .sort((a, b) => a[1].elapsed - b[1].elapsed)[0]?.[0];
+  const entries = getGameParticipantIds()
+    .map(uid => [uid, getPseudoForUserId(uid), roundPoints[uid]?.total || 0])
+    .sort((a, b) => b[2] - a[2]);
+  return entries.map(([uid, name, pts]) => {
+    const isMe = uid === currentUser?.id;
+    return `
+      <div class="score-row"${isMe ? ' style="border-color:var(--accent1);"' : ""}>
+        <span>${uid === fastestUid ? "⚡ " : ""}${escapeHtml(name)}${isMe ? " (toi)" : ""}</span>
+        <strong style="color:${pts > 0 ? "var(--accent1)" : "var(--text-faint)"};">${pts > 0 ? "+" + pts : "0"} pt${pts > 1 ? "s" : ""}</strong>
+      </div>
+    `;
+  }).join("");
 }
 
 // Fait avancer la partie à la manche suivante (ou vers l'écran de fin si
@@ -6660,6 +6721,7 @@ async function rejouerMemeSalon(){
   gameMyGuessSelection = new Set();
   gameAutoRevealRoundIdx = -1;
   gameQuestionIntroRoundIdx = -1;
+  gameRoundOptionsVisibleAt = 0;
   singleDeviceActivePlayer = null;
   singleDeviceRoundPoints = {};
   singleDeviceTotalScores = {};
@@ -7654,7 +7716,11 @@ function showBtRoundIntro(idx, total){
   el.classList.remove("gq-anim");
   void el.offsetWidth;
   el.classList.add("gq-anim");
-  setTimeout(() => { el.style.display = "none"; el.classList.remove("gq-anim"); }, 2200);
+  setTimeout(() => {
+    el.style.display = "none";
+    el.classList.remove("gq-anim");
+    btRoundOptionsVisibleAt = Date.now(); // voir la déclaration de la variable pour le pourquoi
+  }, 2200);
 }
 
 /* ---- Lecteur synchronisé de la manche en cours — même principe que
@@ -7887,6 +7953,14 @@ function ensureBtGuessSelectionForRound(idx){
     : [];
 }
 
+// Grille à 2 colonnes (classe .guess-grid/.guess-option, ajouté le
+// 07/08/2026, retour de Rémi : "on a toujours besoin de scroller pour voir
+// toutes les propositions de réponse") — jusqu'ici seul ce Blindtest
+// multijoueur rendait ses 4 choix en liste pleine largeur empilée (boutons
+// à styles inline), 2x plus haute qu'une grille. "Le jeu des questions"
+// (gqGuessOptions) ET le Blindtest solo (guessGrid) utilisaient déjà cette
+// même grille compacte — simple oubli lors de la construction du Blindtest
+// multijoueur, maintenant aligné sur le même pattern partout dans l'app.
 function renderBtGuessOptions(round){
   const timeUp = gameVoteSecondsLeft() <= 0;
   const locked = timeUp || !!btMyGuess;
@@ -7895,10 +7969,14 @@ function renderBtGuessOptions(round){
     const active = btMyGuess === opt.youtube_id;
     return `
       <button
+        class="guess-option${active ? " selected" : ""}"
         onclick="pickBtGuessOption('${escJs(opt.youtube_id || "")}')"
         ${locked ? "disabled" : ""}
-        style="width:100%;text-align:left;padding:12px 14px;border-radius:12px;border:2px solid ${active ? "var(--accent1)" : "var(--border)"};background:${active ? "var(--accent1)" : "var(--bg-card)"};color:${active ? "#fff" : "var(--text)"};font-weight:600;font-size:13.5px;cursor:${locked ? "default" : "pointer"};opacity:${locked && !active ? "0.5" : "1"};transition:all .15s;margin-bottom:8px;"
-      >${active ? "✓ " : ""}${escapeHtml(opt.title)}${opt.artist ? " — " + escapeHtml(opt.artist) : ""}</button>
+        style="cursor:${locked ? "default" : "pointer"};opacity:${locked && !active ? "0.5" : "1"};"
+      >
+        <div>${active ? "✓ " : ""}${escapeHtml(opt.title)}</div>
+        ${opt.artist ? `<div style="font-size:10.5px;color:var(--text-faint);">${escapeHtml(opt.artist)}</div>` : ""}
+      </button>
     `;
   }).join("");
   const timeUpHint = document.getElementById("btGuessTimeUpHint");
@@ -7919,9 +7997,13 @@ async function submitBtGuess(){
   const alreadySaved = btGuesses.some(g => g.round_index === roundIndex && g.guesser_user_id === currentUser.id);
   if(alreadySaved) return;
   // Chrono personnel remis à zéro par "Pub bloquée ?" — voir revealAdSkipButton().
+  // Sinon basé sur btRoundOptionsVisibleAt plutôt que game_round_started_at —
+  // même correctif et même raison que submitGameGuess(), voir son commentaire.
   const elapsed = (btAdSkipClickedAtRound === roundIndex && btAdSkipClickedAtTime)
     ? Math.max(0, (Date.now() - btAdSkipClickedAtTime) / 1000)
-    : (currentRoom.game_round_started_at ? Math.max(0, (Date.now() - new Date(currentRoom.game_round_started_at).getTime()) / 1000) : 0);
+    : (btRoundIntroIdx === roundIndex && btRoundOptionsVisibleAt)
+      ? Math.max(0, (Date.now() - btRoundOptionsVisibleAt) / 1000)
+      : (currentRoom.game_round_started_at ? Math.max(0, (Date.now() - new Date(currentRoom.game_round_started_at).getTime()) / 1000) : 0);
   const { error } = await sb.from("blindtest_guesses").insert({
     room_id: currentRoom.id,
     round_index: roundIndex,
@@ -7944,6 +8026,19 @@ async function revealBtRound(){
   currentRoom = data;
   await loadBtGuesses(currentRoom.id);
   renderBlindtestLobby();
+}
+
+// Équivalent computeGameRoundPoints() pour le Blindtest — un seul guess par
+// joueur et par manche ici (btMyGuess, pas un Set), donc pas besoin
+// d'additionner plusieurs guesses comme côté "jeu des questions".
+function computeBtRoundPoints(round, roundIndex){
+  const result = {};
+  btGuesses.filter(g => g.round_index === roundIndex && g.guessed_youtube_id === round.youtube_id).forEach(g => {
+    const elapsed = Number(g.elapsed_seconds) || 0;
+    const { total, lightning } = computePoints(elapsed);
+    result[g.guesser_user_id] = { total, lightning, elapsed };
+  });
+  return result;
 }
 
 function renderBtReveal(round){
@@ -7975,23 +8070,12 @@ function renderBtReveal(round){
     renderSingleDeviceScoreChips("btSingleDeviceScoreChips", singleDeviceKnownNames);
     return;
   }
-  const myGuess = btGuesses.find(g => g.round_index === currentRoom.game_current_round && g.guesser_user_id === currentUser?.id);
-  let myPoints = 0;
-  let lightning = false;
-  if(myGuess && myGuess.guessed_youtube_id === round.youtube_id){
-    const pts = computePoints(Number(myGuess.elapsed_seconds) || 0);
-    myPoints = pts.total;
-    lightning = pts.lightning;
-  }
-  const iAmOwner = owners.includes(currentUser?.id);
   document.getElementById("btRevealBox").innerHTML = `
     <div class="card" style="text-align:center;">
       <div style="font-size:15px;font-weight:700;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
       <div style="font-size:12.5px;color:var(--text-dim);margin-top:6px;">${ownerLine}</div>
-      ${myPoints > 0
-        ? `<div style="margin-top:8px;color:var(--accent1);font-weight:700;">${lightning ? "⚡ " : ""}+${myPoints} point(s) pour toi !</div>`
-        : (iAmOwner ? "" : `<div style="margin-top:8px;color:var(--text-faint);">0 point cette manche.</div>`)}
     </div>
+    <div style="margin-top:12px;text-align:left;">${renderRoundPointsRows(computeBtRoundPoints(round, currentRoom.game_current_round))}</div>
   `;
 }
 
@@ -8302,6 +8386,7 @@ async function rejouerBtMemeSalon(){
   saveSingleDeviceScoringState();
   btAutoRevealRoundIdx = -1;
   btRoundIntroIdx = -1;
+  btRoundOptionsVisibleAt = 0;
   showToast("🔄 Nouvelle partie ! Proposez de nouvelles chansons.");
   renderBlindtestLobby();
 }
