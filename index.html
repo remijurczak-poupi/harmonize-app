@@ -5171,11 +5171,23 @@ function renderMineFlatList(tracks, showBackButton, emptyMessage){
   const backBtn = showBackButton
     ? `<button class="btn-ghost" style="width:auto;padding:6px 12px;font-size:12.5px;margin-bottom:10px;" onclick="backToMinePlaylists()">← Toutes les playlists</button>`
     : "";
+  // Ajout en masse (ajouté le 07/08/2026, demande de Rémi : pouvoir ajouter
+  // toute une playlist d'un coup, pas titre par titre) — uniquement quand on
+  // regarde UNE playlist précise (showBackButton), pas un résultat de
+  // recherche libre qui mélangerait plusieurs playlists sans lien entre eux.
+  // minePlaylistFilter (variable partagée, voir plus haut) porte le nom de
+  // la playlist actuellement affichée.
+  const bulkAddBtns = showBackButton
+    ? `<div style="display:flex;gap:8px;margin-bottom:10px;">
+        <button class="btn-ghost" style="width:auto;flex:1;padding:8px;font-size:12.5px;" onclick="addPlaylistToQueue('${escJs(minePlaylistFilter)}', false)">➕ Tout ajouter</button>
+        <button class="btn-ghost" style="width:auto;flex:1;padding:8px;font-size:12.5px;" onclick="addPlaylistToQueue('${escJs(minePlaylistFilter)}', true)">🔀 Ajouter mélangé</button>
+      </div>`
+    : "";
   if(!tracks.length){
     el.innerHTML = backBtn + `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">${emptyMessage}</p>`;
     return;
   }
-  el.innerHTML = backBtn + tracks.map(t => {
+  el.innerHTML = backBtn + bulkAddBtns + tracks.map(t => {
     const i = myImportedTracks.indexOf(t); // index dans le tableau complet, pour addMineTrackToQueue
     return `
     <div class="search-result">
@@ -5196,6 +5208,49 @@ function addMineTrackToQueue(index){
   const t = myImportedTracks[index];
   if(!t) return;
   addToQueue({ title: t.title, artist: t.artist, youtubeId: t.youtube_id, thumbnail: t.thumbnail });
+}
+
+// Ajoute TOUTE une playlist importée à la file d'un coup (ajouté le
+// 07/08/2026, demande de Rémi — jusqu'ici il fallait ajouter chaque titre un
+// par un via addMineTrackToQueue()). shuffle=true mélange l'ordre d'ajout
+// (demande liée : "lire une playlist en aléatoire") — un simple mélange une
+// fois à l'ajout, pas un mode aléatoire permanent pour toute la file.
+// position explicite (pas laissée à null comme addToQueue()) : une insertion
+// groupée donne le même created_at à toutes les lignes en base, insuffisant
+// à lui seul pour garantir l'ordre voulu au sein du lot.
+async function addPlaylistToQueue(name, shuffle){
+  const tracks = name === ALL_IMPORTED_LABEL
+    ? myImportedTracks
+    : myImportedTracks.filter(t => (t.playlist_title || "Sans playlist") === name);
+  if(!tracks.length){ showToast("Cette playlist est vide."); return; }
+  // Même dédoublonnage par titre que addToQueue() (voir son commentaire) —
+  // pas d'erreur si une partie des titres est déjà dans la file, juste ignorés.
+  const existingTitles = new Set((state.realQueueItems||[]).map(q => q.title));
+  let toAdd = tracks.filter(t => !existingTitles.has(t.title));
+  if(!toAdd.length){ showToast("Tous ces titres sont déjà dans la file."); return; }
+  if(shuffle) toAdd = shuffleArray(toAdd);
+  const basePosition = Math.max(0, ...(state.realQueueItems||[]).map(q => q.position ?? 0)) + 1;
+  const rows = toAdd.map((t, i) => ({
+    room_id: currentRoom.id,
+    title: t.title,
+    artist: t.artist,
+    platform: "youtube",
+    youtube_id: t.youtube_id,
+    proposed_by: currentUser.id,
+    votes: 1,
+    position: basePosition + i,
+  }));
+  const { error } = await sb.from("queue_items").insert(rows);
+  if(error){ showToast("Erreur d'ajout : " + error.message); return; }
+  const skipped = tracks.length - toAdd.length;
+  showToast(`${toAdd.length} titre(s) ajouté(s) à la file` + (skipped ? ` (${skipped} déjà présent(s))` : ""));
+  // Nourrit aussi le pool communautaire, comme addToQueue() pour un ajout
+  // individuel (voir son commentaire du 22/07/2026).
+  const poolRows = toAdd.filter(t => t.youtube_id).map(t => ({ youtube_id: t.youtube_id, title: t.title, artist: t.artist || "", thumbnail: t.thumbnail || "" }));
+  if(poolRows.length) await populateBtPool(poolRows);
+  await loadRealQueue(currentRoom.id);
+  if(state.mode === "distance" && !distanceJoined) autoJoinDistanceListening();
+  closeSearch();
 }
 
 /* ============================================================
