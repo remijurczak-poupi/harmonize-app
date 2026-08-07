@@ -978,12 +978,16 @@
                clique dessus, sans étape de validation séparée. Son propre nom
                apparaît maintenant aussi parmi les choix (avant, il en était
                exclu par erreur). -->
+          <!-- Titre repassé d'un <h2> à une ligne compacte, et phrase
+               d'explication retirée (ajouté le 07/08/2026, retour de Rémi :
+               toujours besoin de scroller pour voir les réponses). Le texte
+               de gqGuessBoxTitle reste dynamique (voir renderGamePlaying()) —
+               seule sa taille change, l'info "quel mode" reste affichée. -->
           <div id="gqGuessBox" style="display:none;margin-bottom:16px;">
-            <h2 style="margin-top:0;display:flex;align-items:center;justify-content:space-between;gap:8px;">
-              <span id="gqGuessBoxTitle">Qui a répondu ça ?</span>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <span id="gqGuessBoxTitle" style="font-weight:700;font-size:15px;">Qui a répondu ça ?</span>
               <span class="pill" id="gqVoteCountdown" style="font-size:12px;"></span>
-            </h2>
-            <p style="font-size:12px;color:var(--text-faint);margin-top:-6px;margin-bottom:10px;">Un clic suffit à voter — c'est ensuite définitif pour cette manche.</p>
+            </div>
             <div class="guess-grid" id="gqGuessOptions"></div>
             <p id="gqGuessTimeUpHint" style="display:none;font-size:12px;color:var(--text-faint);text-align:center;margin-top:12px;">⏰ Temps écoulé pour voter sur cette manche — révélation dans un instant.</p>
           </div>
@@ -1264,16 +1268,17 @@
             <p style="font-size:13px;color:var(--text-dim);margin:0;">🎵 C'est l'une de tes propositions ! Profite du morceau — les autres devinent de quelle chanson il s'agit.</p>
           </div>
 
+          <!-- Titre "C'est quelle chanson ?" + phrase d'explication retirés
+               le 07/08/2026 (retour de Rémi : toujours besoin de scroller
+               pour voir les réponses, sur toutes les manches — l'intitulé du
+               01/08/2026 avait déjà réduit une longue explication, mais pas
+               assez). Le concept ("Blindtest" = deviner la chanson) est déjà
+               clair sans le répéter à chaque manche ; le compte à rebours
+               suffit, replié dans une simple ligne compacte. -->
           <div id="btGuessBox" style="display:none;margin-bottom:16px;">
-            <h2 style="margin-top:0;display:flex;align-items:center;justify-content:space-between;gap:8px;">
-              <span>C'est quelle chanson ?</span>
+            <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
               <span class="pill" id="btVoteCountdown" style="font-size:12px;"></span>
-            </h2>
-            <!-- Raccourci le 01/08/2026, retour de Rémi : "il faut scroller
-                 pour voir les réponses possibles" — ce texte prenait à lui
-                 seul 3-4 lignes, pour des infos déjà visibles ailleurs (le
-                 compte à rebours juste au-dessus). -->
-            <p style="font-size:12px;color:var(--text-faint);margin-top:-6px;margin-bottom:10px;">Un clic suffit — c'est définitif pour cette manche. Plus tu réponds vite, plus tu marques de points.</p>
+            </div>
             <div class="guess-grid" id="btGuessOptions"></div>
             <p id="btGuessTimeUpHint" style="display:none;font-size:12px;color:var(--text-faint);text-align:center;margin-top:12px;">⏰ Temps écoulé pour deviner sur cette manche — révélation dans un instant.</p>
           </div>
@@ -1915,6 +1920,15 @@ let gameQuestionIntroRoundIdx = -1;
 // les options — les 1000 pts max devenaient donc impossibles à atteindre.
 // Voir submitGameGuess()). 0 tant que l'intro n'a pas fini au moins une fois.
 let gameRoundOptionsVisibleAt = 0;
+// Dernière manche pour laquelle scrollToRevealAnswers() a déjà été appelée
+// (ajouté le 07/08/2026, retour de Rémi : sur petit écran, même après avoir
+// réduit la hauteur du lecteur/de l'intitulé, tout ne rentre pas toujours —
+// plutôt que de laisser la page en haut par défaut [le lecteur/les boutons
+// visibles, les réponses coupées], on scrolle explicitement pour prioriser
+// les réponses : "l'important c'est les réponses", retour de Rémi). Une
+// seule fois par manche — pas à chaque re-rendu (ex: un autre joueur qui
+// répond), sinon la page saute sous les pieds de qui est en train de lire.
+let gameScrolledAnswersRoundIdx = -1;
 let gameMyGuessSelection = new Set();
 let gameGuessSelectionRoundIdx = -1; // dernière manche pour laquelle gameMyGuessSelection a été initialisée depuis la base
 let gamePlayer = null; // lecteur YouTube de CET appareil pour la manche en cours
@@ -1945,6 +1959,8 @@ let btRoundIntroIdx = -1;
 // Même principe que gameRoundOptionsVisibleAt ci-dessus, pour le Blindtest
 // multijoueur — voir submitBtGuess().
 let btRoundOptionsVisibleAt = 0;
+// Même principe que gameScrolledAnswersRoundIdx ci-dessus, pour le Blindtest.
+let btScrolledAnswersRoundIdx = -1;
 let btVoteTimerInterval = null;
 let btVoteTimerRoundIdx = -1;
 let btPlayer = null; // lecteur YouTube de CET appareil, distinct de gamePlayer (écran différent)
@@ -3157,6 +3173,7 @@ async function routeToRoomScreen(room, toastMsg){
     gameAutoRevealRoundIdx = -1;
     gameQuestionIntroRoundIdx = -1;
     gameRoundOptionsVisibleAt = 0;
+    gameScrolledAnswersRoundIdx = -1;
     singleDeviceActivePlayer = null;
     singleDeviceRoundPoints = {};
     singleDeviceTotalScores = {};
@@ -3192,6 +3209,7 @@ async function routeToRoomScreen(room, toastMsg){
     btAutoRevealRoundIdx = -1;
     btRoundIntroIdx = -1;
     btRoundOptionsVisibleAt = 0;
+    btScrolledAnswersRoundIdx = -1;
     renderRoomAvatars("btRoomAvatars");
     showScreen("screen-blindtest-lobby");
     await loadGameAnswers(room.id);
@@ -6060,17 +6078,11 @@ function renderGamePlaying(){
 function showGameQuestionIntro(idx, total, label){
   if(gameQuestionIntroRoundIdx === idx) return;
   gameQuestionIntroRoundIdx = idx;
-  // Remonte en haut de la page à la toute 1ère manche uniquement (ajouté le
-  // 07/08/2026, retour de Rémi : sur la manche 1 seulement, la 2e ligne de
-  // réponses restait sous le bas de l'écran — un plafonnement de la hauteur
-  // du lecteur n'avait pas suffi, la vraie cause était ailleurs). L'écran de
-  // réglages précédent ("Lancer la partie") peut avoir été scrollé assez bas
-  // pour l'atteindre ; passer à l'écran de jeu ne réinitialise PAS la
-  // position de scroll tout seul (aucune vraie navigation de page, juste un
-  // changement d'affichage en JS) — elle restait donc telle quelle. Limité à
-  // idx===0 : les manches suivantes ne doivent JAMAIS être interrompues par
-  // un retour forcé en haut (agaçant en cours de partie).
-  if(idx === 0) window.scrollTo(0, 0);
+  // Remise à zéro à idx===0 (ajoutée le 07/08/2026) retirée le même jour :
+  // remonter en haut ne suffisait pas (le vrai souci touchait aussi les
+  // manches suivantes) — voir scrollToRevealAnswers(), qui priorise
+  // maintenant les réponses elles-mêmes plutôt que le haut de la page, à
+  // CHAQUE manche.
   const el = document.getElementById("gqQuestionIntro");
   if(!el) return;
   document.getElementById("gqQuestionIntroCounter").textContent = `Manche ${idx + 1}/${total}`;
@@ -6341,6 +6353,20 @@ function ensureGuessSelectionForRound(idx){
 // propriétaires, choisir n'importe lequel des deux suffit à valider la
 // réponse (voir renderGameReveal, inchangé). Et une fois choisi, ça ne se
 // change plus : tous les boutons se verrouillent après le premier clic.
+// Scrolle pour que la grille de réponses soit visible en priorité, quitte à
+// perdre le haut de l'écran (bannière/lecteur) — ajouté le 07/08/2026,
+// retour de Rémi ("l'important c'est les réponses") après que réduire la
+// hauteur du lecteur et l'intitulé n'aient pas suffi sur tous les
+// téléphones. "end" aligne le BAS de la grille sur le bas de l'écran visible
+// plutôt que son haut : si tout ne rentre toujours pas, ce qui disparaît est
+// le haut de la page, jamais une réponse. instant (pas smooth) pour ne pas
+// laisser voir le petit trajet de scroll pendant l'intro plein écran qui
+// masque tout au même moment (voir showGameQuestionIntro()/showBtRoundIntro()).
+function scrollToRevealAnswers(gridId){
+  const el = document.getElementById(gridId);
+  if(el && el.children.length) el.scrollIntoView({ block: "end", behavior: "instant" });
+}
+
 function renderGameGuessOptions(round){
   const idx = currentRoom.game_current_round;
   const timeUp = gameVoteSecondsLeft() <= 0;
@@ -6360,6 +6386,12 @@ function renderGameGuessOptions(round){
   }).join("");
   const timeUpHint = document.getElementById("gqGuessTimeUpHint");
   if(timeUpHint) timeUpHint.style.display = timeUp ? "block" : "none";
+  // Une seule fois par manche (pas à chaque re-rendu, ex: un autre joueur
+  // qui répond) — voir scrollToRevealAnswers() pour le pourquoi.
+  if(gameScrolledAnswersRoundIdx !== idx){
+    gameScrolledAnswersRoundIdx = idx;
+    scrollToRevealAnswers("gqGuessOptions");
+  }
 }
 
 function toggleGuessSelection(userId){
@@ -6753,6 +6785,7 @@ async function rejouerMemeSalon(){
   gameAutoRevealRoundIdx = -1;
   gameQuestionIntroRoundIdx = -1;
   gameRoundOptionsVisibleAt = 0;
+  gameScrolledAnswersRoundIdx = -1;
   singleDeviceActivePlayer = null;
   singleDeviceRoundPoints = {};
   singleDeviceTotalScores = {};
@@ -7746,9 +7779,6 @@ function renderBtPlaying(){
 function showBtRoundIntro(idx, total){
   if(btRoundIntroIdx === idx) return;
   btRoundIntroIdx = idx;
-  // Remonte en haut de la page à la manche 1 uniquement — même correctif que
-  // showGameQuestionIntro(), voir son commentaire pour le pourquoi.
-  if(idx === 0) window.scrollTo(0, 0);
   const el = document.getElementById("btRoundIntro");
   if(!el) return;
   document.getElementById("btRoundIntroCounter").textContent = `Manche ${idx + 1}/${total}`;
@@ -8021,6 +8051,13 @@ function renderBtGuessOptions(round){
   }).join("");
   const timeUpHint = document.getElementById("btGuessTimeUpHint");
   if(timeUpHint) timeUpHint.style.display = timeUp ? "block" : "none";
+  // Une seule fois par manche — même correctif que renderGameGuessOptions(),
+  // voir scrollToRevealAnswers() pour le pourquoi.
+  const idx = currentRoom.game_current_round;
+  if(btScrolledAnswersRoundIdx !== idx){
+    btScrolledAnswersRoundIdx = idx;
+    scrollToRevealAnswers("btGuessOptions");
+  }
 }
 
 function pickBtGuessOption(youtubeId){
@@ -8427,6 +8464,7 @@ async function rejouerBtMemeSalon(){
   btAutoRevealRoundIdx = -1;
   btRoundIntroIdx = -1;
   btRoundOptionsVisibleAt = 0;
+  btScrolledAnswersRoundIdx = -1;
   showToast("🔄 Nouvelle partie ! Proposez de nouvelles chansons.");
   renderBlindtestLobby();
 }
