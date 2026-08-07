@@ -8593,28 +8593,37 @@ function escJs(str){
 }
 
 /* ---- Scoring : 1000 pts pour une réponse en moins d'1 seconde, puis
-   décroissance progressive jusqu'à un plancher (jamais 0, pour ne pas
-   décourager une bonne réponse juste lente) ----
+   décroissance jusqu'à un plancher (jamais 0, pour ne pas décourager une
+   bonne réponse juste lente) ----
    Refondu le 24/07/2026 (retour de Rémi : l'ancien barème donnait toujours
    AU MOINS 1000 pts de socle fixe même pour une réponse très lente, ce qui
    produisait des totaux "ronds" (1000, 2000, 3000...) qui semblaient être un
    bug — 1000 pts est maintenant le MAXIMUM (pour <1s), plus rien de fixe
-   au-delà. Décroissance linéaire jusqu'au plancher (200 pts), atteint à la
-   fin du temps de vote (GAME_VOTE_SECONDS) — au-delà (réponse encore plus
-   lente), on reste au plancher, jamais 0. L'ancien bonus "éclair x2" est
+   au-delà. Plancher à 200 pts, jamais 0. L'ancien bonus "éclair x2" est
    retiré (il aurait dépassé le nouveau maximum de 1000) : ⚡ reste affiché
    comme simple repère visuel pour une réponse quasi instantanée, sans
-   multiplier le score. */
+   multiplier le score.
+   Décroissance passée d'EXPONENTIELLE le 07/08/2026 (retour de Rémi : la
+   version linéaire d'origine ne créait pas assez d'écart entre une réponse
+   rapide et une lente — sur la plage de temps où les gens répondent
+   RÉELLEMENT, quelques secondes, la perte de points restait faible). Une
+   exponentielle chute vite au début (là où se concentrent les vrais écarts
+   de rapidité entre joueurs) puis s'aplatit vers le plancher — GAME_POINTS_
+   DECAY_RATE règle la vitesse de cette chute (plus grand = chute plus
+   rapide) ; 3 = ~95% de l'écart max/plancher déjà consommé à la fin de
+   GAME_VOTE_SECONDS. */
 const GAME_POINTS_MAX = 1000;
 const GAME_POINTS_MIN = 200;
 const GAME_POINTS_GRACE_SECONDS = 1; // 1000 pts garantis en dessous de ce seuil
+const GAME_POINTS_DECAY_RATE = 3;
 
 function computePoints(elapsed){
   const lightning = elapsed <= GAME_POINTS_GRACE_SECONDS;
   if(lightning) return { total: GAME_POINTS_MAX, lightning };
   const decayWindow = GAME_VOTE_SECONDS - GAME_POINTS_GRACE_SECONDS;
-  const progress = Math.min(1, (elapsed - GAME_POINTS_GRACE_SECONDS) / decayWindow);
-  const total = Math.round(GAME_POINTS_MAX - progress * (GAME_POINTS_MAX - GAME_POINTS_MIN));
+  const t = Math.min(elapsed - GAME_POINTS_GRACE_SECONDS, decayWindow);
+  const decayed = Math.exp(-GAME_POINTS_DECAY_RATE * (t / decayWindow));
+  const total = Math.round(GAME_POINTS_MIN + decayed * (GAME_POINTS_MAX - GAME_POINTS_MIN));
   return { total, lightning };
 }
 
