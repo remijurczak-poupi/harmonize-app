@@ -6052,6 +6052,17 @@ function renderGamePlaying(){
 function showGameQuestionIntro(idx, total, label){
   if(gameQuestionIntroRoundIdx === idx) return;
   gameQuestionIntroRoundIdx = idx;
+  // Remonte en haut de la page à la toute 1ère manche uniquement (ajouté le
+  // 07/08/2026, retour de Rémi : sur la manche 1 seulement, la 2e ligne de
+  // réponses restait sous le bas de l'écran — un plafonnement de la hauteur
+  // du lecteur n'avait pas suffi, la vraie cause était ailleurs). L'écran de
+  // réglages précédent ("Lancer la partie") peut avoir été scrollé assez bas
+  // pour l'atteindre ; passer à l'écran de jeu ne réinitialise PAS la
+  // position de scroll tout seul (aucune vraie navigation de page, juste un
+  // changement d'affichage en JS) — elle restait donc telle quelle. Limité à
+  // idx===0 : les manches suivantes ne doivent JAMAIS être interrompues par
+  // un retour forcé en haut (agaçant en cours de partie).
+  if(idx === 0) window.scrollTo(0, 0);
   const el = document.getElementById("gqQuestionIntro");
   if(!el) return;
   document.getElementById("gqQuestionIntroCounter").textContent = `Manche ${idx + 1}/${total}`;
@@ -7727,6 +7738,9 @@ function renderBtPlaying(){
 function showBtRoundIntro(idx, total){
   if(btRoundIntroIdx === idx) return;
   btRoundIntroIdx = idx;
+  // Remonte en haut de la page à la manche 1 uniquement — même correctif que
+  // showGameQuestionIntro(), voir son commentaire pour le pourquoi.
+  if(idx === 0) window.scrollTo(0, 0);
   const el = document.getElementById("btRoundIntro");
   if(!el) return;
   document.getElementById("btRoundIntroCounter").textContent = `Manche ${idx + 1}/${total}`;
