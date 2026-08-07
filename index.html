@@ -159,6 +159,16 @@
   }
   .btn-success:active{transform:scale(0.98);}
   .btn-success:disabled{opacity:.55;}
+  /* Bouton "Ajouter" à côté du champ prénom (ajouté le 07/08/2026, retour de
+     Rémi : le "➕" en style ghost, même poids visuel qu'un bouton
+     secondaire/retour, ne se voyait pas comme LE geste qu'on répète pour
+     chaque prénom). Dégradé identique à .btn-primary pour bien signaler
+     "action à faire ici", mais compact pour rester à côté de l'input. */
+  .btn-add-name{
+    background:var(--accent-gradient);color:white;font-weight:600;font-size:14px;
+    padding:0 18px;border-radius:var(--radius-sm);flex-shrink:0;
+  }
+  .btn-add-name:active{transform:scale(0.97);}
   .btn-icon{
     background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);
     width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;
@@ -1109,11 +1119,18 @@
           <div id="btStepSingleDeviceNames" class="card" style="display:none;margin-bottom:16px;">
             <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">Qui va jouer ? (pour pouvoir donner des points à chacun pendant la partie)</p>
             <div id="btSingleDeviceNamesChips" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;"></div>
-            <div style="display:flex;gap:8px;margin-bottom:12px;">
+            <div style="display:flex;gap:8px;">
               <input type="text" id="btSingleDeviceSetupNameInput" placeholder="Prénom" style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault();addSingleDeviceSetupName();}" />
-              <button class="btn-ghost" style="width:auto;padding:8px 14px;" onclick="addSingleDeviceSetupName()">➕</button>
+              <button class="btn-add-name" onclick="addSingleDeviceSetupName()">Ajouter</button>
             </div>
-            <button class="btn-primary" onclick="confirmSingleDeviceNamesStep()">Continuer</button>
+            <p style="font-size:12px;color:var(--text-faint);margin:6px 0 0;">Un prénom à la fois : tape-le puis appuie sur "Ajouter" (ou Entrée). Répète pour chaque joueur.</p>
+            <!-- Séparation visuelle "ajouter" (répétable) / "continuer" (une
+                 seule fois) — même principe que sdLaunchBtn plus bas, retour
+                 de Rémi le 07/08/2026 : les deux gestes se confondaient. -->
+            <div style="text-align:center;margin-top:22px;padding-top:20px;border-top:1px solid var(--border);">
+              <p style="font-size:12px;color:var(--text-faint);margin:0 0 10px;">Une fois que tout le monde est ajouté :</p>
+              <button class="btn-primary" onclick="confirmSingleDeviceNamesStep()">Continuer</button>
+            </div>
             <button class="btn-ghost" style="margin-top:10px;" onclick="backToBtSongsCountStep()">← Changer le nombre de chansons</button>
           </div>
           <!-- Pas de choix "vidéo visible" ici (contrairement au jeu des
@@ -1399,6 +1416,20 @@
        fichier cachée, déclenchée par le clic sur l'avatar/le bouton texte —
        plus simple qu'un vrai input file (moche par défaut) tout en restant
        accessible (le vrai input reçoit bien le clic). -->
+  <!-- Modale de confirmation générique (ajoutée le 07/08/2026, retour de
+       Rémi : la fenêtre confirm() du navigateur est grise/moche et jure avec
+       le reste de l'app). Remplace les 3 confirm() natifs — voir
+       customConfirm() dans le JS. Un seul jeu d'éléments réutilisé à chaque
+       appel plutôt que d'en dupliquer un par cas d'usage. -->
+  <div class="modal-backdrop" id="confirmModal">
+    <div class="modal" style="max-width:400px;">
+      <div class="modal-handle"></div>
+      <p id="confirmModalMessage" style="white-space:pre-line;font-size:14.5px;line-height:1.5;margin:0 0 20px;"></p>
+      <button class="btn-primary" id="confirmModalOkBtn">Continuer</button>
+      <button class="btn-ghost" style="margin-top:10px;" id="confirmModalCancelBtn">Annuler</button>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="editPseudoModal">
     <div class="modal">
       <div class="modal-handle"></div>
@@ -2386,7 +2417,7 @@ async function handleSignOut(){
   // pour se reconnecter ensuite — se déconnecter le perd DÉFINITIVEMENT,
   // contrairement à un vrai compte. Confirmation supplémentaire pour éviter
   // une perte accidentelle (ajouté le 22/07/2026).
-  if(currentUser?.is_anonymous && !confirm("Tu joues sans compte : te déconnecter fera perdre l'accès à ce profil pour toujours (impossible de te reconnecter ensuite). Continuer ?")) return;
+  if(currentUser?.is_anonymous && !(await customConfirm("Tu joues sans compte : te déconnecter fera perdre l'accès à ce profil pour toujours (impossible de te reconnecter ensuite).", "Se déconnecter"))) return;
   if(realtimeChannel){ sb.removeChannel(realtimeChannel); realtimeChannel = null; }
   stopQueuePolling();
   stopAnyPlayback();
@@ -2426,6 +2457,28 @@ async function afterLogin(pseudo, avatarUrl){
     sessionStorage.removeItem("harmonizeActiveRoomCode");
   }
   showScreen("screen-lobby");
+}
+
+// Remplace window.confirm() par la modale stylée #confirmModal (ajouté le
+// 07/08/2026). okLabel personnalisable ("Continuer", "Se déconnecter"...) ;
+// le message accepte les \n (white-space:pre-line sur #confirmModalMessage).
+function customConfirm(message, okLabel = "Continuer"){
+  return new Promise(resolve => {
+    const modal = document.getElementById("confirmModal");
+    const okBtn = document.getElementById("confirmModalOkBtn");
+    const cancelBtn = document.getElementById("confirmModalCancelBtn");
+    document.getElementById("confirmModalMessage").textContent = message;
+    okBtn.textContent = okLabel;
+    function cleanup(result){
+      modal.classList.remove("open");
+      okBtn.onclick = null;
+      cancelBtn.onclick = null;
+      resolve(result);
+    }
+    okBtn.onclick = () => cleanup(true);
+    cancelBtn.onclick = () => cleanup(false);
+    modal.classList.add("open");
+  });
 }
 
 // Modifier son pseudo (ajouté le 24/07/2026, demande de Rémi) : jusque-là,
@@ -5751,10 +5804,10 @@ async function logActivityEvent(eventType, roomId, mode){
 // computeGameRounds()). Utilisé uniquement par sdLaunchBtn (mode "un seul
 // téléphone") — le bouton de lancement normal (gqLaunchBtn, un salon par
 // personne) n'a pas ce risque, donc launchGame() lui-même reste inchangé.
-function confirmLaunchSingleDeviceGame(){
+async function confirmLaunchSingleDeviceGame(){
   const names = getSingleDeviceLocalNames();
   const list = names.length ? names.join(", ") : "personne";
-  if(!confirm(`Lancer la partie avec : ${list} ?\n\nSi quelqu'un n'a pas encore répondu, appuie sur Annuler et fais-le d'abord — une fois la partie lancée, il ne pourra plus répondre à ce tour de questions.`)) return;
+  if(!(await customConfirm(`Lancer la partie avec : ${list} ?\n\nSi quelqu'un n'a pas encore répondu, appuie sur Annuler et fais-le d'abord — une fois la partie lancée, il ne pourra plus répondre à ce tour de questions.`, "🚀 Lancer la partie"))) return;
   launchGame();
 }
 
@@ -7069,7 +7122,7 @@ function backToBtSingleDeviceNamesStep(){
   renderBtSongCountPicker();
 }
 
-function confirmSingleDeviceNamesStep(){
+async function confirmSingleDeviceNamesStep(){
   // Au moins 1 prénom obligatoire (ajouté le 01/08/2026) : plus de champ de
   // secours à la volée pendant la partie (retiré à la demande de Rémi),
   // donc sans prénom renseigné ici, aucun point ne serait attribuable du tout.
@@ -7078,7 +7131,7 @@ function confirmSingleDeviceNamesStep(){
   // confirmLaunchSingleDeviceGame()) : la liste ne peut plus être complétée
   // une fois la partie commencée (pas de champ de secours à la volée), donc
   // oublier quelqu'un ici l'exclut silencieusement de tout le classement.
-  if(!confirm(`Ces personnes vont pouvoir marquer des points pendant la partie : ${singleDeviceKnownNames.join(", ")}.\n\nTu ne pourras plus en ajouter une fois la partie commencée. Continuer ?`)) return;
+  if(!(await customConfirm(`Ces personnes vont pouvoir marquer des points pendant la partie : ${singleDeviceKnownNames.join(", ")}.\n\nTu ne pourras plus en ajouter une fois la partie commencée.`, "Continuer"))) return;
   btSingleDeviceNamesStepDone = true;
   saveSingleDeviceScoringState();
   renderBtSongCountPicker();
