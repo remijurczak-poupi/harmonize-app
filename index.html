@@ -1199,6 +1199,34 @@
         </div>
       </div>
 
+      <!-- Phase 2, mode "un seul téléphone" (ajouté le 07/08/2026, retour de
+           Rémi : "3 joueurs, 1 chanson chacun" ne demandait qu'au seul compte
+           de l'appareil de proposer, ignorant les joueurs locaux nommés à
+           l'étape "Qui va jouer ?" juste avant) — même principe que
+           gqSingleDeviceAnswering (le téléphone tourne, chacun propose en
+           privé à son tour), voir renderBtSingleDeviceAnswering() dans le
+           JS. Différence avec le jeu des questions : ici le roster est déjà
+           connu (singleDeviceKnownNames, rempli à l'étape précédente) donc
+           des puces cliquables remplacent le champ "prénom" à retaper — pas
+           de risque de typo créant un joueur fantôme. -->
+      <div id="btSingleDeviceAnswering" style="display:none;">
+        <div id="btSdPickPlayer">
+          <h2 style="margin-top:0;">À qui de proposer ?</h2>
+          <p style="font-size:12.5px;color:var(--text-faint);margin-top:-8px;margin-bottom:14px;" id="btSdPickPlayerHint"></p>
+          <div id="btSdPlayersList" class="stack" style="margin-bottom:16px;"></div>
+          <div style="text-align:center;margin-top:22px;padding-top:20px;border-top:1px solid var(--border);">
+            <p style="font-size:12px;color:var(--text-faint);margin:0 0 10px;">Une fois que tout le monde a proposé :</p>
+            <button class="btn-success" id="btSdLaunchBtn" onclick="confirmLaunchBtSingleDevice()" disabled>🚀 Lancer la partie</button>
+            <p id="btSdLaunchHint" style="font-size:12px;color:var(--text-faint);margin-top:8px;"></p>
+          </div>
+        </div>
+        <div id="btSdTurnActive" style="display:none;">
+          <h2 style="margin-top:0;">Au tour de <span id="btSdActiveName"></span></h2>
+          <div id="btSdActiveAnswers" class="stack" style="margin-bottom:20px;"></div>
+          <button class="btn-primary" onclick="finishBtSingleDeviceTurn()">✅ J'ai fini, passer le téléphone</button>
+        </div>
+      </div>
+
       <!-- Phase 3 : la partie — écoute manche par manche + choix multiple +
            points selon la vitesse. -->
       <div id="btPhasePlaying" style="display:none;">
@@ -3260,6 +3288,12 @@ async function routeToRoomScreen(room, toastMsg){
     btRoundIntroIdx = -1;
     btRoundOptionsVisibleAt = 0;
     btScrolledAnswersRoundIdx = -1;
+    // Oubli corrigé le 07/08/2026 (voir renderBtSingleDeviceAnswering()) :
+    // variable PARTAGÉE avec "Le jeu des questions" (déjà remise à zéro dans
+    // SON propre bloc d'entrée en salon un peu plus haut) — sans cette
+    // ligne, un tour resté actif dans une PRÉCÉDENTE partie (l'un ou l'autre
+    // jeu) aurait pu fuiter dans un salon Blindtest fraîchement rejoint.
+    singleDeviceActivePlayer = null;
     renderRoomAvatars("btRoomAvatars");
     showScreen("screen-blindtest-lobby");
     await loadGameAnswers(room.id);
@@ -7181,13 +7215,15 @@ async function renderGameAnswerResults(q){
 // snake_case, comme en base) — voir pickGameAnswer()/pickGameAnswerFromMine().
 async function saveGameAnswerTrack(title, artist, youtubeId, thumbnail){
   if(!gamePickingQuestionId || !currentRoom) return;
-  // Mode "un seul téléphone" (ajouté le 24/07/2026) : toutes les réponses
+  // Mode "un seul téléphone" (ajouté le 24/07/2026, étendu au Blindtest le
+  // 07/08/2026 — voir renderBtSingleDeviceAnswering()) : toutes les réponses
   // viennent du même compte réel (celui de l'appareil qui tourne) — c'est
   // local_player_name qui distingue les réponses des différents joueurs
   // locaux entre elles (voir singleDeviceActivePlayer, et la contrainte
-  // élargie dans harmonize-schema.sql). Vide ('') pour toutes les autres
-  // parties, y compris le Blindtest en mode "un seul téléphone" simple (sa
-  // soumission reste par appareil, pas de téléphone qui tourne).
+  // élargie dans harmonize-schema.sql). Fonction 100% générique : vide ('')
+  // tant que personne n'a "pris le téléphone" (singleDeviceActivePlayer),
+  // quel que soit le jeu — c'est l'écran appelant qui décide de faire
+  // tourner le téléphone ou non, pas cette fonction.
   const localPlayerName = (currentRoom.single_device && singleDeviceActivePlayer) ? singleDeviceActivePlayer : "";
   const { error } = await sb.from("game_answers").upsert({
     room_id: currentRoom.id,
@@ -7367,14 +7403,19 @@ function renderBlindtestLobby(){
   if(!currentRoom) return;
   renderRoomAvatars("btRoomAvatars");
   const phase = currentRoom.game_phase || "lobby";
+  const singleDevice = !!currentRoom.single_device;
   document.getElementById("btPhaseLobby").style.display = phase === "lobby" ? "block" : "none";
-  document.getElementById("btPhaseAnswering").style.display = phase === "answering" ? "block" : "none";
+  document.getElementById("btPhaseAnswering").style.display = (phase === "answering" && !singleDevice) ? "block" : "none";
+  document.getElementById("btSingleDeviceAnswering").style.display = (phase === "answering" && singleDevice) ? "block" : "none";
   document.getElementById("btPhasePlaying").style.display = (phase === "playing" || phase === "finished") ? "block" : "none";
   document.getElementById("btPlayingActive").style.display = phase === "playing" ? "block" : "none";
   document.getElementById("btPhaseFinished").style.display = phase === "finished" ? "block" : "none";
 
   if(phase === "lobby") renderBtSongCountPicker();
-  else if(phase === "answering") renderBtAnsweringPhase();
+  else if(phase === "answering") {
+    if(singleDevice){ renderBtSingleDeviceAnswering(); }
+    else { renderBtAnsweringPhase(); }
+  }
   else if(phase === "playing") renderBtPlaying();
   else renderBtFinished();
 }
@@ -7648,6 +7689,112 @@ async function computeBtRandomRounds(count){
 }
 
 /* ---- Phase 2 : chacun propose ses chansons, le créateur suit la progression ---- */
+/* ---- Phase 2, mode "un seul téléphone" (ajouté le 07/08/2026, retour de
+   Rémi : "3 joueurs, 1 chanson chacun" ne demandait qu'au seul compte de
+   l'appareil de proposer, ignorant les joueurs locaux nommés à l'étape "Qui
+   va jouer ?" juste avant) : le téléphone tourne, chaque joueur du roster
+   propose ses chansons à son tour — même principe que
+   renderSingleDeviceAnswering() côté "Le jeu des questions" (réutilise le
+   même mécanisme générique local_player_name sur game_answers). Différence :
+   ici le roster est déjà connu (singleDeviceKnownNames, rempli à l'étape
+   précédente — voir confirmSingleDeviceNamesStep()), donc des puces
+   cliquables remplacent le champ "prénom" à retaper de gq — pas de risque
+   de typo créant un joueur fantôme distinct du roster prévu. ---- */
+function renderBtSingleDeviceAnswering(){
+  const slots = currentRoom.game_question_ids || [];
+  const total = slots.length;
+  const roster = singleDeviceKnownNames || [];
+
+  document.getElementById("btSdPickPlayer").style.display = !singleDeviceActivePlayer ? "block" : "none";
+  document.getElementById("btSdTurnActive").style.display = singleDeviceActivePlayer ? "block" : "none";
+
+  if(singleDeviceActivePlayer){
+    document.getElementById("btSdActiveName").textContent = singleDeviceActivePlayer;
+    const myAnswers = gameAnswers.filter(a => a.local_player_name === singleDeviceActivePlayer);
+    document.getElementById("btSdActiveAnswers").innerHTML = slots.map(slot => {
+      const label = `🎵 Chanson n°${slot.slice(2)}`;
+      const mine = myAnswers.find(a => a.question_id === slot);
+      return `
+        <div class="search-result" style="align-items:flex-start;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:600;">${escapeHtml(label)}</div>
+            ${mine
+              ? `<div style="font-size:12.5px;color:var(--text-dim);margin-top:2px;">✅ ${escapeHtml(mine.title)} — ${escapeHtml(mine.artist||"")}</div>`
+              : `<div style="font-size:12.5px;color:var(--text-faint);margin-top:2px;">Pas encore proposée</div>`}
+          </div>
+          <button class="add-btn" onclick="openGameAnswerModal('${slot}')" title="${mine ? "Changer" : "Proposer"}" style="width:auto;padding:0 12px;">${mine ? "✏️ Modifier" : "➕ Proposer"}</button>
+        </div>
+      `;
+    }).join("");
+    return;
+  }
+
+  if(!roster.length){
+    document.getElementById("btSdPickPlayerHint").textContent = "Aucun joueur enregistré — reviens à l'étape précédente pour ajouter des prénoms.";
+    document.getElementById("btSdPlayersList").innerHTML = "";
+    updateBtSingleDeviceLaunchButton(roster, total);
+    return;
+  }
+
+  document.getElementById("btSdPickPlayerHint").textContent = "Tape sur un prénom pour lui passer le téléphone. Retape sur le sien pour corriger ses propositions.";
+  document.getElementById("btSdPlayersList").innerHTML = roster.map(name => {
+    const count = gameAnswers.filter(a => a.local_player_name === name && slots.includes(a.question_id)).length;
+    const done = total > 0 && count >= total;
+    return `
+      <div class="search-result" style="cursor:pointer;" onclick="startBtSingleDeviceTurn('${escJs(name)}')">
+        ${avatarHtml(null, name, 30, 12)}
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:600;">${escapeHtml(name)}</div>
+          <div style="font-size:11.5px;color:var(--text-faint);">${count}/${total} chanson(s)${done ? " ✅" : ""}</div>
+        </div>
+        <span style="color:var(--text-faint);">›</span>
+      </div>
+    `;
+  }).join("");
+  updateBtSingleDeviceLaunchButton(roster, total);
+}
+
+function updateBtSingleDeviceLaunchButton(roster, total){
+  const btn = document.getElementById("btSdLaunchBtn");
+  const hint = document.getElementById("btSdLaunchHint");
+  const slots = currentRoom.game_question_ids || [];
+  const doneNames = roster.filter(name =>
+    gameAnswers.filter(a => a.local_player_name === name && slots.includes(a.question_id)).length >= total
+  );
+  if(doneNames.length > 0){
+    btn.disabled = false;
+    hint.textContent = `${doneNames.length}/${roster.length} joueur(s) prêt(s) — lance la partie, ou fais proposer quelqu'un de plus.`;
+  } else {
+    btn.disabled = true;
+    hint.textContent = "Fais proposer au moins une personne (toutes ses chansons) pour pouvoir lancer.";
+  }
+}
+
+function startBtSingleDeviceTurn(name){
+  if(!currentRoom || !name) return;
+  singleDeviceActivePlayer = name;
+  renderBlindtestLobby();
+}
+
+function finishBtSingleDeviceTurn(){
+  singleDeviceActivePlayer = null;
+  renderBlindtestLobby();
+}
+
+// Même principe que confirmLaunchSingleDeviceGame() côté "Le jeu des
+// questions" (ajouté le 06/08/2026) — confirmation avant de lancer pour de
+// vrai, pour ne pas couper court à quelqu'un qui n'a pas fini de proposer.
+async function confirmLaunchBtSingleDevice(){
+  const roster = singleDeviceKnownNames || [];
+  const slots = currentRoom.game_question_ids || [];
+  const doneNames = roster.filter(name =>
+    gameAnswers.filter(a => a.local_player_name === name && slots.includes(a.question_id)).length >= slots.length
+  );
+  const list = doneNames.length ? doneNames.join(", ") : "personne";
+  if(!(await customConfirm(`Lancer la partie avec les chansons de : ${list} ?\n\nSi quelqu'un n'a pas fini de proposer, appuie sur Annuler et fais-le d'abord — une fois la partie lancée, ses chansons manquantes ne pourront plus être ajoutées.`, "🚀 Lancer la partie"))) return;
+  launchBlindtest();
+}
+
 function renderBtAnsweringPhase(){
   const slots = currentRoom.game_question_ids || [];
   const myAnswers = gameAnswers.filter(a => a.user_id === currentUser?.id);
@@ -7768,9 +7915,17 @@ async function computeBtRounds(){
         artist: a.artist || "",
         thumbnail: a.thumbnail || "",
         owner_user_ids: [],
+        // Mode "un seul téléphone" (ajouté le 07/08/2026, voir
+        // renderBtSingleDeviceAnswering()) : toutes les propositions
+        // viennent du MÊME compte réel — owner_user_ids ne sert donc à rien
+        // pour savoir qui a proposé quoi. owner_local_names porte cette
+        // info à la place (même principe que computeGameRounds()) ; vide
+        // pour les parties classiques.
+        owner_local_names: [],
       });
     }
     groups.get(key).owner_user_ids.push(a.user_id);
+    if(a.local_player_name) groups.get(key).owner_local_names.push(a.local_player_name);
   });
   const rounds = shuffleArray([...groups.values()]);
   const realAnswerIds = new Set(rounds.map(r => r.youtube_id).filter(Boolean));
@@ -8326,11 +8481,18 @@ function renderBtReveal(round){
   // plus de champ d'ajout à la volée ici, retiré le 01/08/2026 (retour de
   // Rémi : peu pratique/ne marchait pas bien en jouant).
   if(currentRoom.single_device){
+    // ownerLine (ci-dessus) utilise owner_user_ids -> toujours le MÊME
+    // compte réel en mode "un seul téléphone", donc inutilisable ici.
+    // owner_local_names (ajouté le 07/08/2026, voir computeBtRounds() et
+    // renderBtSingleDeviceAnswering()) porte les vrais prénoms de qui a
+    // proposé — même principe que renderGameReveal().
+    const localNames = (round.owner_local_names || []).join(", ");
+    const sdOwnerLine = localNames ? `Proposée par : ${escapeHtml(localNames)}` : "🎲 Chanson piochée dans le pool communautaire";
     document.getElementById("btRevealBox").innerHTML = `
       <div class="card" style="text-align:center;">
         <div style="font-size:15px;font-weight:700;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
         ${round.youtube_id ? ytSaveHeartBtn("openYtSaveForCurrentBtRound") : ""}
-        <div style="font-size:12.5px;color:var(--text-dim);margin-top:6px;">${ownerLine}</div>
+        <div style="font-size:12.5px;color:var(--text-dim);margin-top:6px;">${sdOwnerLine}</div>
         <p style="font-size:11px;color:var(--text-faint);margin:10px 0 8px;">Donne des points à qui a bien deviné (jusqu'à 3 : artiste, titre, bonus feat/film...).</p>
         <div id="btSingleDeviceScoreChips" class="stack" style="text-align:left;"></div>
       </div>
@@ -8657,6 +8819,12 @@ async function rejouerBtMemeSalon(){
   btRoundIntroIdx = -1;
   btRoundOptionsVisibleAt = 0;
   btScrolledAnswersRoundIdx = -1;
+  // Filet de sécurité (ajouté le 07/08/2026, voir renderBtSingleDeviceAnswering()) :
+  // devrait déjà être à null en pratique à ce stade (le bouton "Lancer la
+  // partie" qui mène jusqu'ici n'est atteignable QUE depuis l'écran où
+  // personne n'a le téléphone), mais remis explicitement par cohérence avec
+  // le reste de ce bloc.
+  singleDeviceActivePlayer = null;
   showToast("🔄 Nouvelle partie ! Proposez de nouvelles chansons.");
   renderBlindtestLobby();
 }
