@@ -8750,11 +8750,16 @@ async function backfillPoolLanguages(){
 // mode solo "chansons aléatoires". Doublons ignorés (ON CONFLICT côté
 // Supabase, contrainte "unique" sur youtube_id) — sans risque à rappeler
 // plusieurs fois (idempotent), utile puisque n'importe quel participant peut
-// déclencher la fin de partie (pas de "chef de salon").
+// déclencher la fin de partie (pas de "chef de salon"). "status: pending"
+// explicite depuis le 12/08/2026 (Round 121) : la colonne n'a pas de valeur
+// par défaut à "pending" contrairement à ce qu'on pensait — sans ce champ,
+// toute chanson ajoutée en vrai depuis l'appli (Soirée, À distance, fin de
+// partie) sautait directement en "approved" sans jamais passer par la
+// validation manuelle du Round 45.
 async function populateBtPool(rounds){
   const rows = (rounds || [])
     .filter(r => r.youtube_id)
-    .map(r => ({ youtube_id: r.youtube_id, title: r.title, artist: r.artist || "", thumbnail: r.thumbnail || "", language: null }));
+    .map(r => ({ youtube_id: r.youtube_id, title: r.title, artist: r.artist || "", thumbnail: r.thumbnail || "", language: null, status: "pending" }));
   if(!rows.length) return;
 
   // Langue détectée uniquement pour les chansons VRAIMENT nouvelles dans le
