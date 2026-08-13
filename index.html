@@ -522,6 +522,37 @@
       <button class="btn-ghost" style="margin-top:16px;" onclick="showScreen('screen-confirm')">← Retour</button>
     </section>
 
+    <!-- SCREEN: BLINDTEST SOLO — filtres décennie/genre (ajouté le
+         13/08/2026), entre le choix de la source et le vrai début de partie.
+         Voir renderPoolFilterPicker()/showBtSoloPoolFilters() dans le script. -->
+    <section class="screen" id="screen-blindtest-solo-filters">
+      <h1><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="12" height="12" x="2" y="10" rx="2" ry="2" /><path d="m17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6" /><path d="M6 18h.01" /><path d="M10 14h.01" /><path d="M15 6h.01" /><path d="M18 9h.01" /></svg> Chansons aléatoires</h1>
+      <p class="sub">Laisse tout coché pour piocher dans tout le pool, ou affine.</p>
+      <div class="card">
+        <div id="btSoloFilterPicker"></div>
+      </div>
+      <p id="btSoloFilterCount" style="font-size:13px;color:var(--text-dim);text-align:center;margin-top:10px;"></p>
+      <button class="btn-primary" id="btSoloFilterLaunchBtn" style="margin-top:14px;" onclick="launchBtSoloFiltered()">Lancer</button>
+      <button class="btn-ghost" style="margin-top:10px;" onclick="showScreen('screen-blindtest-solo-source')">← Retour</button>
+    </section>
+
+    <!-- SCREEN: SÉRIE DE BLINDTEST — filtres décennie/genre (ajouté le
+         13/08/2026), avant le vrai début de la série. Réintroduit un écran
+         avant le lancement direct du 21/07/2026 (voir juste en dessous) —
+         décision assumée : le filtre apporte assez pour justifier 1 clic de
+         plus, contrairement à l'ancien "choix de la source" qui n'apportait
+         rien vu qu'il n'y avait qu'une seule source possible. -->
+    <section class="screen" id="screen-serie-filters">
+      <h1><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4" /></svg> Série de blindtest</h1>
+      <p class="sub">Laisse tout coché pour piocher dans tout le pool, ou affine.</p>
+      <div class="card">
+        <div id="serieFilterPicker"></div>
+      </div>
+      <p id="serieFilterCount" style="font-size:13px;color:var(--text-dim);text-align:center;margin-top:10px;"></p>
+      <button class="btn-primary" id="serieFilterLaunchBtn" style="margin-top:14px;" onclick="launchSerieFiltered()">Lancer</button>
+      <button class="btn-ghost" style="margin-top:10px;" onclick="showScreen('screen-modes')">← Retour</button>
+    </section>
+
     <!-- SCREEN: SÉRIE DE BLINDTEST — la partie elle-même (ajouté le
          21/07/2026, simplifié le même jour : plus d'écran de choix de source,
          toujours le pool communautaire — voir previewMode()). Pas de nombre
@@ -1131,6 +1162,16 @@
             </div>
             <button class="btn-primary" onclick="confirmBtRandomCount()">Valider</button>
             <button class="btn-ghost" style="margin-top:10px;" onclick="backToBtSourceStep()">← Changer la source des chansons</button>
+          </div>
+          <!-- Filtres décennie/genre (ajouté le 13/08/2026) : uniquement en
+               mode "aléatoire" (chansons piochées dans blindtest_pool) — voir
+               renderPoolFilterPicker()/ensureBtRandomFilterPool() plus loin. -->
+          <div id="btStepFilters" class="card" style="display:none;margin-bottom:16px;">
+            <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">Époque et styles à inclure (laisse tout coché pour piocher dans tout le pool) :</p>
+            <div id="btRandomFilterPicker"></div>
+            <p id="btRandomFilterCount" style="font-size:12.5px;color:var(--text-faint);margin-top:8px;"></p>
+            <button class="btn-primary" id="btConfirmFiltersBtn" style="margin-top:8px;" onclick="confirmBtRandomFiltersStep()">Valider</button>
+            <button class="btn-ghost" style="margin-top:10px;" onclick="backToBtRandomCountStep()">← Changer le nombre de chansons</button>
           </div>
           <!-- Étape "qui va jouer ?" (ajouté le 01/08/2026, demande de Rémi) :
                en mode "un seul téléphone", renseigner les prénoms AVANT le
@@ -2115,6 +2156,83 @@ let btAnswerSearchResults = [];
 let btAnswerSearchDebounce = null;
 
 
+// ---- Filtres décennie/genre pour les modes piochant dans blindtest_pool
+// (ajouté le 13/08/2026, demande de Rémi). Partagé entre Blindtest solo,
+// Série de blindtest et Blindtest multijoueur (mode "aléatoire") — les seuls
+// 3 endroits où de VRAIES chansons (pas juste des pièges) viennent du pool
+// communautaire, voir docs/idees.md Round 123 pour le détail de comment
+// `decade`/`genres` ont été remplies en base.
+//
+// Chaque écran garde son propre état de filtre (pas une variable globale
+// partagée) : { decades: Set|null, genres: Set|null }, où null = pas de
+// filtre (tout inclus) — c'est le réglage par défaut à chaque nouvelle
+// visite de l'écran, pour ne jamais silencieusement exclure des chansons
+// à cause d'un filtre oublié d'une partie précédente.
+const GENRE_LABELS_LIST = ["Pop", "Rock", "Rap/Hip-Hop", "Électro/Dance", "R&B/Soul", "Variété française", "Metal", "Reggae/Ska", "Jazz/Blues", "Country/Folk", "Latino", "Classique/Comédie musicale", "Autre"];
+
+function trackMatchesPoolFilter(track, filterState){
+  if(filterState.decades){
+    const d = track.decade == null ? "unknown" : track.decade;
+    if(!filterState.decades.has(d)) return false;
+  }
+  if(filterState.genres){
+    // Chanson d'un artiste pas encore classé (ajouté après le Round 123, ou
+    // oublié) : traitée comme "style inconnu" plutôt que masquée par défaut.
+    const genres = (track.genres && track.genres.length) ? track.genres : ["unknown"];
+    if(!genres.some(g => filterState.genres.has(g))) return false;
+  }
+  return true;
+}
+
+function availableDecadesIn(tracks){
+  const set = new Set();
+  tracks.forEach(t => set.add(t.decade == null ? "unknown" : t.decade));
+  return Array.from(set).sort((a, b) => {
+    if(a === "unknown") return 1;
+    if(b === "unknown") return -1;
+    return a - b;
+  });
+}
+
+// Construit les cases à cocher décennie/genre dans `containerId`. `tracks` ne
+// sert qu'à savoir quelles décennies proposer (les genres sont la liste fixe
+// ci-dessus) ; `filterState` est modifié en place à chaque case cochée, et
+// `onChange` rappelée pour laisser l'écran appelant mettre à jour son propre
+// compteur "X chansons correspondent".
+function renderPoolFilterPicker(containerId, tracks, filterState, onChange){
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  const decades = availableDecadesIn(tracks);
+  const chip = (checked, value, label, attr) => `
+    <label style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;margin:3px;border:1px solid var(--border);border-radius:20px;cursor:pointer;font-size:13px;">
+      <input type="checkbox" ${attr}="${escapeHtml(String(value))}" ${checked ? "checked" : ""} style="width:15px;height:15px;flex-shrink:0;" />${escapeHtml(label)}
+    </label>`;
+  const decadeRow = decades.map(d => chip(!filterState.decades || filterState.decades.has(d), d, d === "unknown" ? "Décennie inconnue" : `${d}s`, "data-decade")).join("");
+  const genreOptions = [...GENRE_LABELS_LIST, "unknown"];
+  const genreRow = genreOptions.map(g => chip(!filterState.genres || filterState.genres.has(g), g, g === "unknown" ? "Style inconnu" : g, "data-genre")).join("");
+  el.innerHTML = `
+    <div style="margin-bottom:14px;"><strong style="font-size:13px;">Époque</strong><div style="display:flex;flex-wrap:wrap;margin-top:6px;">${decadeRow}</div></div>
+    <div><strong style="font-size:13px;">Styles musicaux</strong><div style="display:flex;flex-wrap:wrap;margin-top:6px;">${genreRow}</div></div>
+  `;
+  el.querySelectorAll("input[data-decade]").forEach(cb => {
+    cb.onchange = () => {
+      if(!filterState.decades) filterState.decades = new Set(decades);
+      const d = cb.getAttribute("data-decade");
+      const key = d === "unknown" ? "unknown" : Number(d);
+      if(cb.checked) filterState.decades.add(key); else filterState.decades.delete(key);
+      onChange();
+    };
+  });
+  el.querySelectorAll("input[data-genre]").forEach(cb => {
+    cb.onchange = () => {
+      if(!filterState.genres) filterState.genres = new Set(genreOptions);
+      const g = cb.getAttribute("data-genre");
+      if(cb.checked) filterState.genres.add(g); else filterState.genres.delete(g);
+      onChange();
+    };
+  });
+}
+
 // ---- Blindtest SOLO sur vraies données (ajouté le 19/07/2026) ----
 // Contrairement au multijoueur ci-dessus, pas de salon/Supabase-realtime ici :
 // juste une file de vraies chansons (pool communautaire OU playlist perso)
@@ -2125,6 +2243,12 @@ let btSoloQueue = [];
 let btSoloPlayer = null;
 
 const BT_SOLO_MIN_TRACKS = 4; // il faut au moins 1 bonne réponse + 3 pièges
+
+// Filtres décennie/genre du Blindtest solo (ajouté le 13/08/2026) — voir
+// renderPoolFilterPicker() ci-dessus. Réinitialisés à chaque nouvelle visite
+// de l'écran de filtres (showBtSoloPoolFilters()), jamais persistés.
+let btSoloFilterState = { decades: null, genres: null };
+let btSoloFilterTracks = [];
 
 async function goSoloBlindtest(){
   document.getElementById("btSoloSourceHint").textContent = "";
@@ -2150,12 +2274,40 @@ async function startBtSoloFromPool(){
   // le mélange qui suit porte sur l'ensemble complet.
   const { data, error } = await sb.from("blindtest_pool").select("*").eq("status", "approved").limit(5000);
   if(error){ hint.textContent = "Erreur de chargement : " + error.message; return; }
-  const tracks = data || [];
+  const tracks = (data || []).filter(t => t.youtube_id);
   if(tracks.length < BT_SOLO_MIN_TRACKS){
     hint.textContent = `Pas encore assez de chansons dans le pool communautaire (${tracks.length} pour l'instant) — invite des amis à jouer en multijoueur d'abord, ou choisis "Ma playlist".`;
     return;
   }
-  beginBtSoloSession(tracks);
+  showBtSoloPoolFilters(tracks);
+}
+
+// Écran intermédiaire "époque / styles" (ajouté le 13/08/2026), entre le
+// choix de la source et le vrai début de partie — voir screen-blindtest-solo-filters.
+function showBtSoloPoolFilters(tracks){
+  btSoloFilterTracks = tracks;
+  btSoloFilterState = { decades: null, genres: null };
+  renderPoolFilterPicker("btSoloFilterPicker", tracks, btSoloFilterState, updateBtSoloFilterCount);
+  updateBtSoloFilterCount();
+  showScreen("screen-blindtest-solo-filters");
+}
+
+function updateBtSoloFilterCount(){
+  const n = btSoloFilterTracks.filter(t => trackMatchesPoolFilter(t, btSoloFilterState)).length;
+  const hint = document.getElementById("btSoloFilterCount");
+  const launchBtn = document.getElementById("btSoloFilterLaunchBtn");
+  const enough = n >= BT_SOLO_MIN_TRACKS;
+  hint.textContent = enough
+    ? `${n} chanson${n > 1 ? "s" : ""} correspond${n > 1 ? "ent" : ""} à ta sélection.`
+    : `${n} chanson${n > 1 ? "s" : ""} seulement avec ces filtres — il en faut au moins ${BT_SOLO_MIN_TRACKS}, élargis ta sélection.`;
+  launchBtn.disabled = !enough;
+  launchBtn.style.opacity = enough ? "1" : "0.5";
+}
+
+function launchBtSoloFiltered(){
+  const filtered = btSoloFilterTracks.filter(t => trackMatchesPoolFilter(t, btSoloFilterState));
+  if(filtered.length < BT_SOLO_MIN_TRACKS) return;
+  beginBtSoloSession(filtered);
 }
 
 // Source 2 : ma propre playlist importée (imported_tracks, déjà chargée par
@@ -2253,20 +2405,52 @@ const SERIE_VOTE_SECONDS = 15;
 let serieVoteTimer = null;
 let serieVoteDeadline = 0;
 
+// Filtres décennie/genre de la Série (ajouté le 13/08/2026) — voir
+// renderPoolFilterPicker() et son commentaire plus haut dans le script.
+let serieFilterState = { decades: null, genres: null };
+let serieFilterTracks = [];
+
 async function startSerieFromPool(){
   if(!currentUser){ showToast("Connecte-toi d'abord."); showScreen("screen-login"); return; }
-  document.getElementById("serieSourceHint").textContent = "Chargement du pool communautaire...";
-  showScreen("screen-serie");
+  showScreen("screen-serie-filters");
+  const hint = document.getElementById("serieFilterCount");
+  const launchBtn = document.getElementById("serieFilterLaunchBtn");
+  document.getElementById("serieFilterPicker").innerHTML = "";
+  hint.textContent = "Chargement du pool communautaire...";
+  launchBtn.disabled = true;
+  launchBtn.style.opacity = "0.5";
   // limit(300) → limit(5000) : même correctif que startBtSoloFromPool() (voir
   // son commentaire, ajouté le 01/08/2026).
   const { data, error } = await sb.from("blindtest_pool").select("*").eq("status", "approved").limit(5000);
-  if(error){ document.getElementById("serieSourceHint").textContent = "Erreur de chargement : " + error.message; return; }
-  const tracks = data || [];
+  if(error){ hint.textContent = "Erreur de chargement : " + error.message; return; }
+  const tracks = (data || []).filter(t => t.youtube_id);
   if(tracks.length < SERIE_MIN_TRACKS){
-    document.getElementById("serieSourceHint").textContent = `Pas encore assez de chansons dans le pool communautaire (${tracks.length} pour l'instant) — invite des amis à jouer en multijoueur d'abord.`;
+    hint.textContent = `Pas encore assez de chansons dans le pool communautaire (${tracks.length} pour l'instant) — invite des amis à jouer en multijoueur d'abord.`;
     return;
   }
-  await beginSerieSession(tracks);
+  serieFilterTracks = tracks;
+  serieFilterState = { decades: null, genres: null };
+  renderPoolFilterPicker("serieFilterPicker", tracks, serieFilterState, updateSerieFilterCount);
+  updateSerieFilterCount();
+}
+
+function updateSerieFilterCount(){
+  const n = serieFilterTracks.filter(t => trackMatchesPoolFilter(t, serieFilterState)).length;
+  const hint = document.getElementById("serieFilterCount");
+  const launchBtn = document.getElementById("serieFilterLaunchBtn");
+  const enough = n >= SERIE_MIN_TRACKS;
+  hint.textContent = enough
+    ? `${n} chanson${n > 1 ? "s" : ""} correspond${n > 1 ? "ent" : ""} à ta sélection.`
+    : `${n} chanson${n > 1 ? "s" : ""} seulement avec ces filtres — il en faut au moins ${SERIE_MIN_TRACKS}, élargis ta sélection.`;
+  launchBtn.disabled = !enough;
+  launchBtn.style.opacity = enough ? "1" : "0.5";
+}
+
+async function launchSerieFiltered(){
+  const filtered = serieFilterTracks.filter(t => trackMatchesPoolFilter(t, serieFilterState));
+  if(filtered.length < SERIE_MIN_TRACKS) return;
+  showScreen("screen-serie");
+  await beginSerieSession(filtered);
 }
 
 async function beginSerieSession(tracks){
@@ -7509,6 +7693,7 @@ function renderBtSongCountPicker(){
     document.getElementById("btStepSource").style.display = "block";
     document.getElementById("btStepSongs").style.display = "none";
     document.getElementById("btStepRandomCount").style.display = "none";
+    document.getElementById("btStepFilters").style.display = "none";
     document.getElementById("btStepPlayback").style.display = "none";
     return;
   }
@@ -7518,12 +7703,25 @@ function renderBtSongCountPicker(){
   if(!countChosen){
     document.getElementById("btStepSongs").style.display = btSourceMode === "propose" ? "block" : "none";
     document.getElementById("btStepRandomCount").style.display = btSourceMode === "random" ? "block" : "none";
+    document.getElementById("btStepFilters").style.display = "none";
     document.getElementById("btStepSingleDeviceNames").style.display = "none";
     document.getElementById("btStepPlayback").style.display = "none";
     return;
   }
   document.getElementById("btStepSongs").style.display = "none";
   document.getElementById("btStepRandomCount").style.display = "none";
+
+  // Filtres décennie/genre (ajouté le 13/08/2026) : seulement en mode
+  // "aléatoire" (en mode "chacun propose", les chansons ne viennent pas du
+  // pool, filtrer n'aurait pas de sens) — voir ensureBtRandomFilterPool().
+  if(btSourceMode === "random" && !btRandomFiltersStepDone){
+    document.getElementById("btStepFilters").style.display = "block";
+    document.getElementById("btStepSingleDeviceNames").style.display = "none";
+    document.getElementById("btStepPlayback").style.display = "none";
+    ensureBtRandomFilterPool();
+    return;
+  }
+  document.getElementById("btStepFilters").style.display = "none";
 
   // Étape "qui va jouer ?" (ajouté le 01/08/2026) : uniquement en mode "un
   // seul téléphone", et une seule fois par configuration de partie (voir
@@ -7608,6 +7806,9 @@ function backToBtSourceStep(){
   btSourceMode = null;
   btSongsPerPersonTarget = null;
   btRandomCount = null;
+  btRandomFiltersStepDone = false;
+  btRandomFilterState = { decades: null, genres: null };
+  btRandomFilterPoolLoaded = false;
   renderBtSongCountPicker();
 }
 
@@ -7635,10 +7836,65 @@ function confirmBtRandomCount(){
   renderBtSongCountPicker();
 }
 
+// Filtres décennie/genre du Blindtest multijoueur, mode "aléatoire" (ajouté
+// le 13/08/2026) — voir renderPoolFilterPicker() plus haut dans le script.
+// Chargés une seule fois par configuration de partie (btRandomFilterPoolLoaded),
+// pas à chaque passage sur l'étape, pour éviter un aller-retour réseau inutile
+// quand on navigue entre les étapes du réglage.
+let btRandomFilterState = { decades: null, genres: null };
+let btRandomFilterTracks = [];
+let btRandomFilterPoolLoaded = false;
+let btRandomFiltersStepDone = false;
+
+async function ensureBtRandomFilterPool(){
+  if(btRandomFilterPoolLoaded) return;
+  const picker = document.getElementById("btRandomFilterPicker");
+  picker.innerHTML = `<p style="font-size:13px;color:var(--text-dim);">Chargement du pool communautaire...</p>`;
+  // select("*") plutôt que "decade,genres" explicitement (ajouté le
+  // 13/08/2026) : tant que genres.sql n'a pas été collé en base par Rémi, ces
+  // 2 colonnes n'existent pas encore, et demander une colonne inexistante par
+  // son nom fait planter la requête (PostgREST, code 42703) — alors que
+  // select("*") renvoie simplement les colonnes qui existent, sans erreur.
+  // trackMatchesPoolFilter() traite déjà une valeur absente comme "inconnue".
+  const { data, error } = await sb.from("blindtest_pool").select("*").eq("status", "approved").limit(5000);
+  if(error){ picker.innerHTML = `<p style="font-size:13px;color:var(--text-dim);">Erreur de chargement : ${escapeHtml(error.message)}</p>`; return; }
+  btRandomFilterTracks = data || [];
+  btRandomFilterPoolLoaded = true;
+  renderPoolFilterPicker("btRandomFilterPicker", btRandomFilterTracks, btRandomFilterState, updateBtRandomFilterCount);
+  updateBtRandomFilterCount();
+}
+
+// Même seuil que le contrôle fait dans computeBtRandomRounds() (count + 3
+// pièges minimum) — pour que le message pendant le réglage corresponde
+// exactement à ce qui sera accepté ou refusé au lancement.
+function updateBtRandomFilterCount(){
+  const n = btRandomFilterTracks.filter(t => trackMatchesPoolFilter(t, btRandomFilterState)).length;
+  const hint = document.getElementById("btRandomFilterCount");
+  const enough = n >= btRandomCount + 3;
+  hint.textContent = enough
+    ? `${n} chansons disponibles avec ces filtres.`
+    : `${n} chanson${n > 1 ? "s" : ""} seulement avec ces filtres — il en faut au moins ${btRandomCount + 3} (${btRandomCount} manche(s) + des pièges), élargis ta sélection ou réduis le nombre de manches.`;
+  const btn = document.getElementById("btConfirmFiltersBtn");
+  btn.disabled = !enough;
+  btn.style.opacity = enough ? "1" : "0.5";
+}
+
+function confirmBtRandomFiltersStep(){
+  btRandomFiltersStepDone = true;
+  renderBtSongCountPicker();
+}
+
+function backToBtRandomCountStep(){
+  btRandomCount = null;
+  btRandomFiltersStepDone = false;
+  renderBtSongCountPicker();
+}
+
 function backToBtSongsCountStep(){
   btSongsPerPersonTarget = null;
   btRandomCount = null;
   btPlaybackStart = null;
+  btRandomFiltersStepDone = false;
   renderBtSongCountPicker();
 }
 
@@ -7667,7 +7923,7 @@ async function confirmBtSettings(){
   if(btSourceMode === "random"){
     let rounds, available;
     try {
-      ({ rounds, available } = await computeBtRandomRounds(btRandomCount));
+      ({ rounds, available } = await computeBtRandomRounds(btRandomCount, btRandomFilterState));
     } catch(e){
       showToast("Erreur de chargement du pool communautaire : " + e.message);
       return;
@@ -7720,15 +7976,24 @@ async function confirmBtSettings(){
 // renderBtPlaying()) — tout le monde peut jouer sur toutes les manches, y
 // compris la personne qui a lancé la partie. Mêmes pièges (decoys), et même
 // exclusion des vraies réponses de la partie, que computeBtRounds().
-async function computeBtRandomRounds(count){
+async function computeBtRandomRounds(count, filterState){
   // limit(300) → limit(5000) : même correctif que startBtSoloFromPool() (voir
   // son commentaire, ajouté le 01/08/2026) — c'est très probablement LA cause
   // du "les mêmes chansons reviennent tout le temps" remonté par Rémi en mode
   // "🎲 Chansons aléatoires", puisque c'est ici que les VRAIES manches (pas
   // seulement les pièges) sont piochées.
-  const { data, error } = await sb.from("blindtest_pool").select("youtube_id,title,artist,thumbnail,language").eq("status", "approved").limit(5000);
+  // select("*") plutôt qu'une liste de colonnes explicite incluant
+  // decade/genres : même raison que ensureBtRandomFilterPool() ci-dessus,
+  // reste robuste tant que genres.sql n'a pas encore été appliqué en base.
+  const { data, error } = await sb.from("blindtest_pool").select("*").eq("status", "approved").limit(5000);
   if(error) throw error;
-  const pool = shuffleArray((data || []).filter(t => t.youtube_id));
+  // Filtre décennie/genre appliqué ICI, avant même de piocher les manches —
+  // donc les pièges (decoys, tirés de `rest` juste en dessous) respectent eux
+  // aussi le filtre, ce qui est même un plus pour le jeu (des pièges de la
+  // même époque/du même style sont plus trompeurs que des pièges au hasard).
+  const all = data || [];
+  const filtered = filterState ? all.filter(t => trackMatchesPoolFilter(t, filterState)) : all;
+  const pool = shuffleArray(filtered.filter(t => t.youtube_id));
   if(pool.length < count + 3) return { rounds: null, available: pool.length };
 
   const picked = pool.slice(0, count);
