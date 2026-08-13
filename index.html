@@ -41,6 +41,11 @@
     --radius-sm:10px;
   }
   *{box-sizing:border-box;}
+  /* Icônes SVG (ajouté le 13/08/2026, remplace les emojis utilisés comme
+     icônes dans l'UI — voir la constante ICONS plus bas dans le code JS.
+     1em = suit toujours la taille du texte à côté duquel l'icône est
+     placée, comme le faisait l'emoji avant elle. */
+  .icon{width:1em;height:1em;vertical-align:-0.15em;flex-shrink:0;}
   body{
     margin:0;
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
@@ -370,7 +375,7 @@
       <h1>Bienvenue 👋</h1>
       <p class="sub">Connecte-toi, ou crée un compte si c'est ta première visite.</p>
       <div class="card stack">
-        <button class="btn-ghost" onclick="handleGoogleLogin()">🔐 Continuer avec Google</button>
+        <button class="btn-ghost" onclick="handleGoogleLogin()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg> Continuer avec Google</button>
         <!-- Ajouté le 22/07/2026, demande de Rémi : jouer (rejoindre OU créer
              un salon) sans créer de compte. Auth anonyme Supabase — un vrai
              auth.uid() est créé, donc toutes les policies RLS existantes
@@ -379,7 +384,7 @@
              assumée : ce compte est propre à cet appareil/navigateur, pas de
              vraie reconnexion possible ailleurs, et l'import de playlists
              YouTube reste réservé à un vrai compte Google. -->
-        <button class="btn-ghost" onclick="handleGuestLogin()">🎧 Jouer sans compte</button>
+        <button class="btn-ghost" onclick="handleGuestLogin()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" /></svg> Jouer sans compte</button>
         <div class="divider-or">ou</div>
         <input type="text" id="pseudoInput" placeholder="Ton pseudo (pour créer un compte ou jouer sans compte)" />
         <input type="email" id="emailInput" placeholder="Email" />
@@ -398,14 +403,14 @@
 
       <h2 style="margin-top:8px;">Créer un salon</h2>
       <button class="mode-card" onclick="chooseCategory('ecoute')">
-        <div class="mode-icon">🎧</div>
+        <div class="mode-icon" style="color:#fff;"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" /></svg></div>
         <div>
           <div class="mode-title">Écoute</div>
           <div class="mode-desc">Créer un salon pour écouter de la musique avec tes amis, ensemble ou à distance.</div>
         </div>
       </button>
       <button class="mode-card" onclick="chooseCategory('jeux')">
-        <div class="mode-icon">🎮</div>
+        <div class="mode-icon" style="color:#fff;"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="10" y1="11" y2="11" /><line x1="8" x2="8" y1="9" y2="13" /><line x1="15" x2="15.01" y1="12" y2="12" /><line x1="18" x2="18.01" y1="10" y2="10" /><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z" /></svg></div>
         <div>
           <div class="mode-title">Jeux</div>
           <div class="mode-desc">Des mini-jeux musicaux à jouer en solo ou entre amis.</div>
@@ -432,7 +437,7 @@
       <h2 style="margin-top:28px;">Tes playlists importées</h2>
       <div class="card">
         <p id="importedSummary" style="margin:0 0 12px;color:var(--text-dim);font-size:13.5px;">Chargement...</p>
-        <button class="btn-ghost" onclick="goToPlaylistsScreen()">📥 Gérer mes playlists</button>
+        <button class="btn-ghost" onclick="goToPlaylistsScreen()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6 4 14" /><path d="M12 6v14" /><path d="M8 8v12" /><path d="M4 4v16" /></svg> Gérer mes playlists</button>
       </div>
 
       <!-- Réservé aux comptes admin (profiles.is_admin, voir
@@ -442,13 +447,13 @@
            compte) le bouton lui-même est aussi caché pour ne pas laisser
            n'importe qui même OUVRIR cet écran — voir afterLogin(). -->
       <div class="card" style="margin-top:16px;display:none;" id="poolAdminEntryCard">
-        <button class="btn-ghost" onclick="goToPoolAdminScreen()">🛠 Gérer le pool communautaire</button>
+        <button class="btn-ghost" onclick="goToPoolAdminScreen()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z" /></svg> Gérer le pool communautaire</button>
         <!-- Tableau de bord d'activité (ajouté le 24/07/2026), même réglage
              de visibilité que le bouton ci-dessus. -->
-        <button class="btn-ghost" style="margin-top:10px;" onclick="goToStatsScreen()">📊 Statistiques</button>
+        <button class="btn-ghost" style="margin-top:10px;" onclick="goToStatsScreen()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" /></svg> Statistiques</button>
       </div>
 
-      <button class="btn-ghost" style="margin-top:20px;" onclick="openEditPseudoModal()">✏️ Modifier mon pseudo</button>
+      <button class="btn-ghost" style="margin-top:20px;" onclick="openEditPseudoModal()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /><path d="m15 5 4 4" /></svg> Modifier mon pseudo</button>
       <button class="btn-ghost" style="margin-top:10px;" onclick="handleSignOut()">Se déconnecter</button>
       <p style="text-align:center;font-size:11.5px;color:var(--text-faint);margin-top:18px;">
         <a href="politique-confidentialite.html" style="color:inherit;">Politique de confidentialité</a> · <a href="conditions-utilisation.html" style="color:inherit;">Conditions d'utilisation</a>
@@ -482,12 +487,12 @@
           <span class="toggle-track"></span>
         </span>
       </label>
-      <button class="btn-primary" id="confirmCreateBtn" onclick="confirmCreateRoom()">🚀 Créer le salon</button>
+      <button class="btn-primary" id="confirmCreateBtn" onclick="confirmCreateRoom()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" /><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09" /><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z" /><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05" /></svg> Créer le salon</button>
       <!-- Bouton solo (ajouté le 19/07/2026), affiché uniquement pour le
            Blindtest — voir previewMode()/goSoloBlindtest(). Pas besoin d'amis
            ni de vrai salon : on pioche directement dans le pool communautaire
            ou dans sa propre playlist importée. -->
-      <button class="btn-ghost" style="margin-top:10px;display:none;" id="btSoloInstead" onclick="goSoloBlindtest()">🎧 Jouer en solo à la place</button>
+      <button class="btn-ghost" style="margin-top:10px;display:none;" id="btSoloInstead" onclick="goSoloBlindtest()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" /></svg> Jouer en solo à la place</button>
       <button class="btn-ghost" style="margin-top:10px;" onclick="showScreen('screen-modes')">← Choisir un autre mode</button>
     </section>
 
@@ -495,18 +500,18 @@
          Pas de salon créé ici : on reste en local, comme l'ancien mode démo,
          mais avec de vraies chansons et du vrai son. -->
     <section class="screen" id="screen-blindtest-solo-source">
-      <h1>🎧 Blindtest solo</h1>
+      <h1><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" /></svg> Blindtest solo</h1>
       <p class="sub">D'où viennent les chansons à deviner ?</p>
       <div class="stack">
         <button class="mode-card" onclick="startBtSoloFromPool()">
-          <div class="mode-icon">🎲</div>
+          <div class="mode-icon" style="color:#fff;"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="12" height="12" x="2" y="10" rx="2" ry="2" /><path d="m17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6" /><path d="M6 18h.01" /><path d="M10 14h.01" /><path d="M15 6h.01" /><path d="M18 9h.01" /></svg></div>
           <div>
             <div class="mode-title">Chansons aléatoires</div>
             <div class="mode-desc">Pioche dans le pool communautaire — toutes les chansons déjà proposées par des joueurs lors de vraies parties en groupe.</div>
           </div>
         </button>
         <button class="mode-card" onclick="startBtSoloFromPlaylist()">
-          <div class="mode-icon">🎵</div>
+          <div class="mode-icon" style="color:#fff;"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg></div>
           <div>
             <div class="mode-title">Ma playlist</div>
             <div class="mode-desc">Pioche dans tes propres titres importés (écran "Tes playlists") — de quoi tester si tu reconnais tes propres chansons !</div>
@@ -524,19 +529,19 @@
          remet la série à 0 (mais ne coupe jamais automatiquement — toujours
          un bouton pour continuer ou recommencer, voir CLAUDE.md). -->
     <section class="screen" id="screen-serie">
-      <h1>🔥 Série de blindtest</h1>
+      <h1><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4" /></svg> Série de blindtest</h1>
       <p class="sub" id="serieSourceHint">Enchaîne un maximum de bonnes réponses sans te tromper !</p>
       <!-- Série en cours mise en avant (agrandie le 22/07/2026, retour de
            Rémi : le score en cours devait être plus visible qu'une simple
            pastille de la même taille que les 2 records) — le nombre est ce
            qu'on veut voir grossir d'un coup d'œil après chaque bonne réponse. -->
       <div class="card" style="text-align:center;padding:14px 20px;margin-bottom:10px;background:var(--accent-gradient);">
-        <div style="font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.85);">🔥 Série en cours</div>
+        <div style="font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.85);"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4" /></svg> Série en cours</div>
         <div style="font-size:40px;font-weight:800;color:#fff;line-height:1.15;" id="serieStreak">0</div>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
-        <span class="pill">📅 Record du jour : <span id="serieRecordToday">0</span></span>
-        <span class="pill">🏆 Record total : <span id="serieRecordAllTime">0</span></span>
+        <span class="pill"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v3" /><path d="M16 2v3" /><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18" /></svg> Record du jour : <span id="serieRecordToday">0</span></span>
+        <span class="pill"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2" /><path d="M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2" /><path d="M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3" /><path d="M4 22h16" /><path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z" /><path d="M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3" /></svg> Record total : <span id="serieRecordAllTime">0</span></span>
       </div>
       <div class="card" style="text-align:center;padding:24px;margin-bottom:16px;">
         <div style="position:relative;display:inline-block;">
@@ -550,12 +555,12 @@
                jamais gêner le bouton natif "Ignorer" en dessous. -->
           <div id="serieAdSkipBanner" style="display:none;position:absolute;top:0;left:0;right:0;height:55%;pointer-events:none;background:linear-gradient(160deg,var(--accent1),var(--accent2));border-radius:8px 8px 0 0;"></div>
         </div>
-        <div style="font-size:34px;">🎧</div>
+        <div style="font-size:34px;"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" /></svg></div>
         <p style="font-size:12.5px;color:var(--text-dim);margin:8px 0 0;">Écoute et devine de quelle chanson il s'agit !</p>
         <p style="font-size:22px;font-weight:700;margin:10px 0 0;" id="serieCountdown">15</p>
         <div style="display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap;">
           <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12.5px;" onclick="serieSkipForward()">⏩ Avancer de 1 min</button>
-          <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12.5px;" onclick="revealSerieAdSkip()">📺 Pub bloquée ?</button>
+          <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12.5px;" onclick="revealSerieAdSkip()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2-5 5-5-5" /><rect width="20" height="15" x="2" y="7" rx="2" /></svg> Pub bloquée ?</button>
         </div>
       </div>
       <div id="serieGuessBox">
@@ -573,7 +578,7 @@
 
     <!-- SCREEN: PLAYLISTS IMPORTÉES (rattachées au compte, réutilisables dans tous les salons) -->
     <section class="screen" id="screen-playlists">
-      <h1>🎵 Tes playlists</h1>
+      <h1><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg> Tes playlists</h1>
       <p class="sub">Connecte ton compte YouTube une fois, importe une playlist entière — les titres restent ensuite disponibles dans tous tes salons, sans avoir à te reconnecter à chaque fois.</p>
       <div class="card" id="playlistsImportCard"></div>
       <h2 style="margin-top:24px;">Titres déjà importés</h2>
@@ -599,17 +604,17 @@
          harmonize-schema.sql) — sur un compte normal, ces boutons échouent
          simplement avec un message d'erreur clair. -->
     <section class="screen" id="screen-pool-admin">
-      <h1>🛠 Pool communautaire</h1>
+      <h1><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z" /></svg> Pool communautaire</h1>
       <p class="sub">Les chansons proposées par les joueurs attendent ici ta validation avant d'être utilisables dans une vraie partie.</p>
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
-        <button class="btn-ghost" id="poolAdminTabPending" style="width:auto;padding:8px 14px;" onclick="switchPoolAdminView('pending')">🕓 En attente <span id="poolAdminPendingCount"></span></button>
-        <button class="btn-ghost" id="poolAdminTabApproved" style="width:auto;padding:8px 14px;" onclick="switchPoolAdminView('approved')">✅ Déjà approuvées</button>
+        <button class="btn-ghost" id="poolAdminTabPending" style="width:auto;padding:8px 14px;" onclick="switchPoolAdminView('pending')"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg> En attente <span id="poolAdminPendingCount"></span></button>
+        <button class="btn-ghost" id="poolAdminTabApproved" style="width:auto;padding:8px 14px;" onclick="switchPoolAdminView('approved')"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg> Déjà approuvées</button>
       </div>
       <!-- Rattrapage ponctuel (ajouté le 24/07/2026) : détecte la langue des
            chansons déjà présentes dans le pool avant l'ajout de la
            détection automatique — voir backfillPoolLanguages(). Coût quota
            minime (~1 appel par lot de 50 chansons). -->
-      <button class="btn-ghost" id="poolBackfillLangBtn" style="margin-bottom:16px;font-size:12.5px;" onclick="backfillPoolLanguages()">🌐 Détecter les langues manquantes</button>
+      <button class="btn-ghost" id="poolBackfillLangBtn" style="margin-bottom:16px;font-size:12.5px;" onclick="backfillPoolLanguages()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" /><path d="M2 12h20" /></svg> Détecter les langues manquantes</button>
       <input type="text" id="poolAdminSearch" placeholder="Filtrer par titre ou artiste..." oninput="onPoolAdminSearchInput()" style="margin-bottom:14px;display:none;" />
       <div id="poolAdminList"></div>
       <button class="btn-ghost" style="width:auto;padding:10px 16px;margin:12px auto 0;display:none;" id="poolAdminLoadMoreBtn" onclick="loadMorePoolAdminApproved()">Afficher plus</button>
@@ -625,7 +630,7 @@
          appli (pas de fonction SQL côté Supabase), sur le même principe que
          le reste de l'app. -->
     <section class="screen" id="screen-stats">
-      <h1>📊 Statistiques</h1>
+      <h1><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" /></svg> Statistiques</h1>
       <p class="sub">Activité des 30 derniers jours. "Comptes actifs" compte les comptes ayant joué à un jeu OU ajouté un titre à une file d'écoute ce jour-là.</p>
       <div id="statsContent">
         <p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Chargement...</p>
@@ -637,12 +642,12 @@
     <section class="screen" id="screen-room">
       <div class="room-hero">
         <div class="code">Salon · <span id="roomCode" class="room-code-btn" title="Rester appuyé pour copier">------</span></div>
-        <div class="name" id="roomModeName">🪩 Soirée</div>
+        <div class="name" id="roomModeName"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M6 12c0-1.7.7-3.2 1.8-4.2" /><circle cx="12" cy="12" r="2" /><path d="M18 12c0 1.7-.7 3.2-1.8 4.2" /></svg> Soirée</div>
         <div class="avatars-inline" id="roomAvatars"></div>
       </div>
 
       <div class="now-playing">
-        <div class="art">🎵</div>
+        <div class="art" style="color:#fff;"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg></div>
         <div class="np-info">
           <div class="np-title" id="npTitle">En attente du premier titre…</div>
           <div class="np-artist" id="npArtist">Ajoute un titre pour lancer la file</div>
@@ -655,7 +660,7 @@
              peut garder le titre du moment dans SES PROPRES playlists
              YouTube. Caché en mode démo (pas de vraie playlist à proposer) et
              tant qu'aucun titre n'est encore en cours. -->
-        <button class="add-btn" id="npSaveBtn" onclick="openYtSaveForNowPlaying()" title="Ajouter ce titre à une de tes playlists YouTube" style="display:none;margin-left:0;">❤️</button>
+        <button class="add-btn" id="npSaveBtn" onclick="openYtSaveForNowPlaying()" title="Ajouter ce titre à une de tes playlists YouTube" style="display:none;margin-left:0;"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5" /></svg></button>
       </div>
 
       <!-- Lecteur réel : uniquement dans un vrai salon (mode Soirée OU À
@@ -674,13 +679,13 @@
       <div id="queueList"></div>
 
       <div class="fab-row">
-        <button class="btn-primary" onclick="openSearch()">➕ Ajouter un titre</button>
+        <button class="btn-primary" onclick="openSearch()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg> Ajouter un titre</button>
       </div>
     </section>
 
     <!-- SCREEN: GAME -->
     <section class="screen" id="screen-game">
-      <h1 id="gameTitle">🎲 Devine qui a mis ça</h1>
+      <h1 id="gameTitle"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="12" height="12" x="2" y="10" rx="2" ry="2" /><path d="m17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6" /><path d="M6 18h.01" /><path d="M10 14h.01" /><path d="M15 6h.01" /><path d="M18 9h.01" /></svg> Devine qui a mis ça</h1>
       <p class="sub" id="gameSub">Un morceau est tiré au hasard des playlists du groupe. Devine à qui il appartient avant les autres !</p>
 
       <div id="gameIdle">
@@ -691,7 +696,7 @@
             <button class="btn-ghost" style="width:auto;padding:10px 18px;" data-rounds="10" onclick="pickRounds(10)">10</button>
             <button class="btn-ghost" style="width:auto;padding:10px 18px;" data-rounds="15" onclick="pickRounds(15)">15</button>
           </div>
-          <button class="btn-primary" onclick="startGame()">🚀 Lancer la partie (<span id="roundsChosenLabel">5</span> manches)</button>
+          <button class="btn-primary" onclick="startGame()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" /><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09" /><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z" /><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05" /></svg> Lancer la partie (<span id="roundsChosenLabel">5</span> manches)</button>
         </div>
       </div>
 
@@ -714,8 +719,8 @@
                  couvre que le haut (le titre) sans bloquer le clic. -->
             <div id="btSoloAdSkipBanner" style="display:none;position:absolute;top:0;left:0;right:0;height:55%;pointer-events:none;background:linear-gradient(160deg,var(--accent1),var(--accent2));border-radius:8px 8px 0 0;"></div>
           </div>
-          <div id="btSoloAudioCover" style="display:none;font-size:34px;padding:20px 0;">🎧</div>
-          <div class="game-art" id="gameArtEmoji">🎵</div>
+          <div id="btSoloAudioCover" style="display:none;font-size:34px;padding:20px 0;color:var(--text-dim);"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" /></svg></div>
+          <div class="game-art" id="gameArtEmoji" style="color:#fff;"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg></div>
           <div style="font-size:11px;font-weight:700;color:var(--accent1);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;" id="mysteryCategory"></div>
           <div style="font-weight:700;font-size:16px;" id="mysteryTitle">???</div>
           <div style="color:var(--text-dim);font-size:13px;margin-top:2px;" id="mysteryArtist">???</div>
@@ -726,22 +731,22 @@
           <div id="btSoloVoteRow" style="display:none;align-items:center;justify-content:center;gap:10px;margin:8px 0;flex-wrap:wrap;">
             <span class="pill" id="btSoloCountdown">15</span>
             <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="btSoloSkipForward()">⏩ Avancer de 45s</button>
-            <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="revealBtSoloAdSkip()">📺 Pub bloquée ?</button>
+            <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="revealBtSoloAdSkip()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2-5 5-5-5" /><rect width="20" height="15" x="2" y="7" rx="2" /></svg> Pub bloquée ?</button>
           </div>
           <div class="guess-grid" id="guessGrid"></div>
         </div>
         <div id="roundNextPanel" style="display:none;margin-top:16px;text-align:center;">
           <p style="color:var(--text-dim);font-size:13px;margin-bottom:10px;" id="roundNextHint">Prenez le temps d'écouter le morceau jusqu'au bout si vous voulez — passez à la suite quand vous êtes prêts.</p>
-          <button class="btn-primary" onclick="nextRound()">➡️ Manche suivante</button>
+          <button class="btn-primary" onclick="nextRound()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg> Manche suivante</button>
         </div>
       </div>
 
       <div id="gameOver" style="display:none;">
         <div class="card" style="text-align:center;padding:28px;">
-          <div style="font-size:32px;margin-bottom:10px;">🏆</div>
+          <div style="font-size:32px;margin-bottom:10px;"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2" /><path d="M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2" /><path d="M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3" /><path d="M4 22h16" /><path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z" /><path d="M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3" /></svg></div>
           <p style="font-size:15px;font-weight:700;margin-bottom:6px;">Partie terminée !</p>
           <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px;" id="finalScoreLine">Ton score : 0 pts</p>
-          <button class="btn-primary" onclick="backToRoundPicker()">🔁 Rejouer</button>
+          <button class="btn-primary" onclick="backToRoundPicker()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4" /><path d="M3 11v-1a4 4 0 0 1 4-4h14" /><path d="m7 22-4-4 4-4" /><path d="M21 13v1a4 4 0 0 1-4 4H3" /></svg> Rejouer</button>
         </div>
       </div>
 
@@ -795,8 +800,8 @@
           <div id="gqStepPlayback" class="card" style="display:none;margin-bottom:16px;">
             <p style="font-size:13px;color:var(--text-dim);margin-bottom:10px;">Comment veux-tu afficher les manches ?</p>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;" id="gqDisplayModePicker">
-              <button class="btn-ghost" style="width:auto;flex:1;padding:10px 8px;" data-display="video" onclick="pickGameDisplayMode('video')">🎬 Vidéo visible</button>
-              <button class="btn-ghost" style="width:auto;flex:1;padding:10px 8px;" data-display="audio" onclick="pickGameDisplayMode('audio')">🎧 Audio seulement</button>
+              <button class="btn-ghost" style="width:auto;flex:1;padding:10px 8px;" data-display="video" onclick="pickGameDisplayMode('video')"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12.296 3.464 3.02 3.956" /><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3z" /><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><path d="m6.18 5.276 3.1 3.899" /></svg> Vidéo visible</button>
+              <button class="btn-ghost" style="width:auto;flex:1;padding:10px 8px;" data-display="audio" onclick="pickGameDisplayMode('audio')"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" /></svg> Audio seulement</button>
             </div>
             <p style="font-size:13px;color:var(--text-dim);margin-bottom:10px;">Où démarrer la lecture de chaque chanson ?</p>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;" id="gqPlaybackStartPicker">
@@ -816,8 +821,8 @@
           <div id="gqStepMode" class="card" style="display:none;margin-bottom:16px;">
             <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;" id="gqStepModeIntro"></p>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-              <button class="btn-ghost" style="width:auto;flex:1;padding:12px 8px;" onclick="chooseGameSelectionMode('manual')">🎯 Je choisis les questions</button>
-              <button class="btn-ghost" style="width:auto;flex:1;padding:12px 8px;" onclick="chooseGameSelectionMode('random')">🎲 Questions aléatoires</button>
+              <button class="btn-ghost" style="width:auto;flex:1;padding:12px 8px;" onclick="chooseGameSelectionMode('manual')"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></svg> Je choisis les questions</button>
+              <button class="btn-ghost" style="width:auto;flex:1;padding:12px 8px;" onclick="chooseGameSelectionMode('random')"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="12" height="12" x="2" y="10" rx="2" ry="2" /><path d="m17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6" /><path d="M6 18h.01" /><path d="M10 14h.01" /><path d="M15 6h.01" /><path d="M18 9h.01" /></svg> Questions aléatoires</button>
             </div>
             <button class="btn-ghost" onclick="backToPlaybackStep()">← Changer les réglages d'écoute</button>
           </div>
@@ -867,7 +872,7 @@
         <div id="gqProgress" class="stack" style="margin-bottom:20px;"></div>
 
         <div id="gqCreatorControls" style="display:none;text-align:center;">
-          <button class="btn-primary" id="gqLaunchBtn" onclick="launchGame()" disabled>🚀 Lancer la partie</button>
+          <button class="btn-primary" id="gqLaunchBtn" onclick="launchGame()" disabled><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" /><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09" /><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z" /><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05" /></svg> Lancer la partie</button>
           <p id="gqLaunchHint" style="font-size:12px;color:var(--text-faint);margin-top:8px;"></p>
         </div>
       </div>
@@ -889,14 +894,14 @@
                répondu. Confirmation ajoutée dans confirmLaunchSingleDeviceGame(). -->
           <div style="text-align:center;margin-top:22px;padding-top:20px;border-top:1px solid var(--border);">
             <p style="font-size:12px;color:var(--text-faint);margin:0 0 10px;">Une fois que tout le monde a joué :</p>
-            <button class="btn-success" id="sdLaunchBtn" onclick="confirmLaunchSingleDeviceGame()" disabled>🚀 Lancer la partie</button>
+            <button class="btn-success" id="sdLaunchBtn" onclick="confirmLaunchSingleDeviceGame()" disabled><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" /><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09" /><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z" /><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05" /></svg> Lancer la partie</button>
             <p id="sdLaunchHint" style="font-size:12px;color:var(--text-faint);margin-top:8px;"></p>
           </div>
         </div>
         <div id="sdTurnActive" style="display:none;">
           <h2 style="margin-top:0;">Au tour de <span id="sdActiveName"></span></h2>
           <div id="sdActiveAnswers" class="stack" style="margin-bottom:20px;"></div>
-          <button class="btn-primary" onclick="finishSingleDeviceTurn()">✅ J'ai fini, passer le téléphone</button>
+          <button class="btn-primary" onclick="finishSingleDeviceTurn()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg> J'ai fini, passer le téléphone</button>
         </div>
       </div>
 
@@ -931,7 +936,7 @@
                    d'un lyric video...). Recouvre aussi tout clic, comme le
                    cache transparent ci-dessous. -->
               <div id="gqAudioCover" onclick="toggleGamePlayPause()" style="display:none;position:absolute;inset:0;cursor:pointer;background:linear-gradient(160deg,var(--accent1),var(--accent2));align-items:center;justify-content:center;flex-direction:column;gap:6px;border-radius:12px;color:#fff;text-align:center;padding:12px;">
-                <div style="font-size:28px;">🎧</div>
+                <div style="font-size:28px;"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" /></svg></div>
                 <div style="font-size:12.5px;font-weight:600;">Écoute en cours — devine qui a choisi ce morceau !</div>
               </div>
               <!-- Même principe que le lecteur du mode À distance : une couche
@@ -963,11 +968,11 @@
               <!-- Ajouté le 19/07/2026, même correctif que le Blindtest
                    (revealAdSkipButton()) : les 2 couches ci-dessus bloquent
                    aussi le bouton natif "Passer" d'une éventuelle pub. -->
-              <button class="btn-ghost" id="gameAdSkipBtn" style="width:auto;padding:8px 14px;font-size:12px;" onclick="revealGameAdSkipButton()">📺 Pub bloquée ?</button>
+              <button class="btn-ghost" id="gameAdSkipBtn" style="width:auto;padding:8px 14px;font-size:12px;" onclick="revealGameAdSkipButton()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2-5 5-5-5" /><rect width="20" height="15" x="2" y="7" rx="2" /></svg> Pub bloquée ?</button>
               <!-- Ajouté le 31/07/2026, retour de testeurs : dans un groupe de
                    5, seuls 2 avaient du son (politique anti-autoplay de
                    certains navigateurs mobiles) — voir unlockGameSound(). -->
-              <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="unlockGameSound()">🔊 Pas de son ?</button>
+              <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="unlockGameSound()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" /><path d="M16 9a5 5 0 0 1 0 6" /><path d="M19.364 18.364a9 9 0 0 0 0-12.728" /></svg> Pas de son ?</button>
             </div>
           </div>
 
@@ -1000,8 +1005,8 @@
                devine à voix haute — juste un bouton pour révéler quand le
                groupe est prêt, voir renderGamePlaying(). -->
           <div id="gqSingleDeviceRevealBox" style="display:none;text-align:center;margin-bottom:16px;">
-            <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">🎧 Devinez à voix haute qui a proposé ce morceau, puis révélez la réponse !</p>
-            <button class="btn-primary" onclick="revealGameRound()">🔍 Révéler</button>
+            <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" /></svg> Devinez à voix haute qui a proposé ce morceau, puis révélez la réponse !</p>
+            <button class="btn-primary" onclick="revealGameRound()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /><circle cx="12" cy="12" r="3" /></svg> Révéler</button>
           </div>
 
           <div id="gqRevealBox" style="display:none;margin-bottom:16px;"></div>
@@ -1033,7 +1038,7 @@
              sans avoir à quitter/recréer le salon. -->
         <div id="gqPhaseFinished" style="display:none;">
           <div class="card" style="text-align:center;padding:28px;">
-            <div style="font-size:32px;margin-bottom:10px;">🏆</div>
+            <div style="font-size:32px;margin-bottom:10px;"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2" /><path d="M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2" /><path d="M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3" /><path d="M4 22h16" /><path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z" /><path d="M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3" /></svg></div>
             <p style="font-size:15px;font-weight:700;margin-bottom:6px;">Partie terminée !</p>
           </div>
           <!-- Classement/podium : uniquement pour les parties votées — mode
@@ -1068,8 +1073,8 @@
                le classement, et passait facilement inaperçu sans scroller). -->
           <div id="gqReplayControls" style="margin-top:20px;">
             <div style="display:flex;gap:10px;">
-              <button class="btn-primary" style="flex:1;padding:12px 8px;font-size:13.5px;" onclick="rejouerMemeSalon()">🔄 Rejouer</button>
-              <button class="btn-ghost" style="flex:1;padding:12px 8px;font-size:13.5px;" onclick="openChangeGameScreen()">🔀 Changer de jeu</button>
+              <button class="btn-primary" style="flex:1;padding:12px 8px;font-size:13.5px;" onclick="rejouerMemeSalon()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" /></svg> Rejouer</button>
+              <button class="btn-ghost" style="flex:1;padding:12px 8px;font-size:13.5px;" onclick="openChangeGameScreen()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 14 4 4-4 4" /><path d="m18 2 4 4-4 4" /><path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22" /><path d="M2 6h1.972a4 4 0 0 1 3.6 2.2" /><path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45" /></svg> Changer de jeu</button>
             </div>
             <p style="font-size:11px;color:var(--text-faint);text-align:center;margin-top:8px;">Sans quitter le salon, avec les mêmes amis.</p>
           </div>
@@ -1085,7 +1090,7 @@
     <section class="screen" id="screen-blindtest-lobby">
       <div class="room-hero">
         <div class="code">Salon · <span id="btRoomCode" class="room-code-btn" title="Rester appuyé pour copier">------</span></div>
-        <div class="name">🎧 Blindtest</div>
+        <div class="name"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" /></svg> Blindtest</div>
         <div class="avatars-inline" id="btRoomAvatars"></div>
       </div>
 
@@ -1102,8 +1107,8 @@
                sur toutes les manches, y compris celui qui lance la partie. -->
           <div id="btStepSource" class="card" style="margin-bottom:16px;">
             <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">D'où viennent les chansons ?</p>
-            <button class="btn-ghost" style="margin-bottom:8px;" onclick="chooseBtSource('propose')">✍️ Chacun propose ses chansons</button>
-            <button class="btn-ghost" onclick="chooseBtSource('random')">🎲 Chansons aléatoires du pool</button>
+            <button class="btn-ghost" style="margin-bottom:8px;" onclick="chooseBtSource('propose')"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 21h8" /><path d="m15 5 4 4" /><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /></svg> Chacun propose ses chansons</button>
+            <button class="btn-ghost" onclick="chooseBtSource('random')"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="12" height="12" x="2" y="10" rx="2" ry="2" /><path d="m17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6" /><path d="M6 18h.01" /><path d="M10 14h.01" /><path d="M15 6h.01" /><path d="M18 9h.01" /></svg> Chansons aléatoires du pool</button>
           </div>
           <!-- Curseur 1-20 (ajouté le 21/07/2026, remplace les boutons à choix
                fixe 2/3/4/5) : plus flexible pour un petit salon (1-2 chansons
@@ -1163,7 +1168,7 @@
                  (confirmBtSettings()), sans possibilité de vérifier son choix
                  avant. Un vrai bouton "Lancer la partie" laisse le temps de
                  changer d'avis entre les 2 options. -->
-            <button class="btn-primary" id="btLaunchGameBtn" style="display:none;margin-top:10px;" onclick="confirmBtSettings()">🚀 Lancer la partie</button>
+            <button class="btn-primary" id="btLaunchGameBtn" style="display:none;margin-top:10px;" onclick="confirmBtSettings()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" /><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09" /><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z" /><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05" /></svg> Lancer la partie</button>
             <!-- Ajouté le 06/08/2026 (retour de Rémi : après avoir validé les
                  prénoms, "← Changer le nombre de chansons" ramène 2 écrans en
                  arrière mais SAUTE l'étape des prénoms au retour — impossible
@@ -1194,7 +1199,7 @@
         <div id="btProgress" class="stack" style="margin-bottom:20px;"></div>
 
         <div id="btCreatorControls" style="display:none;text-align:center;">
-          <button class="btn-primary" id="btLaunchBtn" onclick="launchBlindtest()" disabled>🚀 Lancer la partie</button>
+          <button class="btn-primary" id="btLaunchBtn" onclick="launchBlindtest()" disabled><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" /><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09" /><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z" /><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05" /></svg> Lancer la partie</button>
           <p id="btLaunchHint" style="font-size:12px;color:var(--text-faint);margin-top:8px;"></p>
         </div>
       </div>
@@ -1216,14 +1221,14 @@
           <div id="btSdPlayersList" class="stack" style="margin-bottom:16px;"></div>
           <div style="text-align:center;margin-top:22px;padding-top:20px;border-top:1px solid var(--border);">
             <p style="font-size:12px;color:var(--text-faint);margin:0 0 10px;">Une fois que tout le monde a proposé :</p>
-            <button class="btn-success" id="btSdLaunchBtn" onclick="confirmLaunchBtSingleDevice()" disabled>🚀 Lancer la partie</button>
+            <button class="btn-success" id="btSdLaunchBtn" onclick="confirmLaunchBtSingleDevice()" disabled><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" /><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09" /><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z" /><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05" /></svg> Lancer la partie</button>
             <p id="btSdLaunchHint" style="font-size:12px;color:var(--text-faint);margin-top:8px;"></p>
           </div>
         </div>
         <div id="btSdTurnActive" style="display:none;">
           <h2 style="margin-top:0;">Au tour de <span id="btSdActiveName"></span></h2>
           <div id="btSdActiveAnswers" class="stack" style="margin-bottom:20px;"></div>
-          <button class="btn-primary" onclick="finishBtSingleDeviceTurn()">✅ J'ai fini, passer le téléphone</button>
+          <button class="btn-primary" onclick="finishBtSingleDeviceTurn()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg> J'ai fini, passer le téléphone</button>
         </div>
       </div>
 
@@ -1233,7 +1238,7 @@
         <div id="btRoundIntro" style="display:none;position:fixed;inset:0;z-index:50;align-items:center;justify-content:center;background:linear-gradient(160deg,var(--accent1),var(--accent2));padding:24px;text-align:center;">
           <div>
             <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.75);margin-bottom:10px;" id="btRoundIntroCounter"></div>
-            <div style="font-size:23px;font-weight:800;color:#fff;line-height:1.35;">🎧 Devine la chanson !</div>
+            <div style="font-size:23px;font-weight:800;color:#fff;line-height:1.35;"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" /></svg> Devine la chanson !</div>
           </div>
         </div>
         <div id="btPlayingActive" style="display:none;">
@@ -1251,14 +1256,14 @@
                différente sur chaque téléphone. Plus de bouton "C'est cet
                appareil qui diffuse" : voir isGameCreator() dans renderBtPlaying(). -->
           <div id="btSingleDeviceCard" class="card" style="display:none;text-align:center;margin-bottom:16px;">
-            <p style="font-size:13px;color:var(--text-dim);">🔊 Écoute en cours sur l'appareil du créateur du salon — pas de deuxième lecteur ici, pour éviter une pub en plus.</p>
+            <p style="font-size:13px;color:var(--text-dim);"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" /><path d="M16 9a5 5 0 0 1 0 6" /><path d="M19.364 18.364a9 9 0 0 0 0-12.728" /></svg> Écoute en cours sur l'appareil du créateur du salon — pas de deuxième lecteur ici, pour éviter une pub en plus.</p>
           </div>
 
           <div id="btPlayerCardWrap" class="card" style="margin-bottom:16px;">
             <div style="position:relative;min-height:180px;overflow:hidden;" id="btPlayerBoxWrap">
               <div id="btYtPlayer"></div>
               <div id="btAudioCover" onclick="toggleBtPlayPause()" style="display:none;position:absolute;inset:0;cursor:pointer;background:linear-gradient(160deg,var(--accent1),var(--accent2));align-items:center;justify-content:center;flex-direction:column;gap:6px;border-radius:12px;color:#fff;text-align:center;padding:12px;">
-                <div style="font-size:28px;">🎧</div>
+                <div style="font-size:28px;"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" /></svg></div>
                 <div style="font-size:12.5px;font-weight:600;">Écoute en cours — devine de quelle chanson il s'agit !</div>
               </div>
               <!-- Bandeau partiel (ajouté le 19/07/2026) : affiché à la place
@@ -1288,11 +1293,11 @@
                    atteindre. Ce bouton les désactive quelques secondes pour
                    pouvoir taper directement sur "Passer" en dessous — voir
                    revealAdSkipButton(). -->
-              <button class="btn-ghost" id="btAdSkipBtn" style="width:auto;padding:8px 14px;font-size:12px;" onclick="revealAdSkipButton()">📺 Pub bloquée ?</button>
+              <button class="btn-ghost" id="btAdSkipBtn" style="width:auto;padding:8px 14px;font-size:12px;" onclick="revealAdSkipButton()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2-5 5-5-5" /><rect width="20" height="15" x="2" y="7" rx="2" /></svg> Pub bloquée ?</button>
               <!-- Ajouté le 31/07/2026, retour de testeurs : dans un groupe de
                    5, seuls 2 avaient du son (politique anti-autoplay de
                    certains navigateurs mobiles) — voir unlockBtSound(). -->
-              <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="unlockBtSound()">🔊 Pas de son ?</button>
+              <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="unlockBtSound()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" /><path d="M16 9a5 5 0 0 1 0 6" /><path d="M19.364 18.364a9 9 0 0 0 0-12.728" /></svg> Pas de son ?</button>
             </div>
           </div>
 
@@ -1318,8 +1323,8 @@
           <!-- Mode "un seul téléphone" (ajouté le 24/07/2026) : pas de vote,
                on devine à voix haute — voir renderBtPlaying(). -->
           <div id="btSingleDeviceRevealBox" style="display:none;text-align:center;margin-bottom:16px;">
-            <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">🎧 Devinez à voix haute de quelle chanson il s'agit, puis révélez la réponse !</p>
-            <button class="btn-primary" onclick="revealBtRound()">🔍 Révéler</button>
+            <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" /></svg> Devinez à voix haute de quelle chanson il s'agit, puis révélez la réponse !</p>
+            <button class="btn-primary" onclick="revealBtRound()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /><circle cx="12" cy="12" r="3" /></svg> Révéler</button>
           </div>
 
           <div id="btRevealBox" style="display:none;margin-bottom:16px;"></div>
@@ -1337,7 +1342,7 @@
 
         <div id="btPhaseFinished" style="display:none;">
           <div class="card" style="text-align:center;padding:28px;">
-            <div style="font-size:32px;margin-bottom:10px;">🏆</div>
+            <div style="font-size:32px;margin-bottom:10px;"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2" /><path d="M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2" /><path d="M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3" /><path d="M4 22h16" /><path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z" /><path d="M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3" /></svg></div>
             <p style="font-size:15px;font-weight:700;margin-bottom:6px;">Partie terminée !</p>
           </div>
           <!-- Mode "un seul téléphone" (ajouté le 24/07/2026) : pas de score. -->
@@ -1362,8 +1367,8 @@
                passait inaperçu trop bas sur l'écran de résultat). -->
           <div id="btReplayControls" style="margin-top:20px;">
             <div style="display:flex;gap:10px;">
-              <button class="btn-primary" style="flex:1;padding:12px 8px;font-size:13.5px;" onclick="rejouerBtMemeSalon()">🔄 Rejouer</button>
-              <button class="btn-ghost" style="flex:1;padding:12px 8px;font-size:13.5px;" onclick="openChangeGameScreen()">🔀 Changer de jeu</button>
+              <button class="btn-primary" style="flex:1;padding:12px 8px;font-size:13.5px;" onclick="rejouerBtMemeSalon()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" /></svg> Rejouer</button>
+              <button class="btn-ghost" style="flex:1;padding:12px 8px;font-size:13.5px;" onclick="openChangeGameScreen()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 14 4 4-4 4" /><path d="m18 2 4 4-4 4" /><path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22" /><path d="M2 6h1.972a4 4 0 0 1 3.6 2.2" /><path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45" /></svg> Changer de jeu</button>
             </div>
             <p style="font-size:11px;color:var(--text-faint);text-align:center;margin-top:8px;">Sans quitter le salon, avec les mêmes amis.</p>
           </div>
@@ -1376,9 +1381,9 @@
 
   <nav class="tabbar" id="tabbar" style="display:none;">
     <button class="tab active" onclick="goToCurrentScreen()" id="tab-current">
-      <span class="ic" id="tabCurrentIcon">🎧</span><span id="tabCurrentLabel">Salon</span>
+      <span class="ic" id="tabCurrentIcon"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" /></svg></span><span id="tabCurrentLabel">Salon</span>
     </button>
-    <button class="tab" onclick="goHome()" id="tab-lobby"><span class="ic">🏠</span>Accueil</button>
+    <button class="tab" onclick="goHome()" id="tab-lobby"><span class="ic"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg></span>Accueil</button>
   </nav>
 
   <!-- SEARCH / ADD MODAL (2 onglets : recherche libre, ou playlists déjà importées) -->
@@ -1387,8 +1392,8 @@
       <div class="modal-handle"></div>
       <h2>Ajouter un titre</h2>
       <div style="display:flex;gap:8px;margin-bottom:14px;">
-        <button class="btn-ghost" id="tabSearchBtn" style="width:auto;flex:1;padding:10px;" onclick="switchAddTab('search')">🔎 Recherche</button>
-        <button class="btn-ghost" id="tabMineBtn" style="width:auto;flex:1;padding:10px;" onclick="switchAddTab('mine')">📂 Mes playlists</button>
+        <button class="btn-ghost" id="tabSearchBtn" style="width:auto;flex:1;padding:10px;" onclick="switchAddTab('search')"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34" /><circle cx="11" cy="11" r="8" /></svg> Recherche</button>
+        <button class="btn-ghost" id="tabMineBtn" style="width:auto;flex:1;padding:10px;" onclick="switchAddTab('mine')"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6 4 14" /><path d="M12 6v14" /><path d="M8 8v12" /><path d="M4 4v16" /></svg> Mes playlists</button>
       </div>
       <div class="modal-scroll">
         <div id="tabSearchPane">
@@ -1410,7 +1415,7 @@
   <div class="modal-backdrop" id="ytSaveModal">
     <div class="modal">
       <div class="modal-handle"></div>
-      <h2>❤️ Ajouter à une playlist YouTube</h2>
+      <h2><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5" /></svg> Ajouter à une playlist YouTube</h2>
       <p id="ytSaveTrackLabel" style="font-size:13px;color:var(--text-dim);margin:-4px 0 14px;"></p>
       <div class="modal-scroll"><div id="ytSaveContent"></div></div>
       <button class="btn-ghost" style="margin-top:10px;flex-shrink:0;" onclick="closeYtSaveModal()">Fermer</button>
@@ -1429,8 +1434,8 @@
       <div class="modal-handle"></div>
       <h2 id="gameAnswerModalTitle">Réponds à la question</h2>
       <div style="display:flex;gap:8px;margin-bottom:14px;">
-        <button class="btn-ghost" id="gameAnswerTabSearchBtn" style="width:auto;flex:1;padding:10px;" onclick="switchGameAnswerTab('search')">🔎 Recherche</button>
-        <button class="btn-ghost" id="gameAnswerTabMineBtn" style="width:auto;flex:1;padding:10px;" onclick="switchGameAnswerTab('mine')">📂 Mes playlists</button>
+        <button class="btn-ghost" id="gameAnswerTabSearchBtn" style="width:auto;flex:1;padding:10px;" onclick="switchGameAnswerTab('search')"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34" /><circle cx="11" cy="11" r="8" /></svg> Recherche</button>
+        <button class="btn-ghost" id="gameAnswerTabMineBtn" style="width:auto;flex:1;padding:10px;" onclick="switchGameAnswerTab('mine')"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6 4 14" /><path d="M12 6v14" /><path d="M8 8v12" /><path d="M4 4v16" /></svg> Mes playlists</button>
       </div>
       <div class="modal-scroll">
         <div id="gameAnswerTabSearchPane">
@@ -1457,7 +1462,7 @@
       <h2 style="margin-bottom:6px;">Série terminée !</h2>
       <p id="serieGameOverText" style="font-size:15px;color:var(--text-dim);margin-bottom:6px;"></p>
       <p id="serieGameOverRecordNote" style="font-size:13px;color:var(--accent1);font-weight:700;min-height:18px;margin-bottom:16px;"></p>
-      <button class="btn-primary" onclick="closeSerieGameOverModal()">🔄 Recommencer une série</button>
+      <button class="btn-primary" onclick="closeSerieGameOverModal()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" /></svg> Recommencer une série</button>
     </div>
   </div>
 
@@ -1650,6 +1655,70 @@ function decodeHtmlEntities(str){
 // (script séparé pour nettoyer rétroactivement ce qui existait déjà).
 const TITLE_QUALIFIER_RE = /\s*[\(\[]\s*(official\s*(music\s*)?(video|audio)|lyrics?\s*video|official\s*hd\s*video|official\s*visualizer|visualizer|hd|4k|hq|remaster(ed|is[ée]e?)?(\s*\d{4})?|audio|video|explicit|clean|mv|vid[ée]o\s*officielle|clip\s*officiel|audio\s*officiel(le)?|vid[ée]o\s*officielle\s*remasteris[ée]e?(\s*en\s*hd)?)\s*[\)\]]\s*$/i;
 
+// Système d'icônes (ajouté le 13/08/2026, remplace les emojis utilisés
+// comme icônes dans l'UI — demande de Rémi de rendre l'appli moins
+// "générique IA"). SVG en ligne (set Lucide, licence ISC — proche MIT,
+// libre de réutilisation), pas de police d'icônes externe ni de dépendance
+// CDN supplémentaire, cohérent avec la contrainte fichier unique. currentColor
+// fait suivre automatiquement la couleur du texte autour (y compris les 12
+// thèmes de couleur en test). Les 69 questions du "jeu des questions" et les
+// médailles 🥇🥈🥉 restent volontairement en emoji : ce sont des flourishes de
+// CONTENU ludique, pas des icônes de navigation — le problème "IA" concernait
+// spécifiquement les boutons/onglets/en-têtes, pas ce genre d'emoji.
+const ICONS = {
+  music: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M9 18V5l12-2v13" /> <circle cx="6" cy="18" r="3" /> <circle cx="18" cy="16" r="3" /> </svg>',
+  headphones: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" /> </svg>',
+  gamepad: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <line x1="6" x2="10" y1="11" y2="11" /> <line x1="8" x2="8" y1="9" y2="13" /> <line x1="15" x2="15.01" y1="12" y2="12" /> <line x1="18" x2="18.01" y1="10" y2="10" /> <path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z" /> </svg>',
+  rocket: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" /> <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09" /> <path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z" /> <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05" /> </svg>',
+  refresh: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /> <path d="M8 16H3v5" /> </svg>',
+  volume: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" /> <path d="M16 9a5 5 0 0 1 0 6" /> <path d="M19.364 18.364a9 9 0 0 0 0-12.728" /> </svg>',
+  plus: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M5 12h14" /> <path d="M12 5v14" /> </svg>',
+  library: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m16 6 4 14" /> <path d="M12 6v14" /> <path d="M8 8v12" /> <path d="M4 4v16" /> </svg>',
+  pencil: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /> <path d="m15 5 4 4" /> </svg>',
+  shuffle: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m18 14 4 4-4 4" /> <path d="m18 2 4 4-4 4" /> <path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22" /> <path d="M2 6h1.972a4 4 0 0 1 3.6 2.2" /> <path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45" /> </svg>',
+  tv: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m17 2-5 5-5-5" /> <rect width="20" height="15" x="2" y="7" rx="2" /> </svg>',
+  arrowRight: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /> </svg>',
+  flame: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4" /> </svg>',
+  trophy: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2" /> <path d="M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2" /> <path d="M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3" /> <path d="M4 22h16" /> <path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z" /> <path d="M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3" /> </svg>',
+  globe: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" /> <path d="M2 12h20" /> </svg>',
+  heart: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5" /> </svg>',
+  eye: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /> <circle cx="12" cy="12" r="3" /> </svg>',
+  search: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" /> </svg>',
+  flag: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528" /> </svg>',
+  check: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M20 6 9 17l-5-5" /> </svg>',
+  lock: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <rect width="18" height="11" x="3" y="11" rx="2" ry="2" /> <path d="M7 11V7a5 5 0 0 1 10 0v4" /> </svg>',
+  repeat: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m17 2 4 4-4 4" /> <path d="M3 11v-1a4 4 0 0 1 4-4h14" /> <path d="m7 22-4-4 4-4" /> <path d="M21 13v1a4 4 0 0 1-4 4H3" /> </svg>',
+  help: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /> <path d="M12 17h.01" /> </svg>',
+  dice: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <rect width="12" height="12" x="2" y="10" rx="2" ry="2" /> <path d="m17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6" /> <path d="M6 18h.01" /> <path d="M10 14h.01" /> <path d="M15 6h.01" /> <path d="M18 9h.01" /> </svg>',
+  wrench: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z" /> </svg>',
+  chart: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M3 3v16a2 2 0 0 0 2 2h16" /> <path d="M18 17V9" /> <path d="M13 17V5" /> <path d="M8 17v-3" /> </svg>',
+  phone: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <rect width="14" height="20" x="5" y="2" rx="2" ry="2" /> <path d="M12 18h.01" /> </svg>',
+  calendar: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M8 2v3" /> <path d="M16 2v3" /> <rect x="3" y="3" width="18" height="18" rx="2" /> <path d="M3 9h18" /> </svg>',
+  clapper: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m12.296 3.464 3.02 3.956" /> <path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3z" /> <path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /> <path d="m6.18 5.276 3.1 3.899" /> </svg>',
+  home: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /> <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /> </svg>',
+  trash: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M10 11v6" /> <path d="M14 11v6" /> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /> <path d="M3 6h18" /> <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /> </svg>',
+  link: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /> <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /> </svg>',
+  userX: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /> <circle cx="9" cy="7" r="4" /> <line x1="17" x2="22" y1="8" y2="13" /> <line x1="22" x2="17" y1="8" y2="13" /> </svg>',
+  zap: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z" /> </svg>',
+  target: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <circle cx="12" cy="12" r="6" /> <circle cx="12" cy="12" r="2" /> </svg>',
+  pencilLine: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M13 21h8" /> <path d="m15 5 4 4" /> <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /> </svg>',
+  clock: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /> </svg>',
+  warning: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" /> </svg>',
+  volumeOff: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" /> <line x1="22" x2="16" y1="9" y2="15" /> <line x1="16" x2="22" y1="9" y2="15" /> </svg>',
+  disc: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="M6 12c0-1.7.7-3.2 1.8-4.2" /> <circle cx="12" cy="12" r="2" /> <path d="M18 12c0 1.7-.7 3.2-1.8 4.2" /> </svg>',
+  party: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M5.8 11.3 2 22l10.7-3.79" /> <path d="M4 3h.01" /> <path d="M22 8h.01" /> <path d="M15 2h.01" /> <path d="M22 20h.01" /> <path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10" /> <path d="m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17" /> <path d="m11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7" /> <path d="M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z" /> </svg>',
+  x: '<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M18 6 6 18" /> <path d="m6 6 12 12" /> </svg>'
+};
+
+function icon(name, opts){
+  const svg = ICONS[name] || "";
+  if(!opts) return svg;
+  let style = "";
+  if(opts.size) style += `width:${opts.size};height:${opts.size};`;
+  if(opts.style) style += opts.style;
+  return style ? svg.replace('class="icon"', `class="icon" style="${style}"`) : svg;
+}
+
 function cleanTitleSuffix(title){
   let t = (title || "").trim();
   let prev = null;
@@ -1722,30 +1791,30 @@ const CATEGORY_MODES = {
 
 const MODE_DETAIL = {
   soiree: {
-    emoji:"🪩", title:"Soirée",
+    emoji:icon("disc"), title:"Soirée",
     desc:"Vous êtes tous réunis au même endroit. Chacun ajoute ses titres à la file d'attente commune, et la musique joue sur une seule enceinte pour tout le monde — comme un juke-box partagé où chacun a la main.",
   },
   distance: {
-    emoji:"🌐", title:"À distance",
+    emoji:icon("globe"), title:"À distance",
     desc:"Chacun est chez soi, avec son casque ou ses enceintes. L'appli synchronise la lecture pour que tout le monde entende exactement le même morceau au même instant, chacun depuis son propre appareil.",
   },
   questions: {
-    emoji:"❓", title:"Le jeu des questions",
+    emoji:icon("help"), title:"Le jeu des questions",
     desc:"Multijoueur. Le créateur choisit des questions (\"ta chanson d'amour préférée\", \"ta chanson la plus triste\"...) parmi une liste proposée. Chacun répond avec un vrai titre AVANT que la partie commence. Ensuite on écoute les réponses une par une et on vote en direct pour deviner qui a choisi quoi.",
   },
   owner: {
-    emoji:"🎲", title:"Qui a mis cette chanson ?",
+    emoji:icon("dice"), title:"Qui a mis cette chanson ?",
     desc:"Multijoueur. Chacun propose quelques chansons de son choix. Le jeu est ensuite de deviner qui a mis les musiques jouées aléatoirement.",
   },
   // Ajouté le 21/07/2026, idée notée le 19/07/2026 : toujours solo (pas de
   // salon à créer), enchaîne les manches de blindtest sans limite tant
   // qu'on répond juste — une erreur remet le compteur à zéro.
   serie: {
-    emoji:"🔥", title:"Série de blindtest",
+    emoji:icon("flame"), title:"Série de blindtest",
     desc:"Solo. Enchaîne un maximum de bonnes réponses d'affilée — une erreur remet le compteur à zéro.",
   },
   blindtest: {
-    emoji:"🎧", title:"Blindtest",
+    emoji:icon("headphones"), title:"Blindtest",
     desc:"Multijoueur et solo. En groupe : chacun propose quelques chansons, puis on les écoute une par une et on devine de quel titre il s'agit parmi plusieurs choix. En solo : devine à partir de chansons déjà proposées par d'autres joueurs, ou de ta propre playlist importée.",
   },
 };
@@ -2109,7 +2178,7 @@ function beginBtSoloSession(tracks){
   btSoloQueue = shuffleArray(tracks.filter(t => t.youtube_id));
   state.mode = "blindtest";
   state.category = "jeux";
-  document.getElementById("gameTitle").textContent = "🎧 Blindtest";
+  document.getElementById("gameTitle").innerHTML = `${icon("headphones")} Blindtest`;
   document.getElementById("gameSub").textContent = "Écoute l'extrait et devine de quelle chanson il s'agit parmi les choix proposés.";
   document.getElementById("gameOver").style.display = "none";
   document.getElementById("gameActive").style.display = "none";
@@ -2396,7 +2465,7 @@ async function pickSerieGuess(youtubeId){
     serieStreak++;
     updateSerieCounters();
     document.getElementById("serieResultText").textContent = `✅ Bonne réponse ! Série en cours : ${serieStreak}.`;
-    document.getElementById("serieContinueBtn").textContent = "➡️ Chanson suivante";
+    document.getElementById("serieContinueBtn").innerHTML = `${icon("arrowRight")} Chanson suivante`;
     document.getElementById("serieGuessBox").style.display = "none";
     document.getElementById("serieResultPanel").style.display = "block";
   } else {
@@ -2915,7 +2984,7 @@ function renderModeCards(){
     const d = MODE_DETAIL[m];
     return `
       <button class="mode-card" onclick="previewMode('${m}')">
-        <div class="mode-icon">${d.emoji}</div>
+        <div class="mode-icon" style="color:#fff;">${d.emoji}</div>
         <div>
           <div class="mode-title">${d.title}</div>
           <div class="mode-desc">${d.desc}</div>
@@ -2972,15 +3041,20 @@ function previewMode(mode){
   const questionMark = d.title.endsWith("?") ? "" : " ?";
   // Textes différents selon qu'on crée un nouveau salon ou qu'on change de
   // jeu dans le salon en cours (ajouté le 31/07/2026, voir changingGameInRoom).
-  document.getElementById("confirmTitle").textContent = changingGameInRoom
+  // .innerHTML plutôt que .textContent pour ces 3 lignes : nécessaire pour
+  // que l'icône SVG de d.emoji s'affiche (une SVG en texte brut ne rendrait
+  // que du code illisible) — sans risque puisque d.title/d.emoji viennent
+  // uniquement de MODE_DETAIL (config fixe de l'app), jamais d'une saisie
+  // utilisateur ou d'un titre YouTube externe.
+  document.getElementById("confirmTitle").innerHTML = changingGameInRoom
     ? `Lancer : ${d.emoji} ${d.title}${questionMark}`
     : `Créer ce salon : ${d.emoji} ${d.title}${questionMark}`;
   document.getElementById("confirmSub").textContent = changingGameInRoom
     ? "Le salon garde le même code — tout le monde bascule automatiquement sur ce nouveau jeu."
     : "Un vrai code sera généré pour que tes amis puissent te rejoindre. Rien n'est créé tant que tu n'as pas confirmé.";
-  document.getElementById("confirmCreateBtn").textContent = changingGameInRoom ? "🔀 Lancer ce jeu" : "🚀 Créer le salon";
+  document.getElementById("confirmCreateBtn").innerHTML = changingGameInRoom ? `${icon("shuffle")} Lancer ce jeu` : `${icon("rocket")} Créer le salon`;
   document.getElementById("confirmCard").innerHTML = `
-    <div class="mode-icon">${d.emoji}</div>
+    <div class="mode-icon" style="color:#fff;">${d.emoji}</div>
     <div>
       <div class="mode-title">${d.title}</div>
       <div class="mode-desc">${d.desc}</div>
@@ -3142,7 +3216,7 @@ async function changeGameType(mode, singleDevice){
   }).eq("id", currentRoom.id).select().single();
   if(error){ showToast("Erreur : " + error.message); return; }
   const d = MODE_DETAIL[mode] || {};
-  await routeToRoomScreen(data, `🔀 Nouveau jeu : ${d.emoji || ""} ${d.title || mode} !`);
+  await routeToRoomScreen(data, `🔀 Nouveau jeu : ${d.title || mode} !`);
 }
 
 // Copie le code du salon en cours dans le presse-papiers (ajouté le
@@ -3186,7 +3260,7 @@ async function joinRoom(){
   if(error){ showToast("Erreur de recherche du salon : " + error.message); return; }
   if(room){
     const d = MODE_DETAIL[room.mode] || MODE_DETAIL.soiree;
-    await enterRealRoom(room, `Tu as rejoint le salon ${room.code} — ${d.emoji} ${d.title}.`);
+    await enterRealRoom(room, `Tu as rejoint le salon ${room.code} — ${d.title}.`);
     return;
   }
 
@@ -3238,7 +3312,7 @@ async function routeToRoomScreen(room, toastMsg){
   if(room.mode === "questions" || room.mode === "owner"){
     document.getElementById("playerCard").style.display = "none";
     document.getElementById("gqRoomCode").textContent = room.code;
-    document.getElementById("gqRoomModeName").textContent = room.mode === "owner" ? "🎲 Qui a mis cette chanson ?" : "❓ Le jeu des questions";
+    document.getElementById("gqRoomModeName").innerHTML = room.mode === "owner" ? `${icon("dice")} Qui a mis cette chanson ?` : `${icon("help")} Le jeu des questions`;
     // Repart d'une sélection vierge à chaque entrée dans le salon.
     gameSelectedQuestionIds = [];
     gameRoundsTarget = null;
@@ -3317,17 +3391,17 @@ async function routeToRoomScreen(room, toastMsg){
 function updateModeUI(){
   const d = MODE_DETAIL[state.mode] || MODE_DETAIL.soiree;
   const heroEl = document.getElementById("roomModeName");
-  if(heroEl) heroEl.textContent = `${d.emoji} ${d.title}`;
+  if(heroEl) heroEl.innerHTML = `${d.emoji} ${d.title}`;
 
   const tabIcon = document.getElementById("tabCurrentIcon");
   const tabLabel = document.getElementById("tabCurrentLabel");
   if(tabIcon && tabLabel){
-    tabIcon.textContent = state.category === "jeux" ? "🎮" : "🎧";
+    tabIcon.innerHTML = state.category === "jeux" ? icon("gamepad") : icon("headphones");
     tabLabel.textContent = state.category === "jeux" ? "Jeu" : "Salon";
   }
 
   if(state.category === "jeux"){
-    document.getElementById("gameTitle").textContent = `${d.emoji} ${d.title}`;
+    document.getElementById("gameTitle").innerHTML = `${d.emoji} ${d.title}`;
     document.getElementById("gameSub").textContent = state.mode === "questions"
       ? "Une question apparaît, chacun avait répondu à l'avance avec un titre. Devine qui a choisi quel morceau !"
       : "Un morceau est tiré au hasard des playlists du groupe. Devine à qui il appartient avant les autres !";
@@ -3392,7 +3466,7 @@ function subscribeQueue(roomId){
       // vers le nouveau jeu — pas seulement chez la personne qui l'a choisi.
       if(currentRoom && payload.new.mode !== currentRoom.mode){
         const d = MODE_DETAIL[payload.new.mode] || {};
-        routeToRoomScreen(payload.new, `🔀 Nouveau jeu : ${d.emoji || ""} ${d.title || payload.new.mode} !`);
+        routeToRoomScreen(payload.new, `🔀 Nouveau jeu : ${d.title || payload.new.mode} !`);
         return;
       }
       currentRoom = payload.new;
@@ -3559,7 +3633,7 @@ function toggleBroadcast(){
   const top = getTopQueueItem();
   if(!top){ showToast("La file est vide — ajoute un titre avant de lancer la lecture."); return; }
   isBroadcasting = true;
-  document.getElementById("broadcastToggleBtn").textContent = "🔇 Arrêter la diffusion";
+  document.getElementById("broadcastToggleBtn").innerHTML = `${icon("volumeOff")} Arrêter la diffusion`;
   document.getElementById("ytPlayerWrap").style.display = "block";
   loadAndPlay(top);
 }
@@ -3568,7 +3642,7 @@ function stopBroadcast(){
   isBroadcasting = false;
   currentPlayingItem = null;
   const btn = document.getElementById("broadcastToggleBtn");
-  if(btn) btn.textContent = "🔊 Je diffuse";
+  if(btn) btn.innerHTML = `${icon("volume")} Je diffuse`;
   const wrap = document.getElementById("ytPlayerWrap");
   if(wrap) wrap.style.display = "none";
   if(ytPlayer){ try { ytPlayer.destroy(); } catch(e) {} ytPlayer = null; }
@@ -3658,9 +3732,9 @@ function renderPlayerCard(){
     el.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
         <p style="font-size:11.5px;color:var(--text-faint);flex:1;min-width:180px;margin:0;">
-          🎧 Chacun écoute depuis son propre appareil, en même temps — rejoins l'écoute pour entendre la musique du groupe.
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" /></svg> Chacun écoute depuis son propre appareil, en même temps — rejoins l'écoute pour entendre la musique du groupe.
         </p>
-        <button class="btn-ghost" style="width:auto;padding:8px 14px;" id="distanceJoinBtn" onclick="toggleDistanceListening()">🎧 Rejoindre l'écoute</button>
+        <button class="btn-ghost" style="width:auto;padding:8px 14px;" id="distanceJoinBtn" onclick="toggleDistanceListening()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" /></svg> Rejoindre l'écoute</button>
       </div>
       <div id="distancePlayerWrap" style="display:none;margin-top:12px;">
         <div style="position:relative;min-height:180px;">
@@ -3687,11 +3761,11 @@ function renderPlayerCard(){
                est que la couche invisible ci-dessus (distanceClickBlocker)
                empêche d'atteindre le bouton natif "Ignorer" de YouTube — ce
                bouton la désactive juste quelques secondes. -->
-          <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="revealDistanceAdSkip()">📺 Pub bloquée ?</button>
+          <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="revealDistanceAdSkip()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2-5 5-5-5" /><rect width="20" height="15" x="2" y="7" rx="2" /></svg> Pub bloquée ?</button>
           <!-- Ajouté le 31/07/2026, retour de testeurs : dans un groupe de
                5, seuls 2 avaient du son (politique anti-autoplay de certains
                navigateurs mobiles) — voir unlockDistanceSound(). -->
-          <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="unlockDistanceSound()">🔊 Pas de son ?</button>
+          <button class="btn-ghost" style="width:auto;padding:8px 14px;font-size:12px;" onclick="unlockDistanceSound()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" /><path d="M16 9a5 5 0 0 1 0 6" /><path d="M19.364 18.364a9 9 0 0 0 0-12.728" /></svg> Pas de son ?</button>
         </div>
         <p style="font-size:11px;color:var(--text-faint);margin-top:6px;">Pause, reprise et "suivant" sont partagés : ce que fait une personne se répercute aussitôt chez tout le monde. La barre de défilement de YouTube est volontairement désactivée : avancer/reculer dans le titre pour tout le monde n'est pas encore possible (à construire si tu en as besoin).</p>
       </div>
@@ -3700,9 +3774,9 @@ function renderPlayerCard(){
     el.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
         <p style="font-size:11.5px;color:var(--text-faint);flex:1;min-width:180px;margin:0;">
-          🔊 Une seule personne (celle connectée à l'enceinte) doit activer ça — pas tout le monde en même temps.
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" /><path d="M16 9a5 5 0 0 1 0 6" /><path d="M19.364 18.364a9 9 0 0 0 0-12.728" /></svg> Une seule personne (celle connectée à l'enceinte) doit activer ça — pas tout le monde en même temps.
         </p>
-        <button class="btn-ghost" style="width:auto;padding:8px 14px;" id="broadcastToggleBtn" onclick="toggleBroadcast()">🔊 Je diffuse</button>
+        <button class="btn-ghost" style="width:auto;padding:8px 14px;" id="broadcastToggleBtn" onclick="toggleBroadcast()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" /><path d="M16 9a5 5 0 0 1 0 6" /><path d="M19.364 18.364a9 9 0 0 0 0-12.728" /></svg> Je diffuse</button>
       </div>
       <div id="ytPlayerWrap" style="display:none;margin-top:12px;">
         <div id="ytPlayer"></div>
@@ -3797,7 +3871,7 @@ async function joinDistanceListening(silent){
 
   distanceJoined = true;
   const btn = document.getElementById("distanceJoinBtn");
-  if(btn) btn.textContent = "🔇 Arrêter d'écouter";
+  if(btn) btn.innerHTML = `${icon("volumeOff")} Arrêter d'écouter`;
   const wrap = document.getElementById("distancePlayerWrap");
   if(wrap) wrap.style.display = "block";
 
@@ -3843,7 +3917,7 @@ function stopDistanceListening(){
   distanceJoined = false;
   distanceAdvancePending = false;
   const btn = document.getElementById("distanceJoinBtn");
-  if(btn) btn.textContent = "🎧 Rejoindre l'écoute";
+  if(btn) btn.innerHTML = `${icon("headphones")} Rejoindre l'écoute`;
   const wrap = document.getElementById("distancePlayerWrap");
   if(wrap) wrap.style.display = "none";
   if(distancePlayer){ try { distancePlayer.destroy(); } catch(e) {} distancePlayer = null; }
@@ -4014,7 +4088,7 @@ function renderRealQueueUI(){
   el.innerHTML = items.map(item => `
     <div class="queue-item" data-id="${item.id}">
       <span class="queue-drag-handle" onpointerdown="startQueueDrag(event,'${item.id}')" title="Glisser pour réordonner">⠿</span>
-      <div class="art-sm">🎵</div>
+      <div class="art-sm">${icon("music")}</div>
       <div class="qi-info">
         <div class="qi-title">${escapeHtml(item.title)}</div>
         <div class="qi-meta">${escapeHtml(item.artist)} · proposé par ${escapeHtml(item.profiles?.pseudo || "…")} <span class="badge ${badgeClass[item.platform]||''}">${escapeHtml((badgeLabel[item.platform]||item.platform||"").toUpperCase())}</span></div>
@@ -4156,8 +4230,8 @@ async function renderSearchResults(q){
         <div style="font-size:12px;color:var(--text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(r.artist)}</div>
       </div>
       <span class="badge ${badgeClass.youtube}">${badgeLabel.youtube}</span>
-      <button class="add-btn" onclick="openYtSavePicker(${i})" title="Ajouter à une de tes playlists YouTube" style="margin-right:4px;">❤️</button>
-      <button class="add-btn" onclick="addTrackToQueue(${i})" title="Ajouter à la file du salon">+</button>
+      <button class="add-btn" onclick="openYtSavePicker(${i})" title="Ajouter à une de tes playlists YouTube" style="margin-right:4px;">${icon("heart")}</button>
+      <button class="add-btn" onclick="addTrackToQueue(${i})" title="Ajouter à la file du salon">${icon("plus")}</button>
     </div>
   `).join("");
 }
@@ -4375,7 +4449,7 @@ async function goToPlaylistsScreen(){
 
 function renderPlaylistsImportStart(){
   document.getElementById("playlistsImportCard").innerHTML = `
-    <button class="btn-primary" onclick="startGoogleImport()">🔐 Connecter mon compte YouTube</button>
+    <button class="btn-primary" onclick="startGoogleImport()">${icon("lock")} Connecter mon compte YouTube</button>
     <p style="font-size:11.5px;color:var(--text-faint);margin:10px 0 0;">Ça passe par une connexion Google (YouTube appartient à Google) — tant que tu restes sur cette page, tu n'auras pas à te reconnecter pour revenir sur cet écran ou en actualiser une playlist.</p>
   `;
 }
@@ -4427,9 +4501,9 @@ async function loadGooglePlaylists(){
         <img src="${p.snippet.thumbnails?.default?.url || ''}" alt="" style="width:34px;height:34px;border-radius:8px;object-fit:cover;flex-shrink:0;" />
         <div style="flex:1;min-width:0;">
           <div style="font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(p.snippet.title)}</div>
-          <div style="font-size:12px;color:var(--text-faint);">${already ? `✅ Déjà importée (${count} titre${count>1?"s":""})` : `${p.contentDetails?.itemCount ?? "?"} titres`}</div>
+          <div style="font-size:12px;color:var(--text-faint);">${already ? `${icon("check")} Déjà importée (${count} titre${count>1?"s":""})` : `${p.contentDetails?.itemCount ?? "?"} titres`}</div>
         </div>
-        <button class="add-btn" onclick="importOnePlaylist(${i})" title="${already ? "Actualiser cette playlist (ajouts/retraits depuis l'import)" : "Importer cette playlist"}">${already ? "🔄" : "+"}</button>
+        <button class="add-btn" onclick="importOnePlaylist(${i})" title="${already ? "Actualiser cette playlist (ajouts/retraits depuis l'import)" : "Importer cette playlist"}">${already ? icon("refresh") : icon("plus")}</button>
       </div>
     `;
     }).join("");
@@ -4601,17 +4675,17 @@ function renderImportedTracksList(){
   el.innerHTML = importedGroupNames.map((name, gi) => `
     <div style="margin-bottom:20px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
-        <div style="font-size:13.5px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📂 ${escapeHtml(name)} <span style="color:var(--text-faint);font-weight:400;">(${groups[name].length})</span></div>
-        <button class="btn-ghost" id="refreshBtn-${gi}" style="width:auto;padding:5px 10px;font-size:12px;flex-shrink:0;" onclick="refreshPlaylist(${gi})">🔄 Actualiser</button>
+        <div style="font-size:13.5px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${icon("library")} ${escapeHtml(name)} <span style="color:var(--text-faint);font-weight:400;">(${groups[name].length})</span></div>
+        <button class="btn-ghost" id="refreshBtn-${gi}" style="width:auto;padding:5px 10px;font-size:12px;flex-shrink:0;" onclick="refreshPlaylist(${gi})">${icon("refresh")} Actualiser</button>
       </div>
       ${groups[name].map(t => `
         <div class="queue-item">
-          <div class="art-sm">🎵</div>
+          <div class="art-sm">${icon("music")}</div>
           <div class="qi-info">
             <div class="qi-title">${escapeHtml(t.title)}</div>
             <div class="qi-meta">${escapeHtml(t.artist||"")} <span class="badge ${badgeClass.youtube}">${badgeLabel.youtube}</span></div>
           </div>
-          <button class="add-btn" onclick="removeImportedTrack('${t.id}')" title="Retirer">🗑</button>
+          <button class="add-btn" onclick="removeImportedTrack('${t.id}')" title="Retirer">${icon("trash")}</button>
         </div>
       `).join("")}
     </div>
@@ -4732,7 +4806,7 @@ function openYtSaveForTrack(track){
   } else {
     el.innerHTML = `
       <p style="font-size:13px;color:var(--text-faint);margin-bottom:12px;">Connecte ton compte YouTube pour choisir une playlist où enregistrer ce titre.</p>
-      <button class="btn-primary" onclick="startGoogleConnectForSave()">🔐 Connecter mon compte YouTube</button>
+      <button class="btn-primary" onclick="startGoogleConnectForSave()">${icon("lock")} Connecter mon compte YouTube</button>
     `;
   }
 }
@@ -4771,7 +4845,7 @@ function openYtSaveForCurrentBtRound(){
 // mieux équilibré, et l'intention ("ajouter à une playlist") est explicite
 // au lieu de reposer sur la seule reconnaissance de l'icône.
 function ytSaveHeartBtn(onclickFn){
-  return `<button class="btn-ghost" style="width:auto;padding:5px 12px;font-size:11.5px;margin-top:8px;" onclick="${onclickFn}()">❤️ Ajouter à ma playlist</button>`;
+  return `<button class="btn-ghost" style="width:auto;padding:5px 12px;font-size:11.5px;margin-top:8px;" onclick="${onclickFn}()">${icon("heart")} Ajouter à ma playlist</button>`;
 }
 
 function closeYtSaveModal(){
@@ -4830,9 +4904,9 @@ function renderYtSavePlaylistsList(){
         <img src="${p.snippet.thumbnails?.default?.url || ''}" alt="" style="width:34px;height:34px;border-radius:8px;object-fit:cover;flex-shrink:0;" />
         <div style="flex:1;min-width:0;">
           <div style="font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(p.snippet.title)}</div>
-          ${already ? `<div style="font-size:12px;color:var(--text-faint);">✅ Ajoutée</div>` : ``}
+          ${already ? `<div style="font-size:12px;color:var(--text-faint);">${icon("check")} Ajoutée</div>` : ``}
         </div>
-        <button class="add-btn" onclick="confirmYtSave(${i})" title="${already ? "Ajouter quand même une seconde fois" : "Enregistrer ce titre dans cette playlist YouTube"}">${already ? "🔁" : "+"}</button>
+        <button class="add-btn" onclick="confirmYtSave(${i})" title="${already ? "Ajouter quand même une seconde fois" : "Enregistrer ce titre dans cette playlist YouTube"}">${already ? icon("repeat") : icon("plus")}</button>
       </div>
     `;
   }).join("");
@@ -4902,7 +4976,7 @@ function renderLobbyImportedSummary(){
     : "Aucune playlist importée pour l'instant.";
 }
 
-/* ---- Écran "🛠 Gérer le pool communautaire" (ajouté le 22/07/2026, revu
+/* ---- Écran "<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z" /></svg> Gérer le pool communautaire" (ajouté le 22/07/2026, revu
    Round 45) ----
    Approbation/suppression bloquées côté base (policy RLS) pour tout compte
    qui n'a pas profiles.is_admin = true — voir harmonize-schema.sql. Sur un
@@ -4932,7 +5006,7 @@ async function goToPoolAdminScreen(){
   await switchPoolAdminView("pending");
 }
 
-/* ---- Écran "📊 Statistiques" (ajouté le 24/07/2026) — réservé aux admins,
+/* ---- Écran "<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" /></svg> Statistiques" (ajouté le 24/07/2026) — réservé aux admins,
    même principe que screen-pool-admin ci-dessus. ---- */
 const STATS_DAYS = 30;
 
@@ -5070,12 +5144,12 @@ function renderPoolAdminPendingList(){
   const el = document.getElementById("poolAdminList");
   el.innerHTML = poolAdminPendingTracks.map(t => `
     <div class="queue-item">
-      <div class="art-sm">🎵</div>
+      <div class="art-sm">${icon("music")}</div>
       <div class="qi-info">
         <div class="qi-title">${escapeHtml(t.title)}</div>
         <div class="qi-meta">${escapeHtml(t.artist || "")}</div>
       </div>
-      <button class="btn-ghost" style="width:auto;padding:8px 10px;font-size:12px;" onclick="reviewPoolTrack('${escJs(t.id)}','approved')">✅</button>
+      <button class="btn-ghost" style="width:auto;padding:8px 10px;font-size:12px;" onclick="reviewPoolTrack('${escJs(t.id)}','approved')">${icon("check")}</button>
       <button class="btn-ghost" style="width:auto;padding:8px 10px;font-size:12px;" onclick="reviewPoolTrack('${escJs(t.id)}','rejected')">❌</button>
     </div>
   `).join("") || `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Rien en attente pour l'instant — les nouvelles propositions des joueurs apparaîtront ici.</p>`;
@@ -5169,12 +5243,12 @@ function renderPoolAdminApprovedList(){
   const el = document.getElementById("poolAdminList");
   el.innerHTML = visible.map(t => `
     <div class="queue-item">
-      <div class="art-sm">🎵</div>
+      <div class="art-sm">${icon("music")}</div>
       <div class="qi-info">
         <div class="qi-title">${escapeHtml(t.title)}</div>
         <div class="qi-meta">${escapeHtml(t.artist || "")}</div>
       </div>
-      <button class="btn-ghost" style="width:auto;padding:8px 12px;font-size:12px;" onclick="deletePoolTrack('${escJs(t.id)}')">🗑</button>
+      <button class="btn-ghost" style="width:auto;padding:8px 12px;font-size:12px;" onclick="deletePoolTrack('${escJs(t.id)}')">${icon("trash")}</button>
     </div>
   `).join("") || `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Aucun résultat.</p>`;
   const loadMoreBtn = document.getElementById("poolAdminLoadMoreBtn");
@@ -5252,7 +5326,7 @@ function renderMineResults(){
   if(!el) return;
   if(!myImportedTracks.length){
     el.innerHTML = `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Tu n'as encore importé aucune playlist.</p>
-      <button class="btn-ghost" style="margin-top:8px;" onclick="closeSearch();goToPlaylistsScreen();">🔗 Importer une playlist</button>`;
+      <button class="btn-ghost" style="margin-top:8px;" onclick="closeSearch();goToPlaylistsScreen();">${icon("link")} Importer une playlist</button>`;
     return;
   }
   const query = (document.getElementById("mineSearchInput")?.value || "").trim().toLowerCase();
@@ -5284,10 +5358,10 @@ function renderMinePlaylistsList(){
   mineGroupNames = [ALL_IMPORTED_LABEL, ...otherNames];
   el.innerHTML = mineGroupNames.map((name, i) => {
     const count = name === ALL_IMPORTED_LABEL ? myImportedTracks.length : groups[name];
-    const icon = name === ALL_IMPORTED_LABEL ? "🎶" : "📂";
+    const rowIcon = name === ALL_IMPORTED_LABEL ? icon("music") : icon("library");
     return `
     <div class="search-result" style="cursor:pointer;" onclick="openMinePlaylist(${i})">
-      <div style="font-size:20px;flex-shrink:0;">${icon}</div>
+      <div style="font-size:20px;flex-shrink:0;">${rowIcon}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(name)}</div>
         <div style="font-size:12px;color:var(--text-faint);">${count} titre(s)</div>
@@ -5322,8 +5396,8 @@ function renderMineFlatList(tracks, showBackButton, emptyMessage){
   // la playlist actuellement affichée.
   const bulkAddBtns = showBackButton
     ? `<div style="display:flex;gap:8px;margin-bottom:10px;">
-        <button class="btn-ghost" style="width:auto;flex:1;padding:8px;font-size:12.5px;" onclick="addPlaylistToQueue('${escJs(minePlaylistFilter)}', false)">➕ Tout ajouter</button>
-        <button class="btn-ghost" style="width:auto;flex:1;padding:8px;font-size:12.5px;" onclick="addPlaylistToQueue('${escJs(minePlaylistFilter)}', true)">🔀 Jouer la playlist au hasard</button>
+        <button class="btn-ghost" style="width:auto;flex:1;padding:8px;font-size:12.5px;" onclick="addPlaylistToQueue('${escJs(minePlaylistFilter)}', false)">${icon("plus")} Tout ajouter</button>
+        <button class="btn-ghost" style="width:auto;flex:1;padding:8px;font-size:12.5px;" onclick="addPlaylistToQueue('${escJs(minePlaylistFilter)}', true)">${icon("shuffle")} Jouer la playlist au hasard</button>
       </div>`
     : "";
   if(!tracks.length){
@@ -5633,7 +5707,7 @@ function renderCustomQuestionsList(){
   const customTexts = gameSelectedQuestionIds.filter(id => !GAME_QUESTIONS.some(q => q.id === id));
   document.getElementById("gqCustomQuestionsList").innerHTML = customTexts.map((text, i) => `
     <div style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border);">
-      <span style="font-size:13.5px;flex:1;min-width:0;">✏️ ${escapeHtml(text)}</span>
+      <span style="font-size:13.5px;flex:1;min-width:0;">${icon("pencil")} ${escapeHtml(text)}</span>
       <button class="add-btn" onclick="removeCustomQuestion(${i})" title="Retirer cette question" style="width:auto;padding:0 10px;flex-shrink:0;">✕</button>
     </div>
   `).join("");
@@ -5773,10 +5847,10 @@ function renderAnsweringPhase(){
         <div style="flex:1;min-width:0;">
           <div style="font-size:13px;font-weight:600;">${escapeHtml(q ? q.label : qid)}</div>
           ${mine
-            ? `<div style="font-size:12.5px;color:var(--text-dim);margin-top:2px;">✅ ${escapeHtml(mine.title)} — ${escapeHtml(mine.artist||"")}</div>`
+            ? `<div style="font-size:12.5px;color:var(--text-dim);margin-top:2px;">${icon("check")} ${escapeHtml(mine.title)} — ${escapeHtml(mine.artist||"")}</div>`
             : `<div style="font-size:12.5px;color:var(--text-faint);margin-top:2px;">Pas encore répondu</div>`}
         </div>
-        <button class="add-btn" onclick="openGameAnswerModal('${qid}')" title="${mine ? "Changer ta réponse" : "Répondre"}" style="width:auto;padding:0 12px;">${mine ? "✏️ Modifier" : "➕ Répondre"}</button>
+        <button class="add-btn" onclick="openGameAnswerModal('${qid}')" title="${mine ? "Changer ta réponse" : "Répondre"}" style="width:auto;padding:0 12px;">${mine ? `${icon("pencil")} Modifier` : `${icon("plus")} Répondre`}</button>
       </div>
     `;
   }).join("");
@@ -5800,14 +5874,14 @@ function renderGameProgress(questionIds){
     const done = total > 0 && answered >= total;
     const pseudo = getPseudoForUserId(uid);
     const excludeBtn = (creator && uid !== currentUser?.id)
-      ? `<button class="add-btn" onclick="excludeParticipant('${uid}')" title="Exclure ${escapeHtml(pseudo)} (AFK)" style="width:auto;padding:0 10px;font-size:11px;">🚫 Exclure</button>`
+      ? `<button class="add-btn" onclick="excludeParticipant('${uid}')" title="Exclure ${escapeHtml(pseudo)} (AFK)" style="width:auto;padding:0 10px;font-size:11px;">${icon("userX")} Exclure</button>`
       : "";
     return `
       <div class="search-result">
         ${avatarHtml(getAvatarUrlForUserId(uid), pseudo, 30, 12)}
         <div style="flex:1;min-width:0;">
           <div style="font-size:13px;font-weight:600;">${escapeHtml(pseudo)}${uid === currentUser?.id ? " (toi)" : ""}</div>
-          <div style="font-size:11.5px;color:var(--text-faint);">${answered}/${total} réponse(s)${done ? " ✅" : ""}</div>
+          <div style="font-size:11.5px;color:var(--text-faint);">${answered}/${total} réponse(s)${done ? " " + icon("check") : ""}</div>
         </div>
         ${excludeBtn}
       </div>
@@ -5874,17 +5948,17 @@ function renderSingleDeviceAnswering(){
     const myAnswers = gameAnswers.filter(a => a.local_player_name === singleDeviceActivePlayer);
     document.getElementById("sdActiveAnswers").innerHTML = questionIds.map(qid => {
       const q = GAME_QUESTIONS.find(x => x.id === qid);
-      const label = q ? q.label : (isOwnerMode ? `🎵 Chanson n°${String(qid).slice(2)}` : qid);
+      const label = q ? q.label : (isOwnerMode ? `${icon("music")} Chanson n°${String(qid).slice(2)}` : qid);
       const mine = myAnswers.find(a => a.question_id === qid);
       return `
         <div class="search-result" style="align-items:flex-start;">
           <div style="flex:1;min-width:0;">
             <div style="font-size:13px;font-weight:600;">${escapeHtml(label)}</div>
             ${mine
-              ? `<div style="font-size:12.5px;color:var(--text-dim);margin-top:2px;">✅ ${escapeHtml(mine.title)} — ${escapeHtml(mine.artist||"")}</div>`
+              ? `<div style="font-size:12.5px;color:var(--text-dim);margin-top:2px;">${icon("check")} ${escapeHtml(mine.title)} — ${escapeHtml(mine.artist||"")}</div>`
               : `<div style="font-size:12.5px;color:var(--text-faint);margin-top:2px;">${isOwnerMode ? "Pas encore proposée" : "Pas encore répondu"}</div>`}
           </div>
-          <button class="add-btn" onclick="openGameAnswerModal('${qid}')" title="${mine ? "Changer" : (isOwnerMode ? "Proposer" : "Répondre")}" style="width:auto;padding:0 12px;">${mine ? "✏️ Modifier" : (isOwnerMode ? "➕ Proposer" : "➕ Répondre")}</button>
+          <button class="add-btn" onclick="openGameAnswerModal('${qid}')" title="${mine ? "Changer" : (isOwnerMode ? "Proposer" : "Répondre")}" style="width:auto;padding:0 12px;">${mine ? `${icon("pencil")} Modifier` : (isOwnerMode ? `${icon("plus")} Proposer` : `${icon("plus")} Répondre`)}</button>
         </div>
       `;
     }).join("");
@@ -5908,7 +5982,7 @@ function renderSingleDeviceAnswering(){
         ${avatarHtml(null, name, 30, 12)}
         <div style="flex:1;min-width:0;">
           <div style="font-size:13px;font-weight:600;">${escapeHtml(name)}</div>
-          <div style="font-size:11.5px;color:var(--text-faint);">${count}/${total} ${isOwnerMode ? "proposition(s)" : "réponse(s)"}${done ? " ✅" : ""}</div>
+          <div style="font-size:11.5px;color:var(--text-faint);">${count}/${total} ${isOwnerMode ? "proposition(s)" : "réponse(s)"}${done ? " " + icon("check") : ""}</div>
         </div>
       </div>
     `;
@@ -6029,7 +6103,7 @@ function computeGameRounds(){
 // détruit jamais rien en plein milieu, reste en place.
 // Journal d'activité (ajouté le 24/07/2026, voir activity_events dans
 // harmonize-schema.sql) : une ligne à chaque lancement/fin de partie, pour
-// le tableau de bord "📊 Statistiques" — rooms.game_phase n'a lui aucun
+// le tableau de bord "<svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" /></svg> Statistiques" — rooms.game_phase n'a lui aucun
 // historique (écrasé à chaque manche/rejouer). Best-effort : une panne ici
 // ne doit jamais empêcher de jouer, juste fausser légèrement les stats.
 async function logActivityEvent(eventType, roomId, mode){
@@ -6218,7 +6292,7 @@ function renderGamePlaying(){
     document.getElementById("gqNextBox").style.display = revealed ? "block" : "none";
     if(revealed){
       const actionBtn = document.getElementById("gqRevealBtn");
-      actionBtn.textContent = isLast ? "🏁 Terminer la partie" : "➡️ Chanson suivante";
+      actionBtn.innerHTML = isLast ? `${icon("flag")} Terminer la partie` : `${icon("arrowRight")} Chanson suivante`;
       actionBtn.onclick = nextGameRound;
     }
     return;
@@ -6254,7 +6328,7 @@ function renderGamePlaying(){
   document.getElementById("gqNextBox").style.display = revealed ? "block" : "none";
   if(revealed){
     const actionBtn = document.getElementById("gqRevealBtn");
-    actionBtn.textContent = isLast ? "🏁 Voir le classement final" : "➡️ Chanson suivante";
+    actionBtn.innerHTML = isLast ? `${icon("flag")} Voir le classement final` : `${icon("arrowRight")} Chanson suivante`;
     actionBtn.onclick = nextGameRound;
   }
 
@@ -6598,7 +6672,7 @@ function renderGameGuessOptions(round){
         onclick="toggleGuessSelection('${uid}')"
         ${locked ? "disabled" : ""}
         style="cursor:${locked ? "default" : "pointer"};opacity:${locked && !active ? "0.5" : "1"};"
-      >${active ? "✓ " : ""}${escapeHtml(getPseudoForUserId(uid))}</button>
+      >${active ? icon("check") + " " : ""}${escapeHtml(getPseudoForUserId(uid))}</button>
     `;
   }).join("");
   const timeUpHint = document.getElementById("gqGuessTimeUpHint");
@@ -6715,7 +6789,7 @@ function renderGameReveal(round){
     // jamais écrit en base — voir singleDeviceRoundPoints/adjustSingleDeviceScore().
     document.getElementById("gqRevealBox").innerHTML = `
       <div class="card" style="text-align:center;">
-        <div style="font-size:13px;color:var(--text-dim);margin-bottom:6px;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
+        <div style="font-size:13px;color:var(--text-dim);margin-bottom:6px;">${icon("music")} "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
         ${round.youtube_id ? ytSaveHeartBtn("openYtSaveForCurrentGameRound") : ""}
         <div style="font-size:15px;font-weight:700;margin-top:8px;">${names ? chosenLabel + escapeHtml(names) : noneLabel}</div>
         <p style="font-size:11px;color:var(--text-faint);margin:10px 0 8px;">Donne des points à qui a bien deviné (jusqu'à 3 : artiste, titre, bonus feat/film...).</p>
@@ -6732,7 +6806,7 @@ function renderGameReveal(round){
   const noneLabel = isOwnerGame ? "Personne n'a proposé ça" : "Personne n'a répondu ça";
   document.getElementById("gqRevealBox").innerHTML = `
     <div class="card" style="text-align:center;">
-      <div style="font-size:13px;color:var(--text-dim);margin-bottom:6px;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
+      <div style="font-size:13px;color:var(--text-dim);margin-bottom:6px;">${icon("music")} "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
       ${round.youtube_id ? ytSaveHeartBtn("openYtSaveForCurrentGameRound") : ""}
       <div style="font-size:15px;font-weight:700;margin-top:8px;">${owners.length ? chosenLabel + escapeHtml(ownerNames) : noneLabel}</div>
     </div>
@@ -6758,7 +6832,7 @@ function renderRoundPointsRows(roundPoints){
     const isMe = uid === currentUser?.id;
     return `
       <div class="score-row"${isMe ? ' style="border-color:var(--accent1);"' : ""}>
-        <span>${uid === fastestUid ? "⚡ " : ""}${escapeHtml(name)}${isMe ? " (toi)" : ""}</span>
+        <span>${uid === fastestUid ? icon("zap") + " " : ""}${escapeHtml(name)}${isMe ? " (toi)" : ""}</span>
         <strong style="color:${pts > 0 ? "var(--accent1)" : "var(--text-faint)"};">${pts > 0 ? "+" + pts : "0"} pt${pts > 1 ? "s" : ""}</strong>
       </div>
     `;
@@ -7079,7 +7153,7 @@ function renderGameAnswerMineResults(){
   if(!el) return;
   if(!myImportedTracks.length){
     el.innerHTML = `<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;">Tu n'as encore importé aucune playlist.</p>
-      <button class="btn-ghost" style="margin-top:8px;" onclick="closeGameAnswerModal();goToPlaylistsScreen();">🔗 Importer une playlist</button>`;
+      <button class="btn-ghost" style="margin-top:8px;" onclick="closeGameAnswerModal();goToPlaylistsScreen();">${icon("link")} Importer une playlist</button>`;
     return;
   }
   const query = (document.getElementById("gameAnswerMineSearchInput")?.value || "").trim().toLowerCase();
@@ -7111,10 +7185,10 @@ function renderGameAnswerMinePlaylistsList(){
   gameAnswerMineGroupNames = [GAME_ANSWER_ALL_IMPORTED_LABEL, ...otherNames];
   el.innerHTML = gameAnswerMineGroupNames.map((name, i) => {
     const count = name === GAME_ANSWER_ALL_IMPORTED_LABEL ? myImportedTracks.length : groups[name];
-    const icon = name === GAME_ANSWER_ALL_IMPORTED_LABEL ? "🎶" : "📂";
+    const rowIcon = name === GAME_ANSWER_ALL_IMPORTED_LABEL ? icon("music") : icon("library");
     return `
     <div class="search-result" style="cursor:pointer;" onclick="openGameAnswerMinePlaylist(${i})">
-      <div style="font-size:20px;flex-shrink:0;">${icon}</div>
+      <div style="font-size:20px;flex-shrink:0;">${rowIcon}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(name)}</div>
         <div style="font-size:12px;color:var(--text-faint);">${count} titre(s)</div>
@@ -7154,7 +7228,7 @@ function renderGameAnswerMineFlatList(tracks, showBackButton, emptyMessage){
         <div style="font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(t.title)}</div>
         <div style="font-size:12px;color:var(--text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(t.artist||"")}</div>
       </div>
-      <button class="add-btn" onclick="pickGameAnswerFromMine(${i})" title="Choisir ce titre comme réponse" style="width:auto;padding:0 12px;">✓ Choisir</button>
+      <button class="add-btn" onclick="pickGameAnswerFromMine(${i})" title="Choisir ce titre comme réponse" style="width:auto;padding:0 12px;">${icon("check")} Choisir</button>
     </div>`;
   }).join("");
 }
@@ -7205,7 +7279,7 @@ async function renderGameAnswerResults(q){
         <div style="font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(r.title)}</div>
         <div style="font-size:12px;color:var(--text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(r.artist)}</div>
       </div>
-      <button class="add-btn" onclick="pickGameAnswer(${i})" title="Choisir ce titre comme réponse" style="width:auto;padding:0 12px;">✓ Choisir</button>
+      <button class="add-btn" onclick="pickGameAnswer(${i})" title="Choisir ce titre comme réponse" style="width:auto;padding:0 12px;">${icon("check")} Choisir</button>
     </div>
   `).join("");
 }
@@ -7351,17 +7425,17 @@ function renderOwnerAnsweringPhase(){
   const myAnswers = gameAnswers.filter(a => a.user_id === currentUser?.id);
 
   document.getElementById("gqMyAnswers").innerHTML = slots.map(slot => {
-    const label = `🎵 Chanson n°${slot.slice(2)}`;
+    const label = `${icon("music")} Chanson n°${slot.slice(2)}`;
     const mine = myAnswers.find(a => a.question_id === slot);
     return `
       <div class="search-result" style="align-items:flex-start;">
         <div style="flex:1;min-width:0;">
           <div style="font-size:13px;font-weight:600;">${escapeHtml(label)}</div>
           ${mine
-            ? `<div style="font-size:12.5px;color:var(--text-dim);margin-top:2px;">✅ ${escapeHtml(mine.title)} — ${escapeHtml(mine.artist||"")}</div>`
+            ? `<div style="font-size:12.5px;color:var(--text-dim);margin-top:2px;">${icon("check")} ${escapeHtml(mine.title)} — ${escapeHtml(mine.artist||"")}</div>`
             : `<div style="font-size:12.5px;color:var(--text-faint);margin-top:2px;">Pas encore proposée</div>`}
         </div>
-        <button class="add-btn" onclick="openGameAnswerModal('${slot}')" title="${mine ? "Changer ta proposition" : "Proposer"}" style="width:auto;padding:0 12px;">${mine ? "✏️ Modifier" : "➕ Proposer"}</button>
+        <button class="add-btn" onclick="openGameAnswerModal('${slot}')" title="${mine ? "Changer ta proposition" : "Proposer"}" style="width:auto;padding:0 12px;">${mine ? `${icon("pencil")} Modifier` : `${icon("plus")} Proposer`}</button>
       </div>
     `;
   }).join("");
@@ -7712,17 +7786,17 @@ function renderBtSingleDeviceAnswering(){
     document.getElementById("btSdActiveName").textContent = singleDeviceActivePlayer;
     const myAnswers = gameAnswers.filter(a => a.local_player_name === singleDeviceActivePlayer);
     document.getElementById("btSdActiveAnswers").innerHTML = slots.map(slot => {
-      const label = `🎵 Chanson n°${slot.slice(2)}`;
+      const label = `${icon("music")} Chanson n°${slot.slice(2)}`;
       const mine = myAnswers.find(a => a.question_id === slot);
       return `
         <div class="search-result" style="align-items:flex-start;">
           <div style="flex:1;min-width:0;">
             <div style="font-size:13px;font-weight:600;">${escapeHtml(label)}</div>
             ${mine
-              ? `<div style="font-size:12.5px;color:var(--text-dim);margin-top:2px;">✅ ${escapeHtml(mine.title)} — ${escapeHtml(mine.artist||"")}</div>`
+              ? `<div style="font-size:12.5px;color:var(--text-dim);margin-top:2px;">${icon("check")} ${escapeHtml(mine.title)} — ${escapeHtml(mine.artist||"")}</div>`
               : `<div style="font-size:12.5px;color:var(--text-faint);margin-top:2px;">Pas encore proposée</div>`}
           </div>
-          <button class="add-btn" onclick="openGameAnswerModal('${slot}')" title="${mine ? "Changer" : "Proposer"}" style="width:auto;padding:0 12px;">${mine ? "✏️ Modifier" : "➕ Proposer"}</button>
+          <button class="add-btn" onclick="openGameAnswerModal('${slot}')" title="${mine ? "Changer" : "Proposer"}" style="width:auto;padding:0 12px;">${mine ? `${icon("pencil")} Modifier` : `${icon("plus")} Proposer`}</button>
         </div>
       `;
     }).join("");
@@ -7745,7 +7819,7 @@ function renderBtSingleDeviceAnswering(){
         ${avatarHtml(null, name, 30, 12)}
         <div style="flex:1;min-width:0;">
           <div style="font-size:13px;font-weight:600;">${escapeHtml(name)}</div>
-          <div style="font-size:11.5px;color:var(--text-faint);">${count}/${total} chanson(s)${done ? " ✅" : ""}</div>
+          <div style="font-size:11.5px;color:var(--text-faint);">${count}/${total} chanson(s)${done ? " " + icon("check") : ""}</div>
         </div>
         <span style="color:var(--text-faint);">›</span>
       </div>
@@ -7800,17 +7874,17 @@ function renderBtAnsweringPhase(){
   const myAnswers = gameAnswers.filter(a => a.user_id === currentUser?.id);
 
   document.getElementById("btMyAnswers").innerHTML = slots.map(slot => {
-    const label = `🎵 Chanson n°${slot.slice(2)}`;
+    const label = `${icon("music")} Chanson n°${slot.slice(2)}`;
     const mine = myAnswers.find(a => a.question_id === slot);
     return `
       <div class="search-result" style="align-items:flex-start;">
         <div style="flex:1;min-width:0;">
           <div style="font-size:13px;font-weight:600;">${escapeHtml(label)}</div>
           ${mine
-            ? `<div style="font-size:12.5px;color:var(--text-dim);margin-top:2px;">✅ ${escapeHtml(mine.title)} — ${escapeHtml(mine.artist||"")}</div>`
+            ? `<div style="font-size:12.5px;color:var(--text-dim);margin-top:2px;">${icon("check")} ${escapeHtml(mine.title)} — ${escapeHtml(mine.artist||"")}</div>`
             : `<div style="font-size:12.5px;color:var(--text-faint);margin-top:2px;">Pas encore proposée</div>`}
         </div>
-        <button class="add-btn" onclick="openGameAnswerModal('${slot}')" title="${mine ? "Changer ta proposition" : "Proposer"}" style="width:auto;padding:0 12px;">${mine ? "✏️ Modifier" : "➕ Proposer"}</button>
+        <button class="add-btn" onclick="openGameAnswerModal('${slot}')" title="${mine ? "Changer ta proposition" : "Proposer"}" style="width:auto;padding:0 12px;">${mine ? `${icon("pencil")} Modifier` : `${icon("plus")} Proposer`}</button>
       </div>
     `;
   }).join("");
@@ -7833,14 +7907,14 @@ function renderBtProgress(slots){
     const done = total > 0 && answered >= total;
     const pseudo = getPseudoForUserId(uid);
     const excludeBtn = (creator && uid !== currentUser?.id)
-      ? `<button class="add-btn" onclick="excludeParticipant('${uid}')" title="Exclure ${escapeHtml(pseudo)} (AFK)" style="width:auto;padding:0 10px;font-size:11px;">🚫 Exclure</button>`
+      ? `<button class="add-btn" onclick="excludeParticipant('${uid}')" title="Exclure ${escapeHtml(pseudo)} (AFK)" style="width:auto;padding:0 10px;font-size:11px;">${icon("userX")} Exclure</button>`
       : "";
     return `
       <div class="search-result">
         ${avatarHtml(getAvatarUrlForUserId(uid), pseudo, 30, 12)}
         <div style="flex:1;min-width:0;">
           <div style="font-size:13px;font-weight:600;">${escapeHtml(pseudo)}${uid === currentUser?.id ? " (toi)" : ""}</div>
-          <div style="font-size:11.5px;color:var(--text-faint);">${answered}/${total} chanson(s)${done ? " ✅" : ""}</div>
+          <div style="font-size:11.5px;color:var(--text-faint);">${answered}/${total} chanson(s)${done ? " " + icon("check") : ""}</div>
         </div>
         ${excludeBtn}
       </div>
@@ -8079,7 +8153,7 @@ function renderBtPlaying(){
     document.getElementById("btNextBox").style.display = revealed ? "block" : "none";
     if(revealed){
       const actionBtn = document.getElementById("btRevealBtn");
-      actionBtn.textContent = isLastSd ? "🏁 Terminer la partie" : "➡️ Chanson suivante";
+      actionBtn.innerHTML = isLastSd ? `${icon("flag")} Terminer la partie` : `${icon("arrowRight")} Chanson suivante`;
       actionBtn.onclick = nextBtRound;
     }
     return;
@@ -8106,7 +8180,7 @@ function renderBtPlaying(){
   document.getElementById("btNextBox").style.display = revealed ? "block" : "none";
   if(revealed){
     const actionBtn = document.getElementById("btRevealBtn");
-    actionBtn.textContent = isLast ? "🏁 Voir le classement final" : "➡️ Chanson suivante";
+    actionBtn.innerHTML = isLast ? `${icon("flag")} Voir le classement final` : `${icon("arrowRight")} Chanson suivante`;
     actionBtn.onclick = nextBtRound;
   }
 
@@ -8389,7 +8463,7 @@ function renderBtGuessOptions(round){
         ${locked ? "disabled" : ""}
         style="cursor:${locked ? "default" : "pointer"};opacity:${locked && !active ? "0.5" : "1"};"
       >
-        <div class="guess-option-title">${active ? "✓ " : ""}${escapeHtml(opt.title)}</div>
+        <div class="guess-option-title">${active ? icon("check") + " " : ""}${escapeHtml(opt.title)}</div>
         ${opt.artist ? `<div style="font-size:10.5px;color:var(--text-faint);">${escapeHtml(opt.artist)}</div>` : ""}
       </button>
     `;
@@ -8472,7 +8546,7 @@ function renderBtReveal(round){
   // impossible : une vraie manche a toujours au moins 1 propriétaire).
   const ownerLine = owners.length
     ? `Proposée par : ${escapeHtml(owners.map(uid => getPseudoForUserId(uid)).join(", "))}`
-    : "🎲 Chanson piochée dans le pool communautaire";
+    : `${icon("dice")} Chanson piochée dans le pool communautaire`;
   // Mode "un seul téléphone" : pas de vote électronique, on devine à voix
   // haute. Points manuels ajoutés le 01/08/2026 (demande de Rémi, même
   // principe que renderGameReveal()) — les prénoms sont renseignés une fois
@@ -8487,10 +8561,10 @@ function renderBtReveal(round){
     // renderBtSingleDeviceAnswering()) porte les vrais prénoms de qui a
     // proposé — même principe que renderGameReveal().
     const localNames = (round.owner_local_names || []).join(", ");
-    const sdOwnerLine = localNames ? `Proposée par : ${escapeHtml(localNames)}` : "🎲 Chanson piochée dans le pool communautaire";
+    const sdOwnerLine = localNames ? `Proposée par : ${escapeHtml(localNames)}` : `${icon("dice")} Chanson piochée dans le pool communautaire`;
     document.getElementById("btRevealBox").innerHTML = `
       <div class="card" style="text-align:center;">
-        <div style="font-size:15px;font-weight:700;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
+        <div style="font-size:15px;font-weight:700;">${icon("music")} "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
         ${round.youtube_id ? ytSaveHeartBtn("openYtSaveForCurrentBtRound") : ""}
         <div style="font-size:12.5px;color:var(--text-dim);margin-top:6px;">${sdOwnerLine}</div>
         <p style="font-size:11px;color:var(--text-faint);margin:10px 0 8px;">Donne des points à qui a bien deviné (jusqu'à 3 : artiste, titre, bonus feat/film...).</p>
@@ -8502,7 +8576,7 @@ function renderBtReveal(round){
   }
   document.getElementById("btRevealBox").innerHTML = `
     <div class="card" style="text-align:center;">
-      <div style="font-size:15px;font-weight:700;">🎵 "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
+      <div style="font-size:15px;font-weight:700;">${icon("music")} "${escapeHtml(round.title)}" — ${escapeHtml(round.artist || "")}</div>
       ${round.youtube_id ? ytSaveHeartBtn("openYtSaveForCurrentBtRound") : ""}
       <div style="font-size:12.5px;color:var(--text-dim);margin-top:6px;">${ownerLine}</div>
     </div>
