@@ -337,8 +337,8 @@
 
   /* mode selection */
   .mode-card{
-    display:flex;align-items:flex-start;gap:14px;background:var(--bg-card);border:1px solid var(--border);
-    border-radius:var(--radius);padding:16px;margin-bottom:12px;text-align:left;width:100%;color:var(--text);
+    display:flex;align-items:center;gap:14px;background:var(--bg-card);border:1px solid var(--border);
+    border-radius:var(--radius);padding:13px 16px;margin-bottom:9px;text-align:left;width:100%;color:var(--text);
   }
   .mode-card:active{transform:scale(0.98);}
   .mode-icon{
@@ -1819,24 +1819,29 @@ const MODE_DETAIL = {
     emoji:icon("globe"), title:"À distance",
     desc:"Chacun est chez soi, avec son casque ou ses enceintes. L'appli synchronise la lecture pour que tout le monde entende exactement le même morceau au même instant, chacun depuis son propre appareil.",
   },
+  // Descriptions raccourcies à 1 ligne le 14/08/2026 (demande de Rémi, capture
+  // d'écran à l'appui) : sur téléphone, les 4 jeux + le bouton "Chansons
+  // acceptées" + "← Retour" doivent tenir sur un seul écran sans avoir à
+  // scroller. Le détail plus complet de chaque jeu reste expliqué ailleurs
+  // (écran de confirmation avant de créer le salon, docs/brief-concept.md).
   questions: {
     emoji:icon("help"), title:"Le jeu des questions",
-    desc:"Multijoueur. Le créateur choisit des questions (\"ta chanson d'amour préférée\", \"ta chanson la plus triste\"...) parmi une liste proposée. Chacun répond avec un vrai titre AVANT que la partie commence. Ensuite on écoute les réponses une par une et on vote en direct pour deviner qui a choisi quoi.",
+    desc:"Multijoueur. Réponds à des questions par un vrai titre, devinez ensemble qui a répondu quoi.",
   },
   owner: {
     emoji:icon("dice"), title:"Qui a mis cette chanson ?",
-    desc:"Multijoueur. Chacun propose quelques chansons de son choix. Le jeu est ensuite de deviner qui a mis les musiques jouées aléatoirement.",
+    desc:"Multijoueur. Chacun propose des chansons, devinez qui a mis quoi.",
   },
   // Ajouté le 21/07/2026, idée notée le 19/07/2026 : toujours solo (pas de
   // salon à créer), enchaîne les manches de blindtest sans limite tant
   // qu'on répond juste — une erreur remet le compteur à zéro.
   serie: {
     emoji:icon("flame"), title:"Série de blindtest",
-    desc:"Solo. Enchaîne un maximum de bonnes réponses d'affilée — une erreur remet le compteur à zéro.",
+    desc:"Solo. Enchaîne un maximum de bonnes réponses d'affilée sans te tromper.",
   },
   blindtest: {
     emoji:icon("headphones"), title:"Blindtest",
-    desc:"Multijoueur et solo. En groupe : chacun propose quelques chansons, puis on les écoute une par une et on devine de quel titre il s'agit parmi plusieurs choix. En solo : devine à partir de chansons déjà proposées par d'autres joueurs, ou de ta propre playlist importée.",
+    desc:"Multijoueur et solo. Devine le titre qui joue parmi plusieurs choix.",
   },
 };
 
