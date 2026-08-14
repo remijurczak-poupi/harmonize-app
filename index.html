@@ -2164,8 +2164,8 @@ let btAnswerSearchDebounce = null;
 // `decade`/`genres` ont été remplies en base.
 //
 // Chaque écran garde son propre état de filtre (pas une variable globale
-// partagée) : { decades: Set|null, genres: Set|null }, où null = pas de
-// filtre (tout inclus).
+// partagée) : { decades: Set|null, genres: Set|null, languages: Set|null },
+// où null = pas de filtre (tout inclus).
 //
 // Mémorisé d'une partie à l'autre dans le localStorage DE CET APPAREIL
 // (ajouté le 13/08/2026, demande de Rémi : "garder les mêmes réglages") —
@@ -2180,11 +2180,25 @@ let btAnswerSearchDebounce = null;
 const GENRE_LABELS_LIST = ["Pop", "Rock", "Rap/Hip-Hop", "Électro/Dance", "R&B/Soul", "Variété française", "Metal", "Reggae/Ska", "Jazz/Blues", "Country/Folk", "Latino", "Classique/Comédie musicale", "Autre"];
 const POOL_FILTER_STORAGE_KEY = "harmonizePoolFilterPrefs";
 
+// Codes ISO 639-1 (colonne `language`, détectée automatiquement depuis
+// YouTube — voir backfillPoolLanguages()) vers un libellé lisible. Pas une
+// liste fixe comme les genres : availableLanguagesIn() n'affiche que les
+// codes réellement présents dans les chansons chargées, cette table sert
+// juste à afficher un nom plutôt qu'un code à 2 lettres quand on le connaît
+// (repli sur le code brut en majuscules sinon, ex. un code plus rare).
+const LANGUAGE_LABELS = {
+  fr: "Français", en: "Anglais", es: "Espagnol", it: "Italien", de: "Allemand",
+  pt: "Portugais", nl: "Néerlandais", ar: "Arabe", tr: "Turc", ko: "Coréen",
+  ja: "Japonais", zh: "Chinois", ru: "Russe", pl: "Polonais", sv: "Suédois",
+  hi: "Hindi", id: "Indonésien",
+};
+
 function savePoolFilterPrefs(filterState){
   try {
     localStorage.setItem(POOL_FILTER_STORAGE_KEY, JSON.stringify({
       decades: filterState.decades ? Array.from(filterState.decades) : null,
       genres: filterState.genres ? Array.from(filterState.genres) : null,
+      languages: filterState.languages ? Array.from(filterState.languages) : null,
     }));
   } catch(e){}
 }
@@ -2192,14 +2206,15 @@ function savePoolFilterPrefs(filterState){
 function loadPoolFilterPrefs(){
   try {
     const raw = localStorage.getItem(POOL_FILTER_STORAGE_KEY);
-    if(!raw) return { decades: null, genres: null };
+    if(!raw) return { decades: null, genres: null, languages: null };
     const data = JSON.parse(raw);
     return {
       decades: Array.isArray(data.decades) ? new Set(data.decades) : null,
       genres: Array.isArray(data.genres) ? new Set(data.genres) : null,
+      languages: Array.isArray(data.languages) ? new Set(data.languages) : null,
     };
   } catch(e){
-    return { decades: null, genres: null };
+    return { decades: null, genres: null, languages: null };
   }
 }
 
@@ -2214,6 +2229,10 @@ function trackMatchesPoolFilter(track, filterState){
     const genres = (track.genres && track.genres.length) ? track.genres : ["unknown"];
     if(!genres.some(g => filterState.genres.has(g))) return false;
   }
+  if(filterState.languages){
+    const lang = track.language || "unknown";
+    if(!filterState.languages.has(lang)) return false;
+  }
   return true;
 }
 
@@ -2227,15 +2246,27 @@ function availableDecadesIn(tracks){
   });
 }
 
-// Construit les cases à cocher décennie/genre dans `containerId`. `tracks` ne
-// sert qu'à savoir quelles décennies proposer (les genres sont la liste fixe
-// ci-dessus) ; `filterState` est modifié en place à chaque case cochée, et
-// `onChange` rappelée pour laisser l'écran appelant mettre à jour son propre
-// compteur "X chansons correspondent".
+function availableLanguagesIn(tracks){
+  const set = new Set();
+  tracks.forEach(t => set.add(t.language || "unknown"));
+  return Array.from(set).sort((a, b) => {
+    if(a === "unknown") return 1;
+    if(b === "unknown") return -1;
+    return (LANGUAGE_LABELS[a] || a).localeCompare(LANGUAGE_LABELS[b] || b);
+  });
+}
+
+// Construit les cases à cocher décennie/genre/langue dans `containerId`.
+// `tracks` sert à savoir quelles décennies et langues proposer (calculées
+// depuis les chansons réellement chargées) ; les genres restent la liste
+// fixe ci-dessus. `filterState` est modifié en place à chaque case cochée,
+// et `onChange` rappelée pour laisser l'écran appelant mettre à jour son
+// propre compteur/message.
 function renderPoolFilterPicker(containerId, tracks, filterState, onChange){
   const el = document.getElementById(containerId);
   if(!el) return;
   const decades = availableDecadesIn(tracks);
+  const languages = availableLanguagesIn(tracks);
   const chip = (checked, value, label, attr) => `
     <label style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;margin:3px;border:1px solid var(--border);border-radius:20px;cursor:pointer;font-size:13px;">
       <input type="checkbox" ${attr}="${escapeHtml(String(value))}" ${checked ? "checked" : ""} style="width:15px;height:15px;flex-shrink:0;" />${escapeHtml(label)}
@@ -2243,9 +2274,11 @@ function renderPoolFilterPicker(containerId, tracks, filterState, onChange){
   const decadeRow = decades.map(d => chip(!filterState.decades || filterState.decades.has(d), d, d === "unknown" ? "Décennie inconnue" : `${d}s`, "data-decade")).join("");
   const genreOptions = [...GENRE_LABELS_LIST, "unknown"];
   const genreRow = genreOptions.map(g => chip(!filterState.genres || filterState.genres.has(g), g, g === "unknown" ? "Style inconnu" : g, "data-genre")).join("");
+  const languageRow = languages.map(l => chip(!filterState.languages || filterState.languages.has(l), l, l === "unknown" ? "Langue inconnue" : (LANGUAGE_LABELS[l] || l.toUpperCase()), "data-language")).join("");
   el.innerHTML = `
     <div style="margin-bottom:14px;"><strong style="font-size:13px;">Époque</strong><div style="display:flex;flex-wrap:wrap;margin-top:6px;">${decadeRow}</div></div>
-    <div><strong style="font-size:13px;">Styles musicaux</strong><div style="display:flex;flex-wrap:wrap;margin-top:6px;">${genreRow}</div></div>
+    <div style="margin-bottom:14px;"><strong style="font-size:13px;">Styles musicaux</strong><div style="display:flex;flex-wrap:wrap;margin-top:6px;">${genreRow}</div></div>
+    <div><strong style="font-size:13px;">Langues</strong><div style="display:flex;flex-wrap:wrap;margin-top:6px;">${languageRow}</div></div>
   `;
   el.querySelectorAll("input[data-decade]").forEach(cb => {
     cb.onchange = () => {
@@ -2266,6 +2299,15 @@ function renderPoolFilterPicker(containerId, tracks, filterState, onChange){
       onChange();
     };
   });
+  el.querySelectorAll("input[data-language]").forEach(cb => {
+    cb.onchange = () => {
+      if(!filterState.languages) filterState.languages = new Set(languages);
+      const l = cb.getAttribute("data-language");
+      if(cb.checked) filterState.languages.add(l); else filterState.languages.delete(l);
+      savePoolFilterPrefs(filterState);
+      onChange();
+    };
+  });
 }
 
 // ---- Blindtest SOLO sur vraies données (ajouté le 19/07/2026) ----
@@ -2282,7 +2324,7 @@ const BT_SOLO_MIN_TRACKS = 4; // il faut au moins 1 bonne réponse + 3 pièges
 // Filtres décennie/genre du Blindtest solo (ajouté le 13/08/2026) — voir
 // renderPoolFilterPicker() ci-dessus. Rechargés depuis localStorage à chaque
 // visite de l'écran de filtres (showBtSoloPoolFilters()) via loadPoolFilterPrefs().
-let btSoloFilterState = { decades: null, genres: null };
+let btSoloFilterState = { decades: null, genres: null, languages: null };
 let btSoloFilterTracks = [];
 
 async function goSoloBlindtest(){
@@ -2442,7 +2484,7 @@ let serieVoteDeadline = 0;
 
 // Filtres décennie/genre de la Série (ajouté le 13/08/2026) — voir
 // renderPoolFilterPicker() et son commentaire plus haut dans le script.
-let serieFilterState = { decades: null, genres: null };
+let serieFilterState = { decades: null, genres: null, languages: null };
 let serieFilterTracks = [];
 
 async function startSerieFromPool(){
@@ -7879,7 +7921,7 @@ function confirmBtRandomCount(){
 // Chargés une seule fois par configuration de partie (btRandomFilterPoolLoaded),
 // pas à chaque passage sur l'étape, pour éviter un aller-retour réseau inutile
 // quand on navigue entre les étapes du réglage.
-let btRandomFilterState = { decades: null, genres: null };
+let btRandomFilterState = { decades: null, genres: null, languages: null };
 let btRandomFilterTracks = [];
 let btRandomFilterPoolLoaded = false;
 let btRandomFiltersStepDone = false;
