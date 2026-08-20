@@ -1572,8 +1572,12 @@
   <div class="modal-backdrop" id="sharePickerModal">
     <div class="modal">
       <div class="modal-handle"></div>
-      <h2>Partager via...</h2>
+      <!-- Aperçu de ce qui va être partagé (ajouté le 18/08/2026, retour de
+           Rémi : on doit voir le message AVANT de choisir "partager via",
+           pas juste des boutons sans savoir ce qu'ils envoient). -->
       <div id="sharePickerImagePreview"></div>
+      <div class="card" id="sharePickerTextPreview" style="margin-bottom:18px;font-size:14.5px;line-height:1.5;"></div>
+      <h2 style="font-size:16px;">Partager via</h2>
       <div class="stack" id="sharePickerOptions"></div>
       <button class="btn-ghost" style="margin-top:10px;" onclick="closeSharePicker()">Fermer</button>
     </div>
@@ -3663,6 +3667,7 @@ function openSharePicker(text, url, imageBlob){
   } else {
     preview.innerHTML = "";
   }
+  document.getElementById("sharePickerTextPreview").textContent = `${text} ${url}`;
 
   const encoded = encodeURIComponent(`${text} ${url}`);
   const saveImageBtn = pendingShareImageBlob
@@ -3732,7 +3737,20 @@ function canvasRoundRect(ctx, x, y, w, h, r){
 // d'Harmonize (voir --bg/--accent-gradient dans le CSS), format 4:5 (lisible
 // partagé en story comme en simple post). Retourne un Blob PNG (ou null si
 // toBlob n'est pas supporté — shareSerieScore() gère ce cas).
-function generateSerieScoreImage(streak, recordNote){
+// Charge une image en <img> classique, pour ctx.drawImage() — utilisé par
+// generateSerieScoreImage() ci-dessous pour dessiner le vrai logo (avant,
+// seul le carré dégradé de fond était dessiné, sans le logo lui-même par
+// dessus, voir icons/icon-192.png).
+function loadImageForCanvas(src){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+async function generateSerieScoreImage(streak, recordNote){
   const canvas = document.createElement("canvas");
   canvas.width = 1080;
   canvas.height = 1350;
@@ -3744,12 +3762,24 @@ function generateSerieScoreImage(streak, recordNote){
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+  // Même composition que .logo-mark en CSS : un carré à coins arrondis avec
+  // un dégradé de fond, et le vrai logo dessiné par dessus (rogné aux mêmes
+  // coins arrondis) — le PNG a des bords transparents, le dégradé se voit
+  // donc légèrement derrière lui, comme dans le bandeau de l'app.
+  ctx.save();
+  canvasRoundRect(ctx, 90, 90, 80, 80, 22);
   const logoGrad = ctx.createLinearGradient(90, 90, 170, 170);
   logoGrad.addColorStop(0, "#51147e");
   logoGrad.addColorStop(1, "#010d2c");
   ctx.fillStyle = logoGrad;
-  canvasRoundRect(ctx, 90, 90, 80, 80, 22);
   ctx.fill();
+  ctx.clip();
+  try{
+    const logo = await loadImageForCanvas("icons/icon-192.png");
+    ctx.drawImage(logo, 90, 90, 80, 80);
+  }catch(e){ /* logo introuvable : le carré dégradé seul reste correct */ }
+  ctx.restore();
+
   ctx.fillStyle = "#f2f0f7";
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
