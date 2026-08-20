@@ -1572,7 +1572,8 @@
   <div class="modal-backdrop" id="sharePickerModal">
     <div class="modal">
       <div class="modal-handle"></div>
-      <h2>Partager</h2>
+      <h2>Partager via...</h2>
+      <div id="sharePickerImagePreview"></div>
       <div class="stack" id="sharePickerOptions"></div>
       <button class="btn-ghost" style="margin-top:10px;" onclick="closeSharePicker()">Fermer</button>
     </div>
@@ -3639,30 +3640,45 @@ async function copyShareText(text){
 // Sélecteur de partage maison (ajouté le 17/08/2026, retour de Rémi) :
 // n'apparaît que sur un appareil qui ne propose pas navigator.share() —
 // typiquement un ordinateur. Avant, ce cas ne proposait qu'une copie
-// silencieuse du lien ; propose maintenant WhatsApp/Email en plus, et le
-// téléchargement de l'image si shareSerieScore() en a généré une.
+// silencieuse du lien ; propose maintenant WhatsApp/Email en plus (avec
+// leur icône), et un aperçu + l'enregistrement de l'image si
+// shareSerieScore() en a généré une. Wording retravaillé (18/08/2026, encore
+// un retour de Rémi : "copier le texte"/"télécharger l'image" jugés trop
+// froids) — voir aussi generateSerieScoreImage() plus bas.
 let pendingShareText = "";
 let pendingShareUrl = "";
 let pendingShareImageBlob = null;
+let pendingShareImageObjectUrl = null;
 
 function openSharePicker(text, url, imageBlob){
   pendingShareText = text;
   pendingShareUrl = url;
   pendingShareImageBlob = imageBlob || null;
+
+  const preview = document.getElementById("sharePickerImagePreview");
+  if(pendingShareImageObjectUrl){ URL.revokeObjectURL(pendingShareImageObjectUrl); pendingShareImageObjectUrl = null; }
+  if(pendingShareImageBlob){
+    pendingShareImageObjectUrl = URL.createObjectURL(pendingShareImageBlob);
+    preview.innerHTML = `<img src="${pendingShareImageObjectUrl}" alt="" style="display:block;width:100%;max-height:280px;object-fit:contain;border-radius:var(--radius);margin-bottom:14px;background:var(--bg);" />`;
+  } else {
+    preview.innerHTML = "";
+  }
+
   const encoded = encodeURIComponent(`${text} ${url}`);
-  const downloadBtn = pendingShareImageBlob
-    ? `<button class="btn-ghost" onclick="downloadPendingShareImage()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M7 10l5 5 5-5" /><path d="M12 15V3" /></svg> Télécharger l'image</button>`
+  const saveImageBtn = pendingShareImageBlob
+    ? `<button class="btn-ghost" onclick="downloadPendingShareImage()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M7 10l5 5 5-5" /><path d="M12 15V3" /></svg> Enregistrer l'image</button>`
     : "";
   document.getElementById("sharePickerOptions").innerHTML = `
-    ${downloadBtn}
-    <a class="btn-ghost" style="text-decoration:none;box-sizing:border-box;display:block;" href="https://wa.me/?text=${encoded}" target="_blank" rel="noopener">WhatsApp</a>
-    <a class="btn-ghost" style="text-decoration:none;box-sizing:border-box;display:block;" href="mailto:?body=${encoded}">Email</a>
-    <button class="btn-ghost" onclick="copyPendingShareText()">Copier le texte</button>
+    ${saveImageBtn}
+    <a class="btn-ghost" style="text-decoration:none;text-align:center;" href="https://wa.me/?text=${encoded}" target="_blank" rel="noopener"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="14" x="3" y="4" rx="3" /><path d="m8 18-3 3v-3" /></svg> WhatsApp</a>
+    <a class="btn-ghost" style="text-decoration:none;text-align:center;" href="mailto:?body=${encoded}"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg> Email</a>
+    <button class="btn-ghost" onclick="copyPendingShareText()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg> Copier le message</button>
   `;
   document.getElementById("sharePickerModal").classList.add("open");
 }
 function closeSharePicker(){
   document.getElementById("sharePickerModal").classList.remove("open");
+  if(pendingShareImageObjectUrl){ URL.revokeObjectURL(pendingShareImageObjectUrl); pendingShareImageObjectUrl = null; }
 }
 async function copyPendingShareText(){
   await copyShareText(`${pendingShareText} ${pendingShareUrl}`);
