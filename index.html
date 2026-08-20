@@ -1554,11 +1554,27 @@
     <div class="modal">
       <div class="modal-handle"></div>
       <h2><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="14" x="3" y="4" rx="3" /><path d="m8 18-3 3v-3" /></svg> Une idée, un bug ?</h2>
-      <p class="sub" style="margin-bottom:16px;">Ton message part directement à Rémi, avec ton pseudo Harmonize.</p>
+      <p class="sub" style="margin-bottom:16px;">Ton message est envoyé avec ton pseudo Harmonize.</p>
       <textarea id="feedbackMessageInput" placeholder="Dis-nous tout..." maxlength="2000" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:13px 14px;border-radius:var(--radius-sm);font-size:15px;outline:none;font-family:inherit;resize:none;height:110px;box-sizing:border-box;"></textarea>
       <input type="email" id="feedbackEmailInput" placeholder="Email (optionnel, si tu veux qu'on te réponde)" style="margin-top:12px;" />
       <button class="btn-primary" style="margin-top:14px;" onclick="submitFeedback()">Envoyer</button>
       <button class="btn-ghost" style="margin-top:10px;" onclick="closeFeedbackModal()">Annuler</button>
+    </div>
+  </div>
+
+  <!-- Sélecteur de partage "maison" (ajouté le 17/08/2026, retour de Rémi) :
+       repli affiché uniquement quand navigator.share() n'existe pas
+       (typiquement un ordinateur) — avant, ce cas ne proposait qu'une copie
+       silencieuse du lien, jugée trop pauvre. Voir openSharePicker(). Sur un
+       appareil qui propose le vrai sélecteur natif (la plupart des
+       téléphones), cette fenêtre n'apparaît jamais : WhatsApp/Messages/Mail
+       sortent directement du sélecteur du système. -->
+  <div class="modal-backdrop" id="sharePickerModal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <h2>Partager</h2>
+      <div class="stack" id="sharePickerOptions"></div>
+      <button class="btn-ghost" style="margin-top:10px;" onclick="closeSharePicker()">Fermer</button>
     </div>
   </div>
 
@@ -2751,21 +2767,9 @@ function closeSerieGameOverModal(){
   startSerieRound();
 }
 
-// Partage du score de série, depuis la fenêtre de fin de série — même
-// mécanisme que shareApp() (voir plus haut), message dynamique selon le
-// score obtenu. Le lien renvoie vers landing.html plutôt qu'une simple
-// image : quelqu'un qui n'a jamais entendu parler d'Harmonize peut
-// directement essayer de battre le score.
-async function shareSerieScore(){
-  const url = harmonizeShareUrl();
-  const text = `🔥 Je viens de faire une série de ${serieLastFinalStreak} sur Harmonize (Série de blindtest) ! Tu penses pouvoir faire mieux ?`;
-  if(navigator.share){
-    try{ await navigator.share({ title: "Harmonize", text, url }); }
-    catch(e){ /* annulé par la personne elle-même, rien à faire */ }
-    return;
-  }
-  await copyShareText(`${text} ${url}`);
-}
+// shareSerieScore() vit maintenant plus bas dans le fichier, avec le reste
+// des fonctions de partage (génération d'image incluse) — voir la section
+// "Partage" pour la version à jour.
 
 function nextSerieRound(){
   startSerieRound();
@@ -3609,12 +3613,11 @@ function harmonizeShareUrl(){
 
 // Copie un texte dans le presse-papiers avec repli si navigator.clipboard
 // est indisponible/refusé (même principe que copyRoomCode()) — utilisé par
-// shareApp()/shareSerieScore() sur les navigateurs sans navigator.share()
-// (typiquement un ordinateur).
+// le sélecteur de partage maison ci-dessous.
 async function copyShareText(text){
   try {
     await navigator.clipboard.writeText(text);
-    showToast("Lien copié !");
+    showToast("Texte copié !");
     return;
   } catch(e){ /* on tente le repli ci-dessous */ }
   const input = document.createElement("input");
@@ -3626,17 +3629,61 @@ async function copyShareText(text){
   input.select();
   try {
     document.execCommand("copy");
-    showToast("Lien copié !");
+    showToast("Texte copié !");
   } catch(e){
-    showToast("Impossible de copier automatiquement le lien.");
+    showToast("Impossible de copier automatiquement le texte.");
   }
   document.body.removeChild(input);
+}
+
+// Sélecteur de partage maison (ajouté le 17/08/2026, retour de Rémi) :
+// n'apparaît que sur un appareil qui ne propose pas navigator.share() —
+// typiquement un ordinateur. Avant, ce cas ne proposait qu'une copie
+// silencieuse du lien ; propose maintenant WhatsApp/Email en plus, et le
+// téléchargement de l'image si shareSerieScore() en a généré une.
+let pendingShareText = "";
+let pendingShareUrl = "";
+let pendingShareImageBlob = null;
+
+function openSharePicker(text, url, imageBlob){
+  pendingShareText = text;
+  pendingShareUrl = url;
+  pendingShareImageBlob = imageBlob || null;
+  const encoded = encodeURIComponent(`${text} ${url}`);
+  const downloadBtn = pendingShareImageBlob
+    ? `<button class="btn-ghost" onclick="downloadPendingShareImage()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M7 10l5 5 5-5" /><path d="M12 15V3" /></svg> Télécharger l'image</button>`
+    : "";
+  document.getElementById("sharePickerOptions").innerHTML = `
+    ${downloadBtn}
+    <a class="btn-ghost" style="text-decoration:none;box-sizing:border-box;display:block;" href="https://wa.me/?text=${encoded}" target="_blank" rel="noopener">WhatsApp</a>
+    <a class="btn-ghost" style="text-decoration:none;box-sizing:border-box;display:block;" href="mailto:?body=${encoded}">Email</a>
+    <button class="btn-ghost" onclick="copyPendingShareText()">Copier le texte</button>
+  `;
+  document.getElementById("sharePickerModal").classList.add("open");
+}
+function closeSharePicker(){
+  document.getElementById("sharePickerModal").classList.remove("open");
+}
+async function copyPendingShareText(){
+  await copyShareText(`${pendingShareText} ${pendingShareUrl}`);
+  closeSharePicker();
+}
+function downloadPendingShareImage(){
+  if(!pendingShareImageBlob) return;
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(pendingShareImageBlob);
+  a.download = "harmonize-score.png";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+  showToast("Image téléchargée !");
 }
 
 // Partage générique de l'app, depuis le bouton "Partager Harmonize" de
 // l'accueil. navigator.share() ouvre le vrai sélecteur natif du téléphone
 // (Messages, WhatsApp, Mail...) — pas disponible partout (jamais sur
-// ordinateur Chrome par ex.), d'où le repli sur une simple copie du lien.
+// ordinateur Chrome/Brave par ex.), d'où le repli sur openSharePicker().
 async function shareApp(){
   const url = harmonizeShareUrl();
   const text = "Viens jouer avec moi sur Harmonize, une appli pour écouter de la musique et jouer à des jeux musicaux entre amis !";
@@ -3645,7 +3692,106 @@ async function shareApp(){
     catch(e){ /* annulé par la personne elle-même, rien à faire */ }
     return;
   }
-  await copyShareText(`${text} ${url}`);
+  openSharePicker(text, url);
+}
+
+// Dessine un rectangle à coins arrondis sur un <canvas> — utilisé par
+// generateSerieScoreImage() ci-dessous. Fonction maison plutôt que la
+// méthode native ctx.roundRect() (trop récente pour être sûr qu'elle existe
+// partout), même principe que le reste d'Harmonize (aucune librairie
+// externe pour un besoin aussi simple, voir le recadrage de photo de profil).
+function canvasRoundRect(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// Image de partage pour un score de série (ajouté le 17/08/2026, retour de
+// Rémi : un simple lien texte "c'est nul" pour ce moment précis — un score
+// qu'on a envie de montrer). Dessinée à la main sur un <canvas> aux couleurs
+// d'Harmonize (voir --bg/--accent-gradient dans le CSS), format 4:5 (lisible
+// partagé en story comme en simple post). Retourne un Blob PNG (ou null si
+// toBlob n'est pas supporté — shareSerieScore() gère ce cas).
+function generateSerieScoreImage(streak, recordNote){
+  const canvas = document.createElement("canvas");
+  canvas.width = 1080;
+  canvas.height = 1350;
+  const ctx = canvas.getContext("2d");
+
+  const bgGrad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+  bgGrad.addColorStop(0, "#241c3a");
+  bgGrad.addColorStop(1, "#0f0d17");
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const logoGrad = ctx.createLinearGradient(90, 90, 170, 170);
+  logoGrad.addColorStop(0, "#51147e");
+  logoGrad.addColorStop(1, "#010d2c");
+  ctx.fillStyle = logoGrad;
+  canvasRoundRect(ctx, 90, 90, 80, 80, 22);
+  ctx.fill();
+  ctx.fillStyle = "#f2f0f7";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.font = "700 44px -apple-system, sans-serif";
+  ctx.fillText("Harmonize", 188, 132);
+
+  const scoreGrad = ctx.createLinearGradient(0, 480, canvas.width, 780);
+  scoreGrad.addColorStop(0, "#8b5cf6");
+  scoreGrad.addColorStop(1, "#ec4899");
+  ctx.fillStyle = scoreGrad;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ctx.font = "800 320px -apple-system, sans-serif";
+  ctx.fillText(String(streak), canvas.width / 2, 700);
+
+  ctx.fillStyle = "#f2f0f7";
+  ctx.font = "700 46px -apple-system, sans-serif";
+  ctx.fillText("bonnes réponses d'affilée", canvas.width / 2, 800);
+  ctx.fillStyle = "#a79fc2";
+  ctx.font = "500 38px -apple-system, sans-serif";
+  ctx.fillText("Série de blindtest", canvas.width / 2, 856);
+
+  if(recordNote){
+    ctx.fillStyle = "#8b5cf6";
+    ctx.font = "700 42px -apple-system, sans-serif";
+    ctx.fillText(recordNote.replace("🎉 ", ""), canvas.width / 2, 960);
+  }
+
+  ctx.fillStyle = "#6f6789";
+  ctx.font = "500 34px -apple-system, sans-serif";
+  ctx.fillText("Tu penses pouvoir faire mieux ?", canvas.width / 2, canvas.height - 90);
+
+  return new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+}
+
+// Partage du score de série, depuis la fenêtre de fin de série. Essaie dans
+// l'ordre : (1) partage natif AVEC l'image générée (meilleure expérience,
+// navigateurs mobiles récents), (2) partage natif texte seul (navigateurs
+// mobiles plus anciens), (3) sélecteur maison avec téléchargement de l'image
+// (ordinateur / navigateur sans support de partage de fichiers).
+async function shareSerieScore(){
+  const url = harmonizeShareUrl();
+  const text = `🔥 Je viens de faire une série de ${serieLastFinalStreak} sur Harmonize (Série de blindtest) ! Tu penses pouvoir faire mieux ?`;
+  const recordNote = document.getElementById("serieGameOverRecordNote").textContent || "";
+  const imageBlob = await generateSerieScoreImage(serieLastFinalStreak, recordNote);
+  const imageFile = imageBlob ? new File([imageBlob], "harmonize-score.png", { type: "image/png" }) : null;
+
+  if(imageFile && navigator.canShare && navigator.canShare({ files: [imageFile] })){
+    try{ await navigator.share({ title: "Harmonize", text, url, files: [imageFile] }); }
+    catch(e){ /* annulé par la personne elle-même, rien à faire */ }
+    return;
+  }
+  if(navigator.share){
+    try{ await navigator.share({ title: "Harmonize", text, url }); }
+    catch(e){ /* annulé par la personne elle-même, rien à faire */ }
+    return;
+  }
+  openSharePicker(text, url, imageBlob);
 }
 
 /* ---------- Entrer dans un salon (réel ou démo) ---------- */
