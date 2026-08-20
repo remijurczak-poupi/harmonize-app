@@ -422,6 +422,17 @@
         <button class="btn-ghost" onclick="joinRoom()">Rejoindre un salon avec un code</button>
       </div>
 
+      <!-- Partage de l'app (ajouté le 17/08/2026, demande de Rémi) : même
+           poids visuel que "Tes playlists importées" juste en dessous
+           (btn-ghost, pas btn-primary, pour ne pas rivaliser avec les
+           cartes Écoute/Jeux qui restent les vraies actions principales de
+           cet écran). Voir shareApp(). -->
+      <h2 style="margin-top:28px;">Inviter des amis</h2>
+      <div class="card">
+        <p style="margin:0 0 12px;color:var(--text-dim);font-size:13.5px;line-height:1.5;">Harmonize est plus sympa à plusieurs. Envoie le lien d'installation à tes amis en un tap.</p>
+        <button class="btn-ghost" onclick="shareApp()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13" /><path d="m7 8 5-5 5 5" /><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" /></svg> Partager Harmonize</button>
+      </div>
+
       <!-- Carte Brave masquée temporairement le 28/07/2026 : Rémi a une demande
            d'augmentation de quota YouTube API en cours de review, et recommander
            un navigateur qui bloque les pubs YouTube ferait mauvaise impression
@@ -455,7 +466,14 @@
 
       <button class="btn-ghost" style="margin-top:20px;" onclick="openEditPseudoModal()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /><path d="m15 5 4 4" /></svg> Modifier mon pseudo</button>
       <button class="btn-ghost" style="margin-top:10px;" onclick="handleSignOut()">Se déconnecter</button>
-      <p style="text-align:center;font-size:11.5px;color:var(--text-faint);margin-top:18px;">
+      <!-- Lien "donner un avis" (ajouté le 17/08/2026, demande de Rémi),
+           volontairement discret — même poids visuel que les liens légaux
+           juste en dessous. Voir openFeedbackModal(). -->
+      <button onclick="openFeedbackModal()" style="display:flex;align-items:center;gap:5px;background:transparent;border:none;color:var(--text-faint);font-size:12px;margin:20px auto 0;padding:4px;">
+        <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="14" x="3" y="4" rx="3" /><path d="m8 18-3 3v-3" /></svg>
+        Une idée, un bug ? Dis-le-moi
+      </button>
+      <p style="text-align:center;font-size:11.5px;color:var(--text-faint);margin-top:14px;">
         <a href="politique-confidentialite.html" style="color:inherit;">Politique de confidentialité</a> · <a href="conditions-utilisation.html" style="color:inherit;">Conditions d'utilisation</a>
       </p>
     </section>
@@ -1484,6 +1502,10 @@
       <p id="serieGameOverText" style="font-size:15px;color:var(--text-dim);margin-bottom:6px;"></p>
       <p id="serieGameOverRecordNote" style="font-size:13px;color:var(--accent1);font-weight:700;min-height:18px;margin-bottom:16px;"></p>
       <button class="btn-primary" onclick="closeSerieGameOverModal()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" /></svg> Recommencer une série</button>
+      <!-- Partage du score (ajouté le 17/08/2026, demande de Rémi) : sous le
+           bouton existant, sans rien changer d'autre à cette fenêtre — voir
+           shareSerieScore(). -->
+      <button class="btn-ghost" style="margin-top:10px;" onclick="shareSerieScore()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13" /><path d="m7 8 5-5 5 5" /><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" /></svg> Partager mon score</button>
     </div>
   </div>
 
@@ -1520,6 +1542,23 @@
       <input type="text" id="editPseudoInput" placeholder="Ton pseudo" maxlength="30" />
       <button class="btn-primary" style="margin-top:12px;" onclick="saveEditedPseudo()">Enregistrer</button>
       <button class="btn-ghost" style="margin-top:10px;" onclick="closeEditPseudoModal()">Annuler</button>
+    </div>
+  </div>
+
+  <!-- Formulaire de retour (ajouté le 17/08/2026, demande de Rémi) : pas de
+       champ nom/contact séparé, le compte connecté (pseudo) suffit à savoir
+       qui écrit — voir submitFeedback(). Email de recontact volontairement
+       optionnel (utile pour un compte "Jouer sans compte", qui n'a pas
+       d'email propre). -->
+  <div class="modal-backdrop" id="feedbackModal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <h2><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="14" x="3" y="4" rx="3" /><path d="m8 18-3 3v-3" /></svg> Une idée, un bug ?</h2>
+      <p class="sub" style="margin-bottom:16px;">Ton message part directement à Rémi, avec ton pseudo Harmonize.</p>
+      <textarea id="feedbackMessageInput" placeholder="Dis-nous tout..." maxlength="2000" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:13px 14px;border-radius:var(--radius-sm);font-size:15px;outline:none;font-family:inherit;resize:none;height:110px;box-sizing:border-box;"></textarea>
+      <input type="email" id="feedbackEmailInput" placeholder="Email (optionnel, si tu veux qu'on te réponde)" style="margin-top:12px;" />
+      <button class="btn-primary" style="margin-top:14px;" onclick="submitFeedback()">Envoyer</button>
+      <button class="btn-ghost" style="margin-top:10px;" onclick="closeFeedbackModal()">Annuler</button>
     </div>
   </div>
 
@@ -1826,22 +1865,22 @@ const MODE_DETAIL = {
   // (écran de confirmation avant de créer le salon, docs/brief-concept.md).
   questions: {
     emoji:icon("help"), title:"Le jeu des questions",
-    desc:"Multijoueur. Réponds à des questions par un vrai titre, devinez ensemble qui a répondu quoi.",
+    desc:"Multijoueur. Réponds avec un vrai titre, puis devinez ensemble qui a dit quoi.",
   },
   owner: {
     emoji:icon("dice"), title:"Qui a mis cette chanson ?",
-    desc:"Multijoueur. Chacun propose des chansons, devinez qui a mis quoi.",
+    desc:"Multijoueur. Chacun propose ses chansons, à vous de deviner qui a mis quoi.",
   },
   // Ajouté le 21/07/2026, idée notée le 19/07/2026 : toujours solo (pas de
   // salon à créer), enchaîne les manches de blindtest sans limite tant
   // qu'on répond juste — une erreur remet le compteur à zéro.
   serie: {
     emoji:icon("flame"), title:"Série de blindtest",
-    desc:"Solo. Enchaîne un maximum de bonnes réponses d'affilée sans te tromper.",
+    desc:"Solo. Enchaîne les bonnes réponses sans faux pas — jusqu'où iras-tu ?",
   },
   blindtest: {
     emoji:icon("headphones"), title:"Blindtest",
-    desc:"Multijoueur et solo. Devine le titre qui joue parmi plusieurs choix.",
+    desc:"Multijoueur et solo. Écoute un extrait, devine le bon titre parmi plusieurs choix.",
   },
 };
 
@@ -2175,7 +2214,7 @@ const LANGUAGE_LABELS = {
   fr: "Français", en: "Anglais", es: "Espagnol", it: "Italien", de: "Allemand",
   pt: "Portugais", nl: "Néerlandais", ar: "Arabe", tr: "Turc", ko: "Coréen",
   ja: "Japonais", zh: "Chinois", ru: "Russe", pl: "Polonais", sv: "Suédois",
-  hi: "Hindi", id: "Indonésien",
+  hi: "Hindi", id: "Indonésien", sr: "Serbe",
 };
 
 function savePoolFilterPrefs(filterState){
@@ -2682,9 +2721,15 @@ async function pickSerieGuess(youtubeId){
 // enregistre le score en base, et signale si c'est un nouveau record.
 // timedOut distingue le message affiché quand les 15s de vote sont écoulées
 // (serieTimeExpired) d'une vraie mauvaise réponse (pickSerieGuess).
+// Dernier résultat de série (ajouté le 17/08/2026) : serieStreak repasse à 0
+// juste après l'ouverture de la modale, donc shareSerieScore() a besoin de
+// sa propre copie du score final pour composer le message de partage.
+let serieLastFinalStreak = 0;
+
 async function showSerieGameOver(timedOut){
   stopSerieVoteTimer();
   const finalStreak = serieStreak;
+  serieLastFinalStreak = finalStreak;
   const isNewToday = finalStreak > serieRecordToday;
   const isNewAllTime = finalStreak > serieRecordAllTime;
   document.getElementById("serieGameOverText").textContent = timedOut
@@ -2704,6 +2749,22 @@ async function showSerieGameOver(timedOut){
 function closeSerieGameOverModal(){
   document.getElementById("serieGameOverModal").classList.remove("open");
   startSerieRound();
+}
+
+// Partage du score de série, depuis la fenêtre de fin de série — même
+// mécanisme que shareApp() (voir plus haut), message dynamique selon le
+// score obtenu. Le lien renvoie vers landing.html plutôt qu'une simple
+// image : quelqu'un qui n'a jamais entendu parler d'Harmonize peut
+// directement essayer de battre le score.
+async function shareSerieScore(){
+  const url = harmonizeShareUrl();
+  const text = `🔥 Je viens de faire une série de ${serieLastFinalStreak} sur Harmonize (Série de blindtest) ! Tu penses pouvoir faire mieux ?`;
+  if(navigator.share){
+    try{ await navigator.share({ title: "Harmonize", text, url }); }
+    catch(e){ /* annulé par la personne elle-même, rien à faire */ }
+    return;
+  }
+  await copyShareText(`${text} ${url}`);
 }
 
 function nextSerieRound(){
@@ -2898,6 +2959,35 @@ async function saveEditedPseudo(){
   document.getElementById("hiName").textContent = newPseudo;
   closeEditPseudoModal();
   showToast("Pseudo mis à jour !");
+}
+
+// Formulaire de retour (ajouté le 17/08/2026, demande de Rémi) — mêmes
+// ouverture/fermeture qu'editPseudoModal ci-dessus. Pas de champ nom/contact
+// séparé : le compte connecté (pseudo) suffit à savoir qui écrit. L'email de
+// recontact reste optionnel (utile pour un compte "Jouer sans compte", qui
+// n'a pas d'email propre).
+function openFeedbackModal(){
+  document.getElementById("feedbackMessageInput").value = "";
+  document.getElementById("feedbackEmailInput").value = "";
+  document.getElementById("feedbackModal").classList.add("open");
+}
+function closeFeedbackModal(){
+  document.getElementById("feedbackModal").classList.remove("open");
+}
+async function submitFeedback(){
+  const message = document.getElementById("feedbackMessageInput").value.trim();
+  if(!message){ showToast("Écris un message avant d'envoyer."); return; }
+  if(!currentUser) return;
+  const contactEmail = document.getElementById("feedbackEmailInput").value.trim() || null;
+  const { error } = await sb.from("feedback").insert({
+    user_id: currentUser.id,
+    pseudo: state.user,
+    message,
+    contact_email: contactEmail,
+  });
+  if(error){ showToast("Erreur : " + error.message); return; }
+  closeFeedbackModal();
+  showToast("Merci, ton message est envoyé !");
 }
 
 // Photo de profil (ajouté le 01/08/2026, demande de Rémi). Affiche la photo
@@ -3120,24 +3210,21 @@ function showScreen(id){
   if(tabMap[id]) document.getElementById(tabMap[id]).classList.add("active");
 }
 
-// Empêche le bouton/geste "retour" d'Android de fermer l'appli par accident
-// (ajouté le 14/08/2026, retour de Rémi). L'appli ne gère jamais l'historique
-// du navigateur elle-même (showScreen() change juste quelle .screen est
-// visible) — sans ça, l'historique de la page ne contient qu'UNE seule
-// entrée, donc le tout premier "retour" n'a plus rien "avant" et Android
-// ferme l'appli plutôt que de rester dedans. Solution volontairement simple
-// (pas un vrai historique écran par écran, qui serait fragile avec les
-// changements d'écran déclenchés par le Realtime plutôt que par un vrai clic) :
-// on garde TOUJOURS au moins un état d'historique "ancre" présent en le
-// remplaçant aussitôt après chaque "retour" — l'OS ne considère donc jamais
-// qu'il n'y a plus rien avant, et le bouton retour devient inoffensif dans
-// l'appli (la navigation reste entièrement gérée par les boutons "← Retour"
-// déjà présents partout). Sans effet pour qui utilise Harmonize dans un
-// navigateur normal (pas installé en PWA).
-history.pushState({ harmonizeAnchor: true }, "");
-window.addEventListener("popstate", () => {
-  history.pushState({ harmonizeAnchor: true }, "");
-});
+// Tentative du 14/08/2026 RETIRÉE le même jour : garder toujours un état
+// d'historique "ancre" pour que le bouton retour d'Android ne trouve jamais
+// l'appli "vide" derrière. Retour de Rémi : ça n'a rien changé — l'appli se
+// ferme toujours complètement au lieu de passer en arrière-plan. En y
+// réfléchissant, cette astuce était probablement CONTRE-PRODUCTIVE : pour une
+// PWA "standalone" (voir manifest.json), Chrome est censé automatiquement
+// mettre l'appli en arrière-plan (comme n'importe quelle appli native) quand
+// il ne reste plus rien à "retour"-naviguer DANS la page — en manipulant
+// l'historique pour qu'il ne soit jamais vide, on empêchait peut-être Chrome
+// d'atteindre ce cas et de déclencher son propre comportement par défaut.
+// Un vrai "mets-toi en arrière-plan" (équivalent de moveTaskToBack() côté
+// appli native Android) n'existe pas côté site web en JavaScript — c'est
+// une décision du système/du navigateur, pas quelque chose qu'Harmonize
+// peut forcer depuis son code. Voir docs/idees.md Round 127 pour la piste
+// la plus probable (réglage batterie/autostart du téléphone).
 
 // Replie les boutons de dépannage ("Pub bloquée ?"/"Pas de son ?") sous un
 // lien, pour ne pas forcer une 2e rangée de boutons à chaque manche (ajouté
@@ -3509,6 +3596,56 @@ async function joinRoom(){
   // tous les modes sont réels) : un code introuvable est toujours signalé
   // clairement, plutôt que de basculer silencieusement vers du faux contenu.
   showToast(`⚠️ Salon "${code}" introuvable. Vérifie le code auprès de la personne qui a créé le salon.`);
+}
+
+/* ---------- Partage (ajouté le 17/08/2026, demande de Rémi) ---------- */
+
+// URL de la page publique à partager — résolue par rapport à la page
+// actuelle plutôt qu'écrite en dur, pour rester correcte quel que soit
+// l'hébergement (GitHub Pages, Netlify, domaine personnalisé futur...).
+function harmonizeShareUrl(){
+  return new URL("landing.html", location.href).href;
+}
+
+// Copie un texte dans le presse-papiers avec repli si navigator.clipboard
+// est indisponible/refusé (même principe que copyRoomCode()) — utilisé par
+// shareApp()/shareSerieScore() sur les navigateurs sans navigator.share()
+// (typiquement un ordinateur).
+async function copyShareText(text){
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast("Lien copié !");
+    return;
+  } catch(e){ /* on tente le repli ci-dessous */ }
+  const input = document.createElement("input");
+  input.value = text;
+  input.style.position = "fixed";
+  input.style.opacity = "0";
+  document.body.appendChild(input);
+  input.focus();
+  input.select();
+  try {
+    document.execCommand("copy");
+    showToast("Lien copié !");
+  } catch(e){
+    showToast("Impossible de copier automatiquement le lien.");
+  }
+  document.body.removeChild(input);
+}
+
+// Partage générique de l'app, depuis le bouton "Partager Harmonize" de
+// l'accueil. navigator.share() ouvre le vrai sélecteur natif du téléphone
+// (Messages, WhatsApp, Mail...) — pas disponible partout (jamais sur
+// ordinateur Chrome par ex.), d'où le repli sur une simple copie du lien.
+async function shareApp(){
+  const url = harmonizeShareUrl();
+  const text = "Viens jouer avec moi sur Harmonize, une appli pour écouter de la musique et jouer à des jeux musicaux entre amis !";
+  if(navigator.share){
+    try{ await navigator.share({ title: "Harmonize", text, url }); }
+    catch(e){ /* annulé par la personne elle-même, rien à faire */ }
+    return;
+  }
+  await copyShareText(`${text} ${url}`);
 }
 
 /* ---------- Entrer dans un salon (réel ou démo) ---------- */
