@@ -2452,6 +2452,19 @@ function beginBtSoloSession(tracks){
   document.getElementById("gameActive").style.display = "none";
   document.getElementById("gameIdle").style.display = "block";
   state.scores = { [state.user]: 0 };
+  // Barre du bas avec "Accueil" (ajoutée le 18/08/2026, bug remonté par
+  // Rémi : impossible de quitter le Blindtest solo, ni pendant la partie ni
+  // à l'écran de fin, qui n'avait que "Rejouer"). Jusque-là cette barre
+  // n'était affichée que par routeToRoomScreen() (VRAIS salons) — le
+  // Blindtest solo n'en passe pas par là (pas de currentRoom). Pas besoin
+  // d'appeler updateModeUI() pour l'icône/le libellé : ça écraserait aussi
+  // gameTitle/gameSub avec un texte générique qui ne correspond pas
+  // exactement à celui du Blindtest solo fixé juste au-dessus. goHome()
+  // (muteAnyLocalPlayback()) et l'onglet "Jeu" (goToCurrentScreen()) gèrent
+  // déjà correctement ce cas précis — voir leurs commentaires respectifs.
+  document.getElementById("tabCurrentIcon").innerHTML = icon("gamepad");
+  document.getElementById("tabCurrentLabel").textContent = "Jeu";
+  document.getElementById("tabbar").style.display = "flex";
   showScreen("screen-game");
 }
 
