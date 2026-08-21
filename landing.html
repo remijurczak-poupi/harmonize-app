@@ -145,7 +145,7 @@
   </section>
 
   <section class="block">
-    <p class="eyebrow">Sur ton téléphone</p>
+    <p class="eyebrow">Selon ton appareil</p>
     <h2>Installer l'application</h2>
     <div class="card">
       <div class="tabs" role="tablist">
@@ -158,41 +158,44 @@
 
       <div id="panel-ios">
         <ol class="steps">
-          <li><span class="step-num">1</span><span class="step-text">Ouvre ce lien dans <b>Safari</b> (l'ajout à l'écran d'accueil ne marche que depuis Safari, pas Chrome, sur iPhone/iPad).</span></li>
-          <li><span class="step-num">2</span><span class="step-text">Appuie sur l'icône <b>Partager</b> (le carré avec la flèche vers le haut), en bas de l'écran.</span></li>
+          <li><span class="step-num">1</span><svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg><span class="step-text"><b>Important</b> : ouvre d'abord la vraie application (pas cette page) — <a href="index.html" style="color:inherit;text-decoration:underline;">appuie ici</a>, dans <b>Safari</b> (seul navigateur qui permet l'ajout à l'écran d'accueil sur iPhone/iPad, pas Chrome ni Brave). Sinon, l'icône ajoutée à l'écran d'accueil rouvrirait cette page d'instructions au lieu du jeu.</span></li>
+          <li><span class="step-num">2</span><svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13" /><path d="m7 8 5-5 5 5" /><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" /></svg><span class="step-text">Une fois sur l'application, appuie sur l'icône <b>Partager</b> (le carré avec la flèche vers le haut), en bas de l'écran.</span></li>
           <li><span class="step-num">3</span><span class="step-text">Fais défiler la liste et appuie sur <b>« Sur l'écran d'accueil »</b>.</span></li>
-          <li><span class="step-num">4</span><span class="step-text">Appuie sur <b>« Ajouter »</b> en haut à droite. C'est fait !</span></li>
+          <li><span class="step-num">4</span><svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg><span class="step-text">Appuie sur <b>« Ajouter »</b> en haut à droite. C'est fait !</span></li>
         </ol>
+        <p style="margin:14px 0 0;color:var(--text-faint);font-size:12px;line-height:1.5;">Cette installation doit passer par Safari, donc Brave n'intervient pas ici. Si tu préfères ne pas installer, la <a href="#no-install" style="color:inherit;text-decoration:underline;">version navigateur</a> fonctionne aussi bien dans Brave, avec ses pubs YouTube bloquées.</p>
       </div>
 
       <div id="panel-android" style="display:none;">
+        <p style="margin:0 0 14px;color:var(--text-dim);font-size:13px;line-height:1.5;">Tu dois déjà être sur cette page dans ton navigateur (Chrome ou Brave) pour que les étapes suivantes s'affichent — si quelqu'un vient de t'envoyer ce lien, ouvre-le d'abord.</p>
         <button class="btn-primary install-native" id="installBtn-android" onclick="installPWA('android')">📲 Installer Harmonize</button>
         <ol class="steps">
-          <li><span class="step-num">1</span><span class="step-text">Appuie sur les <b>3 points ⋮</b> en haut à droite de Chrome.</span></li>
-          <li><span class="step-num">2</span><span class="step-text">Appuie sur <b>« Installer l'application »</b> (ou « Ajouter à l'écran d'accueil »).</span></li>
-          <li><span class="step-num">3</span><span class="step-text">Confirme en appuyant sur <b>« Installer »</b>. C'est fait !</span></li>
+          <li><span class="step-num">1</span><svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="19" r="1" /></svg><span class="step-text">Appuie sur les <b>3 points ⋮</b> en haut à droite du navigateur.</span></li>
+          <li><span class="step-num">2</span><svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg><span class="step-text">Appuie sur <b>« Installer l'application »</b> (ou « Ajouter à l'écran d'accueil »).</span></li>
+          <li><span class="step-num">3</span><svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg><span class="step-text">Confirme en appuyant sur <b>« Installer »</b>. C'est fait !</span></li>
         </ol>
+        <p style="margin:14px 0 0;color:var(--text-faint);font-size:12px;line-height:1.5;">Encore mieux avec <b>Brave</b> : mêmes étapes exactement, avec les pubs YouTube bloquées en plus (voir la recommandation plus haut). Tu peux aussi ne rien installer et rester sur la <a href="#no-install" style="color:inherit;text-decoration:underline;">version navigateur</a>.</p>
       </div>
 
       <div id="panel-desktop" style="display:none;">
         <button class="btn-primary install-native" id="installBtn-desktop" onclick="installPWA('desktop')">💻 Installer Harmonize</button>
         <ol class="steps">
-          <li><span class="step-num">1</span><span class="step-text">Clique sur <b>« Installer Harmonize »</b> ci-dessus s'il apparaît.</span></li>
-          <li><span class="step-num">2</span><span class="step-text">Sinon, dans Chrome ou Edge, une petite icône d'installation apparaît dans la barre d'adresse, à droite — clique dessus puis sur <b>« Installer »</b>.</span></li>
-          <li><span class="step-num">3</span><span class="step-text">Pas obligatoire : tu peux aussi utiliser l'app directement dans le navigateur (voir plus bas), sans rien installer.</span></li>
+          <li><span class="step-num">1</span><span class="step-text">Si un bouton <b>« Installer Harmonize »</b> est visible juste au-dessus, clique dessus — il n'apparaît pas sur tous les navigateurs (Chrome/Edge/Brave seulement), passe à l'étape 2 s'il n'est pas là.</span></li>
+          <li><span class="step-num">2</span><svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M7 10l5 5 5-5" /><path d="M12 15V3" /></svg><span class="step-text">Sinon, dans Chrome, Edge ou Brave, une petite icône d'installation apparaît dans la barre d'adresse, à droite — clique dessus puis sur <b>« Installer »</b>.</span></li>
+          <li><span class="step-num">3</span><span class="step-text">Pas obligatoire : tu peux aussi utiliser l'app directement dans le <a href="#no-install" style="color:inherit;text-decoration:underline;">navigateur</a>, sans rien installer — pense juste à un bloqueur de pub (Brave, ou une extension comme uBlock Origin sur ton navigateur actuel, voir la recommandation plus haut).</span></li>
         </ol>
       </div>
     </div>
   </section>
 
-  <section class="block">
+  <section class="block" id="no-install">
     <p class="eyebrow">Sans installer</p>
     <h2>Ouvrir la version navigateur web</h2>
     <a class="btn-primary" href="index.html">🌐 Rester sur la version navigateur</a>
   </section>
 
   <footer>
-    Un souci pour installer l'appli ? Redemande simplement ce lien.<br/>
+    Un souci pour installer l'appli ? Essaie de recharger cette page, ou depuis un autre navigateur.<br/>
     <a href="politique-confidentialite.html" style="color:inherit;">Politique de confidentialité</a> · <a href="conditions-utilisation.html" style="color:inherit;">Conditions d'utilisation</a>
   </footer>
 
