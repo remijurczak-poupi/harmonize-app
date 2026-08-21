@@ -386,7 +386,7 @@
              YouTube reste réservé à un vrai compte Google. -->
         <button class="btn-ghost" onclick="handleGuestLogin()"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" /></svg> Jouer sans compte</button>
         <div class="divider-or">ou</div>
-        <input type="text" id="pseudoInput" placeholder="Ton pseudo (pour créer un compte ou jouer sans compte)" />
+        <input type="text" id="pseudoInput" placeholder="Ton pseudo (pour créer un compte)" />
         <input type="email" id="emailInput" placeholder="Email" />
         <input type="password" id="passwordInput" placeholder="Mot de passe (6 caractères min.)" />
         <button class="btn-primary" id="loginBtn" onclick="handleLogin()">Se connecter</button>
@@ -398,7 +398,16 @@
 
     <!-- SCREEN: LOBBY (accueil) -->
     <section class="screen" id="screen-lobby">
-      <h1>Salut <span id="hiName">!</span></h1>
+      <!-- Accès rapide à "Modifier mon pseudo/photo" (ajouté le 18/08/2026,
+           demande de Rémi) : avant, seul le bouton tout en bas de l'accueil
+           y menait — gênant pour un compte "Jouer sans compte" (pseudo
+           "AmiXXXX" généré au hasard), qui a justement le plus de raisons de
+           vouloir le changer tout de suite. Même fenêtre que le bouton du
+           bas (openEditPseudoModal()), juste un 2e accès plus visible. -->
+      <div style="display:flex;align-items:center;gap:8px;margin:6px 0 4px;">
+        <h1 style="margin:0;">Salut <span id="hiName">!</span></h1>
+        <button class="btn-icon" style="width:34px;height:34px;" onclick="openEditPseudoModal()" aria-label="Modifier mon pseudo et ma photo"><svg class="icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /><path d="m15 5 4 4" /></svg></button>
+      </div>
       <p class="sub">Qu'est-ce qu'on fait aujourd'hui ?</p>
 
       <h2 style="margin-top:8px;">Créer un salon</h2>
