@@ -82,6 +82,7 @@
   .step-text b{color:var(--text);}
   .step-icon{flex-shrink:0;width:22px;height:22px;opacity:.85;}
   .btn-icon-inline{width:18px;height:18px;vertical-align:-3px;margin-right:4px;flex-shrink:0;}
+  .inline-link-btn{background:none;border:none;padding:0;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;}
 
   .install-native{display:none;margin-top:16px;}
   .already-installed{display:none;text-align:center;padding:10px 0 2px;color:var(--text-dim);font-size:13.5px;}
@@ -130,21 +131,13 @@
     </div>
   </section>
 
-  <!-- Section Brave masquée temporairement le 28/07/2026 puis rétablie le
-       01/08/2026 (retour de Rémi : cette landing page n'est jamais partagée
-       avec Google/YouTube pour la demande de quota API en cours de review —
-       contrairement à l'app elle-même (voir index.html, carte "braveCard"
-       toujours masquée là-bas, elle, en attendant l'accord du quota). -->
-  <section class="block" id="braveSection">
-    <p class="eyebrow">Recommandé</p>
-    <h2>Moins de pubs YouTube avec Brave</h2>
-    <div class="card">
-      <p style="margin:0 0 14px;color:var(--text-dim);font-size:13.5px;line-height:1.5;">Harmonize joue la musique via YouTube — Brave a un bloqueur de pub intégré, gratuit, sans rien à configurer. Télécharge-le avant d'installer ou d'ouvrir Harmonize pour une expérience sans interruption.</p>
-      <button class="btn-primary" id="braveBtn" onclick="openBraveDownload()">Télécharger Brave</button>
-      <p style="margin:10px 0 0;color:var(--text-faint);font-size:11.5px;line-height:1.4;display:none;" id="braveDesktopNote">Sur ordinateur, pas besoin de changer de navigateur : une extension comme uBlock Origin sur celui que tu utilises déjà suffit aussi.</p>
-    </div>
-  </section>
-
+  <!-- Choix de l'appareil remonté ici (18/08/2026, idée de Rémi) : chaque
+       onglet est maintenant un bloc autonome et complet pour cet appareil
+       (pubs + installation + repli navigateur), plutôt que d'avoir ces
+       informations dispersées dans 3 sections séparées comme avant — évite
+       la redite qui apparaissait entre l'ancienne section Brave (générique)
+       et le détail par appareil plus bas. L'ancienne section Brave dédiée a
+       été retirée, son contenu est repris dans chaque onglet concerné. -->
   <section class="block">
     <p class="eyebrow">Selon ton appareil</p>
     <h2>Installer l'application</h2>
@@ -158,13 +151,15 @@
       <p class="already-installed" id="alreadyInstalledMsg"><svg class="btn-icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>Harmonize est déjà installée sur cet appareil !</p>
 
       <div id="panel-ios">
+        <p style="margin:0 0 10px;color:var(--text-dim);font-size:13.5px;line-height:1.5;">Sur iPhone/iPad, seul Safari peut créer une vraie icône d'appli — Apple réserve cette fonction à son propre navigateur, même Brave n'y a pas accès. 2 façons d'éviter les pubs YouTube :</p>
+        <p style="margin:0 0 8px;color:var(--text-dim);font-size:13.5px;line-height:1.5;"><b>1. Sans rien installer, dans Brave</b> — le blocage de pub intégré fonctionne directement. <button class="inline-link-btn brave-download-btn" onclick="openBraveDownload()">Télécharger Brave</button> si tu ne l'as pas, ou <a href="#no-install" style="color:inherit;text-decoration:underline;">ouvrir la version navigateur</a>.</p>
+        <p style="margin:0 0 18px;color:var(--text-dim);font-size:13.5px;line-height:1.5;"><b>2. En installant l'appli</b> (étapes ci-dessous, via Safari) — ajoute aussi un bloqueur de pub Safari, comme <b>1Blocker</b> (gratuit pour bloquer les pubs) ou <b>AdGuard</b> (vérifie l'offre du moment sur l'App Store).</p>
         <ol class="steps">
-          <li><span class="step-num">1</span><svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg><span class="step-text"><b>Important</b> : ouvre d'abord la vraie application (pas cette page), dans Safari : <a href="index.html" style="color:inherit;text-decoration:underline;">appuie ici</a>.</span></li>
+          <li><span class="step-num">1</span><span class="step-text">Ouvre d'abord la vraie application (pas cette page), dans Safari : <a href="index.html" style="color:inherit;text-decoration:underline;">appuie ici</a>.</span></li>
           <li><span class="step-num">2</span><svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13" /><path d="m7 8 5-5 5 5" /><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" /></svg><span class="step-text">Une fois sur l'application, appuie sur l'icône <b>Partager</b> (le carré avec la flèche vers le haut), en bas de l'écran.</span></li>
           <li><span class="step-num">3</span><span class="step-text">Fais défiler la liste et appuie sur <b>« Sur l'écran d'accueil »</b>.</span></li>
           <li><span class="step-num">4</span><svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg><span class="step-text">Appuie sur <b>« Ajouter »</b> en haut à droite. C'est fait !</span></li>
         </ol>
-        <p style="margin:14px 0 0;color:var(--text-faint);font-size:12px;line-height:1.5;">Pourquoi Safari uniquement : sur iPhone/iPad, Apple réserve la création d'une vraie icône d'appli à son propre navigateur — même Brave, qui utilise pourtant le même moteur en coulisses, n'y a pas accès. Si tu préfères ne pas installer, la <a href="#no-install" style="color:inherit;text-decoration:underline;">version navigateur</a> fonctionne bien dans Brave, avec les pubs YouTube bloquées.</p>
       </div>
 
       <div id="panel-android" style="display:none;">
@@ -175,7 +170,7 @@
           <li><span class="step-num">3</span><svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg><span class="step-text">Appuie sur <b>« Installer l'application »</b> (ou « Ajouter à l'écran d'accueil »).</span></li>
           <li><span class="step-num">4</span><svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg><span class="step-text">Confirme en appuyant sur <b>« Installer »</b>. C'est fait !</span></li>
         </ol>
-        <p style="margin:14px 0 0;color:var(--text-faint);font-size:12px;line-height:1.5;">Encore mieux avec <b>Brave</b> : mêmes étapes, pubs YouTube bloquées en plus. Sinon, reste sur la <a href="#no-install" style="color:inherit;text-decoration:underline;">version navigateur</a>, sans rien installer.</p>
+        <p style="margin:14px 0 0;color:var(--text-faint);font-size:12px;line-height:1.5;">Encore mieux avec <b>Brave</b> : mêmes étapes, pubs YouTube bloquées en plus. <button class="inline-link-btn brave-download-btn" style="color:inherit;font-size:inherit;" onclick="openBraveDownload()">Télécharger Brave</button>. Sinon, reste sur la <a href="#no-install" style="color:inherit;text-decoration:underline;">version navigateur</a>, sans rien installer.</p>
       </div>
 
       <div id="panel-desktop" style="display:none;">
@@ -183,7 +178,7 @@
         <ol class="steps">
           <li><span class="step-num">1</span><span class="step-text">Si le bouton ci-dessus n'apparaît pas, ouvre d'abord la vraie application (pas cette page) : <a href="index.html" style="color:inherit;text-decoration:underline;">appuie ici</a>.</span></li>
           <li><span class="step-num">2</span><svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M7 10l5 5 5-5" /><path d="M12 15V3" /></svg><span class="step-text">Sur l'application, une icône d'installation apparaît dans la barre d'adresse — clique dessus puis sur <b>« Installer »</b>.</span></li>
-          <li><span class="step-num">3</span><span class="step-text">Pas obligatoire : utilisable directement dans le <a href="#no-install" style="color:inherit;text-decoration:underline;">navigateur</a>, avec un bloqueur de pub conseillé (Brave, ou uBlock Origin — voir plus haut).</span></li>
+          <li><span class="step-num">3</span><span class="step-text">Pas obligatoire : utilisable directement dans le <a href="#no-install" style="color:inherit;text-decoration:underline;">navigateur</a>, avec un bloqueur de pub conseillé — Brave, ou une extension comme uBlock Origin sur ton navigateur actuel.</span></li>
         </ol>
       </div>
     </div>
@@ -235,22 +230,16 @@
   function openBraveDownload(){
     window.open(braveDownloadUrl(), "_blank", "noopener");
   }
-  // Sur ordinateur, une simple extension de blocage de pub sur le navigateur
-  // déjà utilisé suffit — pas la peine de changer de navigateur (contrairement
-  // au mobile, où seul un navigateur avec bloqueur intégré comme Brave marche
-  // vraiment, voir la conversation du 23/07/2026 sur uBlock Origin et mobile).
-  if(!/iPad|iPhone|iPod|Android/.test(navigator.userAgent || "")){
-    const note = document.getElementById("braveDesktopNote");
-    if(note) note.style.display = "block";
-  }
   // navigator.brave est une API officielle exposée par le navigateur Brave
   // lui-même (voir navigator.brave.isBrave()) — si la personne l'utilise déjà,
-  // toute la section ne sert à rien, on la cache.
+  // proposer de le télécharger ne sert à rien. Cible une CLASSE plutôt qu'un
+  // seul bouton (18/08/2026) : depuis que les conseils Brave vivent dans les
+  // onglets iPhone et Android plutôt que dans une section à part, il peut y
+  // avoir plusieurs boutons "Télécharger Brave" sur la page à la fois.
   if(navigator.brave && typeof navigator.brave.isBrave === "function"){
     navigator.brave.isBrave().then(isBrave => {
       if(isBrave){
-        const el = document.getElementById("braveSection");
-        if(el) el.style.display = "none";
+        document.querySelectorAll(".brave-download-btn").forEach(el => { el.style.display = "none"; });
       }
     }).catch(()=>{});
   }
